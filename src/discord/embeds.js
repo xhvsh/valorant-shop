@@ -86,7 +86,7 @@ function buildNotice(content, opts = {}) {
 }
 
 function buildShopMessage(store, name, gridUrl, walletUrl, opts = {}) {
-  const lines = [`## ${name || 'Shop'}`];
+  const lines = [`## ${name ? `${name}'s shop` : 'Shop'}`];
   const end = store && store.daily && store.daily.expiresAt;
   if (end) lines.push(`Resets <t:${Math.floor(end / 1000)}:R>`);
   lines.push(shopFromLine(store));
@@ -99,7 +99,7 @@ function buildShopMessage(store, name, gridUrl, walletUrl, opts = {}) {
 
 function buildAccessoryMessage(store, name, gridUrl, walletUrl) {
   const ks = (store && store.kingdomShop) || {};
-  const lines = [`## ${name || 'Accessories'}`];
+  const lines = [`## ${name ? `${name}'s accessories` : 'Accessories'}`];
   // Riot only reports how long is left, not how long the rotation lasts, so show
   // the exact end instead of guessing a start date.
   if (ks.expiresAt) {
@@ -116,7 +116,7 @@ function buildAccessoryMessage(store, name, gridUrl, walletUrl) {
 function buildNightMarketMessage(store, name, gridUrl, walletUrl) {
   const nm = store && store.nightMarket;
   if (!nm || !nm.items || !nm.items.length) return null;
-  const lines = [`## ${name || 'Night Market'}`];
+  const lines = [`## ${name ? `${name}'s night market` : 'Night Market'}`];
   if (nm.expiresAt) lines.push(`Night Market leaves <t:${Math.floor(nm.expiresAt / 1000)}:R>`);
   const parts = [section(lines.join('\n'), walletUrl ? thumb(walletUrl) : null)];
   if (!walletUrl) parts.push(text(walletText(store)));
@@ -127,7 +127,7 @@ function buildNightMarketMessage(store, name, gridUrl, walletUrl) {
 // Heading with the Riot ID, then the rendered rank card. The accent bar takes
 // the tier colour (white tiers like Unranked fall back to grey).
 function buildRankMessage(details, name, cardUrl) {
-  const parts = [text(`## ${name || 'Rank'}`)];
+  const parts = [text(`## ${name ? `${name}'s rank` : 'Rank'}`)];
   if (cardUrl) parts.push(gallery(cardUrl, false));
   const m = /^#?([0-9a-fA-F]{6})/.exec(String((details && details.rank && details.rank.color) || ''));
   const hex = m ? parseInt(m[1], 16) : null;
