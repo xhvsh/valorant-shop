@@ -1083,7 +1083,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   background: var(--surface);
   transition: border-color .2s, transform .2s var(--ease);
 }
-.card.is-banner { grid-column: span 2; }
+/* Wide player-card banner: stays inside one column, so rows keep 4 cards. */
+.card.is-banner .card-media { padding: 14px 8px; }
+.card.is-banner .card-media img { width: 100%; height: auto; }
 .card.is-previewable { cursor: pointer; }
 .card.is-previewable:hover { border-color: var(--line-2); transform: translateY(-2px); }
 .card-media {
@@ -1747,7 +1749,6 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 
 @media (max-width: 340px) {
   .grid, .grid.acc, .grid.daily, .nm-grid { grid-template-columns: minmax(0, 1fr); }
-  .card.is-banner { grid-column: auto; }
   .stats { grid-template-columns: minmax(0, 1fr); }
 }
 
