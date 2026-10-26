@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0c0f" />
+  <title>valorant shop</title>
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="apple-touch-icon" href="/logo.png" />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
+  <link rel="stylesheet" href="/styles.css?v=213" />
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 7 4.5 4.5L12 5l4.5 6.5L21 7l-2 12H5z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><path d="M6 7h12l1 14H5z"/><path d="M9 7a3 3 0 0 1 6 0"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3c.6 4.6 3.4 7.4 8 8-4.6.6-7.4 3.4-8 8-.6-4.6-3.4-7.4-8-8 4.6-.6 7.4-3.4 8-8z"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m5 8 4 4-4 4M12 17h7"/></symbol>
+  </svg>
+
+  <!-- Boot splash: only while the session check runs. -->
+  <div class="splash" id="splash" role="status" aria-live="polite">
+    <div class="splash-brand"><img src="/logo.png" alt="" /><span>valorant shop</span></div>
+    <div class="splash-bar"><span></span></div>
+    <div class="splash-text" id="splashText">Signing in...</div>
+  </div>
+
+  <!-- Signed-out landing -->
+  <div class="landing" id="landing" hidden>
+    <div class="landing-card">
+      <div class="landing-brand"><img src="/logo.png" alt="" /><span>valorant shop</span></div>
+      <h1>Your VALORANT shops,<br />all in one place</h1>
+      <p class="landing-lead">Check the daily shop, accessories and Night Market for every account you own, track a wishlist, and get Discord DMs when something you want shows up.</p>
+      <ul class="landing-points">
+        <li><svg class="i"><use href="#i-bag"/></svg>Every shop for every linked account</li>
+        <li><svg class="i"><use href="#i-star"/></svg>Wishlist alerts by DM</li>
+        <li><svg class="i"><use href="#i-share"/></svg>Share accounts with friends, read-only</li>
+      </ul>
+      <a class="btn btn-lg" id="discordLoginBtn" href="/auth/discord">Sign in with Discord</a>
+      <p class="landing-foot">Also on Discord: <a id="installLink" href="#" target="_blank" rel="noopener">add the app</a> for slash commands, or <a id="guildInstallLink" href="#" target="_blank" rel="noopener">add it to a server</a>.</p>
+    </div>
+    <p class="legal">Unofficial fan project. Not affiliated with Riot Games. <a href="/legal">Disclaimer and how it works</a></p>
+  </div>
+
+  <!-- Signed-in app shell -->
+  <div class="app" id="app" hidden>
+    <aside class="sidebar" id="sidebar" aria-label="Navigation">
+      <div class="sb-top">
+        <a class="sb-brand" href="/"><img src="/logo.png" alt="" /><span>valorant shop</span></a>
+        <button class="icon-btn sb-close" id="sidebarClose" type="button" aria-label="Close menu"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <nav class="sb-nav">
+        <a class="sb-link" href="/" data-nav="home"><svg class="i"><use href="#i-grid"/></svg><span>Overview</span></a>
+        <a class="sb-link" href="/wishlist" data-nav="wishlist"><svg class="i"><use href="#i-star"/></svg><span>Wishlist</span><span class="sb-count" id="navWishCount" hidden></span></a>
+        <a class="sb-link" href="/bundles" data-nav="bundles"><svg class="i"><use href="#i-layers"/></svg><span>Bundles</span><span class="sb-count" id="navBundleCount" hidden></span></a>
+        <a class="sb-link" href="/settings" data-nav="settings"><svg class="i"><use href="#i-gear"/></svg><span>Settings</span></a>
+      </nav>
+      <div class="sb-accounts-head">
+        <span>Accounts</span>
+        <div class="menu-wrap">
+          <button class="icon-btn sm" id="sbAddBtn" type="button" aria-label="Add account" aria-haspopup="menu" aria-expanded="false" title="Add account"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+      <ul class="sb-accounts" id="sbAccounts" aria-label="Your accounts"></ul>
+      <p class="sb-hint" id="sbHint" hidden>Drag to reorder</p>
+      <div class="sb-user">
+        <span class="avatar" id="meAvatar"></span>
+        <div class="sb-user-text">
+          <span class="sb-user-name" id="meName">Signed in</span>        </div>
+        <button class="icon-btn" id="signOutBtn" type="button" title="Sign out" aria-label="Sign out"><svg class="i"><use href="#i-logout"/></svg></button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <div class="app-main">
+      <header class="topbar">
+        <button class="icon-btn topbar-menu" id="menuBtn" type="button" aria-label="Open menu"><svg class="i"><use href="#i-menu"/></svg></button>
+        <div class="topbar-title" id="topbarTitle">Overview</div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost sm" id="installBtn" type="button" hidden><svg class="i"><use href="#i-external"/></svg><span>Add to Discord</span></button>
+        </div>
+      </header>
+      <main class="view" id="view" tabindex="-1"></main>
+      <footer class="footer">
+        <span>Unofficial fan project. Not affiliated with Riot Games. <a href="/legal">Disclaimer</a></span>
+        <span>Questions or bugs? <b>@xhvsh</b> on Discord.</span>
+        <span class="foot-ver" id="footVer"></span>
+      </footer>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Sections">
+      <a href="/" data-nav="home"><svg class="i"><use href="#i-grid"/></svg><span>Overview</span></a>
+      <a href="/wishlist" data-nav="wishlist"><svg class="i"><use href="#i-star"/></svg><span>Wishlist</span></a>
+      <a href="/bundles" data-nav="bundles"><svg class="i"><use href="#i-layers"/></svg><span>Bundles</span></a>
+      <a href="/settings" data-nav="settings"><svg class="i"><use href="#i-gear"/></svg><span>Settings</span></a>
+    </nav>
+  </div>
+
+  <!-- Add Riot account -->
+  <div class="overlay" id="addOverlay" role="dialog" aria-modal="true" aria-labelledby="addTitle" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="addTitle">Add a Riot account</h2>
+        <button class="icon-btn" id="addCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <ol class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <div class="step-body">
+            <b>Sign in at Riot</b>
+            <p>Opens in a new tab with a fresh login screen.</p>
+            <a class="btn" id="addOpenBtn" href="#" target="_blank" rel="noopener" aria-disabled="true">Preparing sign-in...</a>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div class="step-body">
+            <b>Copy the address</b>
+            <p>After signing in you land on a page that cannot load. That is expected. Copy the <b>full URL</b> from that tab's address bar.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div class="step-body">
+            <b>Paste it here</b>
+            <input type="text" id="addUrlInput" class="input" spellcheck="false" autocomplete="off" placeholder="http://localhost/redirect?code=..." />
+            <p class="step-hint">It starts with http://localhost/redirect. Your password never reaches this site.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="form-error" id="addError" hidden></p>
+      <div class="modal-actions split">
+        <button class="btn btn-ghost" id="addCancelBtn" type="button">Cancel</button>
+        <button class="btn" id="addCompleteBtn" type="button">Add account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import shared account -->
+  <div class="overlay" id="importOverlay" role="dialog" aria-modal="true" aria-labelledby="importTitle" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="importTitle">Import shared account</h2>
+        <button class="icon-btn" id="importCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <p>Enter the code someone shared with you. Their account shows up in your list as read-only. On Discord you can also use <code>/share import</code>.</p>
+      <input type="text" id="shareCodeInput" class="input code-input" placeholder="ABCD2345" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Share code" />
+      <p class="form-error" id="importError" hidden></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="importCancelBtn" type="button">Cancel</button>
+        <button class="btn" id="importBtn" type="button">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm -->
+  <div class="overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+    <div class="modal modal-sm">
+      <h2 id="confirmTitle">Are you sure?</h2>
+      <p id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
+        <button class="btn" id="confirmOk" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item preview -->
+  <div class="overlay" id="previewOverlay" role="dialog" aria-modal="true" aria-labelledby="previewTitle" hidden>
+    <div class="modal modal-wide preview">
+      <div class="modal-head">
+        <h2 id="previewTitle">Item</h2>
+        <button class="icon-btn" id="previewClose" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="preview-body" id="previewBody"></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <div class="update-pill" id="updatePill" role="status" aria-live="polite" hidden>
+    <span>Update available<span class="update-ver" id="updateVer"></span></span>
+    <button class="btn sm" id="updateBtn" type="button">Reload</button>
+  </div>
+
+  <script src="/dashboard.js?v=213"></script>
+</body>
+</html>

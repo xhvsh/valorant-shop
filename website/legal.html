@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0c0f" />
+  <title>Disclaimer and how it works - valorant shop</title>
+  <link rel="icon" type="image/png" href="logo.png" />
+  <style>
+    @font-face { font-family: Inter; font-weight: 400; src: url(fonts/inter-400-latin.woff2) format("woff2"); font-display: swap; }
+    @font-face { font-family: Inter; font-weight: 600; src: url(fonts/inter-600-latin.woff2) format("woff2"); font-display: swap; }
+    @font-face { font-family: Oswald; font-weight: 600; src: url(fonts/oswald-600-latin.woff2) format("woff2"); font-display: swap; }
+    :root { --bg: #0b0c0f; --panel: #14161b; --line: #262932; --text: #e8eaee; --muted: #9aa0ab; --red: #ff4655; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 Inter, system-ui, sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    a { color: var(--red); }
+    .back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 24px; padding: 8px 14px 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; color: var(--text); font-family: Oswald, Inter, sans-serif; font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; transition: border-color .15s, color .15s; }
+    .back svg { width: 16px; height: 16px; fill: none; stroke: var(--red); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+    .back:hover, .back:focus-visible { border-color: var(--red); color: var(--red); outline: none; }
+    .back:hover svg, .back:focus-visible svg { transform: translateX(-3px); }
+    h1, h2, h3 { font-family: Oswald, Inter, sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; line-height: 1.2; }
+    h1 { font-size: 30px; margin: 0 0 8px; }
+    h2 { font-size: 20px; margin: 40px 0 10px; padding-top: 20px; border-top: 1px solid var(--line); }
+    h3 { font-size: 15px; margin: 22px 0 6px; color: var(--red); }
+    p, li { color: var(--text); }
+    .meta { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+    .note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--red); border-radius: 3px; padding: 12px 16px; margin: 16px 0; }
+    code { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 1px 5px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+<main>
+  <a class="back" href="./"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Back to valorant shop</a>
+  <h1>Disclaimer and how it works</h1>
+  <p class="meta">Last updated 2026-10-26</p>
+
+  <p><b>valorant shop</b> (xhv.sh/valorant-shop) is an independent, fan-made tool that helps VALORANT players view their own in-game shops. It shows your daily weapon skin offers, accessory shop and Night Market, keeps a wishlist, sends Discord notifications, and lets you share a shop view with friends in read-only mode.</p>
+
+  <div class="note"><b>Not affiliated with Riot Games.</b> valorant shop is not affiliated with, endorsed by, sponsored by or officially supported by Riot Games, Inc. VALORANT and Riot Games are trademarks or registered trademarks of Riot Games, Inc. This project was created under no Riot Games program and uses no Riot-issued approval.</div>
+
+  <h2>What it does and does not do</h2>
+  <ul>
+    <li>It reads shop and account information that belongs to you and shows it to you.</li>
+    <li>It does <b>not</b> sell VALORANT Points or skins, buy anything, process in-game purchases, or change your shop offers.</li>
+    <li>It does <b>not</b> touch the game client, game memory or game files, and it does not automate gameplay.</li>
+    <li>It does <b>not</b> ask for your Riot password.</li>
+  </ul>
+
+  <h2>How it works</h2>
+  <h3>1. Sign-in on Riot's own page</h3>
+  <p>To link a Riot account, the website builds a sign-in link to <code>auth.riotgames.com</code>. You enter your password and any 2FA code on that Riot-hosted page. Your password is never submitted to xhv.sh. The sign-in uses the OAuth 2.0 authorization code flow with PKCE, bound to a DPoP key (RFC 9449) so tokens cannot be replayed from another client.</p>
+  <h3>2. The redirect URL</h3>
+  <p>After you sign in, Riot sends your browser to <code>http://localhost/redirect?...</code>. That page cannot load, which is expected. The address contains a one-time authorization code. You copy the full address and paste it into the website, which exchanges the code for tokens.</p>
+  <div class="note"><b>Never share this URL with anyone else.</b> It contains temporary authentication data. Pasting it into this site, once, while linking your own account, is the only intended use. If someone else asks you for it, do not send it.</div>
+  <h3>3. What is stored</h3>
+  <table>
+    <tr><th>Data</th><th>Why</th></tr>
+    <tr><td>Discord ID, display name, avatar (Discord sign-in, <code>identify</code> scope only)</td><td>Identify your dashboard session and send you DMs</td></tr>
+    <tr><td>Riot player ID, display name, region</td><td>Know which account and shard to query</td></tr>
+    <tr><td>Riot access and refresh tokens, encrypted with AES-256-GCM before they are saved</td><td>Fetch your shop later, including for scheduled alerts, without asking you to sign in again</td></tr>
+    <tr><td>Cached shop data, wishlist, alert settings, share codes (stored as an HMAC digest, not in plain text)</td><td>Features you turn on</td></tr>
+  </table>
+  <p>The database is only reachable with a server-side service key. Sessions use an <code>httpOnly</code> cookie. The site loads no third-party scripts and no analytics. Item images are loaded from valorant-api.com and Discord's CDN.</p>
+  <h3>4. What it requests from Riot</h3>
+  <p>Using your tokens, the server makes read-only requests to the same regional player-data services the game client uses: your storefront (daily, accessory, Night Market and bundle offers), wallet balances, competitive rank, account level, owned items and equipped loadout. These are undocumented, unofficial endpoints, which means Riot can change or block them at any time without notice.</p>
+  <h3>5. Sharing</h3>
+  <p>A share code gives someone a read-only view of one account's shop. The recipient never receives your tokens or password. You can revoke a code or remove a recipient at any time.</p>
+  <h3>6. Removing your data</h3>
+  <p>Removing an account in the dashboard deletes the stored tokens and data for that account from our database. You can also change your Riot password and sign out of your Riot sessions at any time. If you want everything deleted, message <b>@xhvsh</b> on Discord.</p>
+
+  <h2>Legal status and Riot's rules</h2>
+  <p>valorant shop is provided for informational and convenience purposes. No representation is made that its functionality is approved or authorized by Riot Games, or that its use is permitted under every applicable law, regulation or Riot Games policy.</p>
+  <p>The sign-in method and the player-data endpoints are not part of an official, published Riot developer program for this purpose. Riot maintains its own Terms of Service and rules for third-party applications and account access, and those rules can change. You are responsible for reading and following them before using this service.</p>
+  <p>As of the date above, the operator has not received any notice, request or enforcement action from Riot Games about this service, and is not aware of any account action taken against users because of it. That is a statement of observation only. It is not permission, approval or a guarantee, and it can change at any time.</p>
+
+  <h2>Risks</h2>
+  <ul>
+    <li><b>Policy risk.</b> Riot could decide that third-party shop viewers break its rules and act against the service or against accounts linked to it. Using this service is at your own discretion and risk.</li>
+    <li><b>Changing how it works raises the risk.</b> This service only reads your data. Forking, self-hosting or modifying a tool like this so that it buys items, automates requests at high volume, interacts with the game client, or accesses accounts that are not yours is a different activity. It is much more likely to be treated as a rules violation or to cause account penalties, and it is not covered by anything on this page.</li>
+    <li><b>Token security.</b> A stored refresh token grants access to your Riot session until it expires or is revoked. We encrypt it and limit access, but no system is perfectly secure. Do not link accounts you cannot afford to risk.</li>
+    <li><b>Availability.</b> The service may change, break or shut down at any time because of technical, legal or policy developments.</li>
+  </ul>
+
+  <h2>Independence</h2>
+  <p>By using this service you acknowledge that it is an independent third-party project, that Riot Games is not responsible for its operation, availability or support, and that it is provided as is, without warranties of any kind, to the extent permitted by law.</p>
+  <p>Questions, bugs or removal requests: <b>@xhvsh</b> on Discord.</p>
+</main>
+</body>
+</html>

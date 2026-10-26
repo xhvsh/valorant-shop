@@ -1,0 +1,27 @@
+{
+  "name": "val-shops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sign in with a Riot account and view your VALORANT daily shop, Night Market and Kingdom Credits (Accessory) store.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "lint": "node --check app.js && node --check src/grid.js && node --check src/image-color.js && node --check server.js && node --check src/riot.js && node --check src/items.js && node --check src/parse.js && node --check src/storage.js && node --check src/session.js && node --check src/shop.js && node --check src/discord/verify.js && node --check src/discord/embeds.js && node --check src/discord/commands.js && node --check src/discord/log.js && node --check website/dashboard.js && node --check scripts/register-commands.js && node --check scripts/test-inventory.js && node --check scripts/test-inventory-probe.js && node --check scripts/test-loadout-paths.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@supabase/supabase-js": "^2.117.3",
+    "@vercel/functions": "^3.9.11",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "gifenc": "^1.0.3",
+    "omggif": "^1.0.10",
+    "tweetnacl": "^1.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [],
+  "type": "commonjs"
+}
