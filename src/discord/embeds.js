@@ -8,6 +8,16 @@ const COLORS = {
   fallback: 0x9aa0a6,
 };
 
+// The easter-egg buddy (see EASTER_EGG_BUDDY_ID in items.js) and the custom
+// emoji shown beside the /collection footer for people who own it.
+const RIOT_GUNBUDDY_ID = 'a57aa3d0-4ad0-b06a-6c54-338cb3ea6b41';
+const RIOT_GUNBUDDY_EMOJI = process.env.EMOJI_RIOT_GUNBUDDY || '<:riotgunbuddy:1564071453974855701>';
+
+function ownsRiotGunbuddy(details) {
+  const buddies = (details && details.buddies) || [];
+  return buddies.some((b) => b && (String(b.id).toLowerCase() === RIOT_GUNBUDDY_ID || b.name === 'Riot Gunbuddy'));
+}
+
 const V2 = 1 << 15;
 const EPHEMERAL = 1 << 6;
 
@@ -174,6 +184,7 @@ function buildCollectionMessage(details, name, cardUrl) {
       parts.push(text(lines.join('\n')));
     }
   }
+  if (ownsRiotGunbuddy(details)) parts.push(text(`-# ${RIOT_GUNBUDDY_EMOJI} This user owns a Riot Gunbuddy`));
   return { flags: V2, components: [container(COLORS.main, parts)] };
 }
 
@@ -247,6 +258,7 @@ module.exports = {
   buildRankMessage,
   buildCollectionMessage,
   collectionColumns,
+  ownsRiotGunbuddy,
   bundleComponents,
   dailyFooter,
   alertFooter,
