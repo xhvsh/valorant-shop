@@ -1319,7 +1319,7 @@
       box.appendChild(grid);
     } else {
       const grid = h("div", { class: "grid daily" });
-      for (const item of items) grid.appendChild(card(item, { wishlist: true, showType: view === "acc" }));
+      for (const item of items) grid.appendChild(card(item, { wishlist: true, showType: view === "acc", banner: view === "acc" }));
       box.appendChild(grid);
       prefetchPreviews(items);
     }
@@ -1333,7 +1333,13 @@
     const el = h("article", { class: "card", style: color ? `--tier:${color}` : null });
     const media = h("div", { class: "card-media" });
     if (item.type === "title") media.appendChild(h("div", { class: "title-text", text: titleName(item.name) }));
-    else media.appendChild(imgOrFallback((item.type === "card" && item.art && item.art.small) || item.icon, item.name));
+    else {
+      // Accessory shop shows player cards as the wide banner (spanning two
+      // columns); everywhere else, including the wishlist, keeps the square art.
+      const banner = Boolean(opts.banner && item.type === "card" && item.art && item.art.wide);
+      if (banner) el.classList.add("is-banner");
+      media.appendChild(imgOrFallback(banner ? item.art.wide : (item.type === "card" && item.art && item.art.small) || item.icon, item.name));
+    }
     if (opts.discount) media.appendChild(h("span", { class: "badge", text: `-${opts.discount}%` }));
     if (opts.wishlist) {
       const star = makeStar(item);

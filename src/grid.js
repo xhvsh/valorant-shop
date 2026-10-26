@@ -854,6 +854,20 @@ async function renderBundleMedia(bundleItems) {
   return png ? { name: 'bundle-grid.png', buf: png } : null;
 }
 
+// Card chrome shared by the rank and collection renders, matching the shop
+// cards: near-black surface, a soft glow in the accent colour rising from the
+// bottom edge, an accent rule along the bottom and a 1px border.
+function cardFrame(W, H, accent, rx = 12) {
+  const c = /^#?ffffff$/i.test(String(accent || '')) ? '#9aa0a6' : accent || '#8b929c';
+  return (
+    `<defs><radialGradient id="fglow" cx="50%" cy="100%" r="85%" fx="50%" fy="100%"><stop offset="0" stop-color="${c}" stop-opacity=".24"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>` +
+    `<clipPath id="fclip"><rect width="${W}" height="${H}" rx="${rx}"/></clipPath></defs>` +
+    `<g clip-path="url(#fclip)"><rect width="${W}" height="${H}" fill="#131419"/><rect width="${W}" height="${H}" fill="url(#fglow)"/>` +
+    `<rect y="${H - 3}" width="${W}" height="3" fill="${c}" fill-opacity=".7"/></g>` +
+    `<rect x=".5" y=".5" width="${W - 1}" height="${H - 1}" rx="${rx - 0.5}" fill="none" stroke="#24262e"/>`
+  );
+}
+
 // ---- Rank card ---------------------------------------------------------------
 // The /rank render is a fixed-size transparent card, so every rank lays out the
 // same way no matter how long its name is:
@@ -905,7 +919,7 @@ async function renderRankImage(rank, opts = {}) {
   const hasFoot = hasPeak || level > 0;
 
   const W = 600;
-  const P = 16;
+  const P = 22;
   const EMB = 132;
   const GAP = 26;
   const COL_X = P + EMB + GAP;
@@ -931,7 +945,7 @@ async function renderRankImage(rank, opts = {}) {
   const H = Math.max(EMB, colH) + 2 * P;
   const top = Math.round((H - colH) / 2);
 
-  let s = await emblemSvg(rank.icon, P, Math.round((H - EMB) / 2), EMB);
+  let s = cardFrame(W, H, color) + (await emblemSvg(rank.icon, P, Math.round((H - EMB) / 2), EMB));
 
   const nameBase = top + refM.top;
   s += `<text x="${COL_X - nameM.x0}" y="${nameBase}" font-family="Anton" font-size="${nameSize}" fill="${WHITE}">${esc(name)}</text>`;
@@ -1010,7 +1024,7 @@ async function renderCollectionImage(columns) {
   const MUTED = '#9a9aa3';
   const TRACK = '#3a3b44';
   const RED = '#ff4655';
-  const P = 12;
+  const P = 22;
   const COL_W = 240;
   const GUTTER = 56;
   const LABEL = 15;
@@ -1027,7 +1041,7 @@ async function renderCollectionImage(columns) {
   const maxRows = Math.max(...columns.map((c) => (c.rows || []).length));
   const H = rowsTop + maxRows * ROW_H + P - 6;
 
-  let s = '';
+  let s = cardFrame(W, H, RED);
   columns.forEach((col, i) => {
     const x = P + i * (COL_W + GUTTER);
     s += `<text x="${x}" y="${labelBase}" font-family="DejaVu Sans" font-size="${LABEL}" letter-spacing="3" fill="${MUTED}">${esc(String(col.label).toUpperCase())}</text>`;
