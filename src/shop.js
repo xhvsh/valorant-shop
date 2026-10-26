@@ -65,16 +65,86 @@ async function renewTokens(auth, opts = {}) {
   throw err;
 }
 
-// Single-flight per user: concurrent getShop calls share one refresh, so a
-// rotating refresh token cannot be spent twice (which would poison the account).
+// Refresh tokens rotate, so spending one twice poisons the account. Two layers
+// stop that: calls in one process share a single refresh (refreshLocks), and
+// across serverless instances a short lock row in the database lets one instance
+// refresh while the others wait for its result and reuse the tokens it saved.
+const REFRESH_LOCK_TTL_MS = 30 * 1000;
+const REFRESH_WAIT_MS = 12 * 1000;
+const REFRESH_POLL_MS = 400;
 const refreshLocks = new Map();
+
+async function storedAuth(discordId, puuid) {
+  const acct = await storage.getAccount(discordId, puuid || undefined);
+  if (!acct || !acct.auth_encrypted) return null;
+  try {
+    return storage.decrypt(acct.auth_encrypted);
+  } catch {
+    return null;
+  }
+}
+
+function freshEnough(auth) {
+  return Boolean(auth && auth.access_token && auth.expires_at && auth.expires_at > Date.now() + TOKEN_SKEW_MS);
+}
+
+async function refreshAcrossInstances(discordId, puuid, auth) {
+  const lockKey = `refresh_lock:${discordId}:${puuid || ''}`;
+  const deadline = Date.now() + REFRESH_WAIT_MS;
+  for (;;) {
+    // Another instance may already have refreshed and saved: reuse its tokens.
+    const stored = await storedAuth(discordId, puuid).catch(() => null);
+    if (stored && stored.refresh_token && stored.refresh_token !== auth.refresh_token && freshEnough(stored)) {
+      return {
+        access_token: stored.access_token,
+        id_token: stored.id_token || auth.id_token || null,
+        expires_at: stored.expires_at,
+        cookies: null,
+        refresh_token: stored.refresh_token,
+      };
+    }
+    // If the lock store itself fails, refresh unguarded rather than fail the shop.
+    const held = await storage.kvLock(lockKey, REFRESH_LOCK_TTL_MS).catch(() => true);
+    if (held) {
+      try {
+        // Always spend the newest refresh token on record.
+        const base = stored && stored.refresh_token ? stored : auth;
+        const next = await renewTokens(base, { discordId });
+        // Persist before releasing, so waiters find the new tokens.
+        try {
+          await storage.saveAccount(discordId, puuid, {
+            auth_encrypted: storage.encrypt({
+              ...base,
+              access_token: next.access_token,
+              id_token: next.id_token,
+              expires_at: next.expires_at,
+              refresh_token: next.refresh_token,
+            }),
+          });
+        } catch (e) {
+          console.warn(`[shop] token persist failed for ${discordId}: ${(e && e.message) || e}`);
+        }
+        return next;
+      } finally {
+        await storage.kvUnlock(lockKey).catch(() => {});
+      }
+    }
+    if (Date.now() > deadline) {
+      const err = new Error('Riot refresh is busy.');
+      err.code = 'TRANSIENT';
+      throw err;
+    }
+    await sleep(REFRESH_POLL_MS);
+  }
+}
+
 function lockedRefresh(discordId, puuid, auth) {
   const key = `${String(discordId)}:${String(puuid || '')}`;
   const existing = refreshLocks.get(key);
   if (existing) return existing;
   const p = (async () => {
     try {
-      return await renewTokens(auth, { discordId });
+      return await refreshAcrossInstances(discordId, puuid, auth);
     } finally {
       if (refreshLocks.get(key) === p) refreshLocks.delete(key);
     }
@@ -528,4 +598,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, cachedStoreFor, accountDetails, renewTokens, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, cachedStoreFor, accountDetails, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

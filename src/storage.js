@@ -127,6 +127,28 @@ async function kvSet(key, value, ttlMs) {
   if (setError) dbFail('kv set', setError);
 }
 
+// Best-effort cross-instance lock on a kv row. Returns true when this caller now
+// holds it. The row is inserted (never upserted), so only one insert wins; an
+// expired holder is cleared first, so a crashed instance cannot block forever.
+async function kvLock(key, ttlMs) {
+  const expiresAt = new Date(Date.now() + (ttlMs || 30000)).toISOString();
+  if (!hasDb) {
+    const row = mem.kv.get(key);
+    if (row && new Date(row.expires_at).getTime() > Date.now()) return false;
+    mem.kv.set(key, { value: JSON.stringify({ at: Date.now() }), expires_at: expiresAt });
+    return true;
+  }
+  await client.from('kv').delete().eq('key', key).lt('expires_at', new Date().toISOString());
+  const { error } = await client.from('kv').insert({ key, value: JSON.stringify({ at: Date.now() }), expires_at: expiresAt });
+  if (!error) return true;
+  if (error.code === '23505') return false; // unique violation: someone else holds it
+  dbFail('kv lock', error);
+}
+
+async function kvUnlock(key) {
+  return kvDel(key);
+}
+
 async function kvGet(key) {
   if (!hasDb) {
     const row = mem.kv.get(key);
@@ -468,6 +490,8 @@ module.exports = {
   sessionDestroy,
   sessionDestroyForUser,
   kvSet,
+  kvLock,
+  kvUnlock,
   kvGet,
   kvDel,
   kvList,

@@ -2183,7 +2183,7 @@ app.get('/api/cron/refresh', async (req, res, next) => {
       try {
         let fresh = null;
         try {
-          fresh = await shop.renewTokens(auth, { discordId: acct.discord_id });
+          fresh = await shop.refreshTokens(acct.discord_id, acct.puuid, auth);
         } catch (e) {
           if (e && e.code === 'REVOKED') {
             relink++;
