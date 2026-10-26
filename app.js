@@ -2307,6 +2307,39 @@ function wishlistMatches(list, storeItems) {
   return out;
 }
 
+// A rotation with less than this left is the previous one: Riot has not flipped
+// the shop yet. Sending then would DM yesterday's shop, so wait (bounded) for it.
+const ROTATION_GRACE_MS = 2 * 60 * 1000;
+const ROTATION_POLL_MS = 8000;
+const ROTATION_WAIT_MS = 35 * 1000;
+const DAILY_CONCURRENCY = 8;
+
+function staleRotation(store) {
+  const end = store && store.daily && store.daily.expiresAt;
+  return Boolean(end) && end - Date.now() < ROTATION_GRACE_MS;
+}
+
+async function waitForRotation(result, discordId, puuid, until) {
+  let r = result;
+  while (r && r.status === 'ok' && staleRotation(r.store) && Date.now() + ROTATION_POLL_MS < until) {
+    await new Promise((resolve) => setTimeout(resolve, ROTATION_POLL_MS));
+    r = await shop.getShop(discordId, puuid, { force: true }).catch(() => r);
+  }
+  return r;
+}
+
+// Runs fn over items with at most `limit` in flight. fn must not throw.
+async function runPool(list, limit, fn) {
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const item = list[next++];
+      await fn(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+}
+
 app.get('/api/cron/dailyshop', async (req, res, next) => {
   try {
     if (!cronAuthorized(req)) return res.status(403).json({ error: 'forbidden' });
@@ -2328,31 +2361,35 @@ app.get('/api/cron/dailyshop', async (req, res, next) => {
     let wishlistSent = 0;
     const okLines = [];
     const failLines = [];
-    for (const discordId of ids) {
+    const rotationDeadline = t0 + ROTATION_WAIT_MS;
+    const processUser = async (discordId) => {
       users++;
       let userSent = 0;
       let userFail = null;
       try {
         const prefs = await loadPrefsWithLegacy(discordId);
         const accounts = await storage.listAccountsByUser(discordId).catch(() => []);
-        if (!accounts.length) continue;
+        if (!accounts.length) return;
         const wishItems = await storage
           .getWishlist(discordId)
           .then((w) => [...(w.daily || []), ...(w.accessory || [])])
           .catch(() => null);
         const results = new Map();
-        for (const acct of accounts) {
-          const r = await shop
-            .getShop(discordId, acct.puuid)
-            .catch((e) => ({ status: 'error', error: (e && e.message) || e }));
-          results.set(acct.puuid, r);
-        }
+        await Promise.all(
+          accounts.map(async (acct) => {
+            const first = await shop
+              .getShop(discordId, acct.puuid)
+              .catch((e) => ({ status: 'error', error: (e && e.message) || e }));
+            results.set(acct.puuid, await waitForRotation(first, discordId, acct.puuid, rotationDeadline));
+          })
+        );
         for (const acct of accounts) {
           const toggle = (prefs.accounts && prefs.accounts[acct.puuid]) || {};
           if (toggle.shop !== true && toggle.accessory !== true) continue;
           try {
             const result = results.get(acct.puuid);
-            if (!result || result.status !== 'ok') {
+            if (!result || result.status !== 'ok' || staleRotation(result.store)) {
+              // Not rotated yet: no marker is written, so the next trigger retries.
               skipped++;
               continue;
             }
@@ -2473,7 +2510,8 @@ app.get('/api/cron/dailyshop', async (req, res, next) => {
         console.warn(`[dailyshop] user ${discordId} failed: ${msg}`);
         failLines.push(`Daily shop failed for ${dcLog.userMention(discordId)}: ${String(msg).slice(0, 200)}`);
       }
-    }
+    };
+    await runPool([...ids], DAILY_CONCURRENCY, processUser);
     // Only post a summary when the run actually did something (or hit a failure).
     // This keeps the standalone `vercel` fallback silent when the primary
     // scheduler already handled the day, so there is one clean summary per day.
