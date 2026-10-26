@@ -257,6 +257,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .btn-danger { background: transparent; border-color: var(--red-line); color: var(--red-2); }
 .btn-danger:hover { background: var(--red-soft); border-color: var(--red); color: #fff; }
 .btn .i { font-size: 15px; }
+/* Ko-fi donate button: neutral ghost button with a coral heart, so it is easy to
+   spot without competing with the red primary actions. */
+.btn-kofi { border-color: rgba(255, 94, 91, .4); text-decoration: none; }
+.btn-kofi .i { color: #ff5e5b; transition: transform .2s var(--ease); }
+.btn-kofi:hover { background: rgba(255, 94, 91, .12); border-color: #ff5e5b; }
+.btn-kofi:hover .i { transform: scale(1.18); }
+@media (prefers-reduced-motion: reduce) { .btn-kofi:hover .i { transform: none; } }
 .btn.is-busy { position: relative; color: transparent !important; pointer-events: none; }
 .btn.is-busy::after {
   content: "";
@@ -491,6 +498,8 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .landing-card .btn { width: 100%; }
 .landing-foot { margin: 16px 0 0; color: var(--text-3); font-size: 12.5px; text-align: center; }
 .landing-foot a { color: var(--red-2); }
+.landing-kofi { margin-top: 6px; }
+.landing-kofi a { color: #ff7a77; }
 .legal { margin: 0; color: var(--text-3); font-size: 11.5px; }
 
 /* ==========================================================================
