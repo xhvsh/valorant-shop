@@ -175,7 +175,10 @@ function collectionColumns(details) {
 // Same shape as /rank: a heading with the Riot ID, then the rendered stat card
 // (columns side by side). Falls back to stacked text if the card failed.
 function buildCollectionMessage(details, name, cardUrl) {
-  const parts = [text(`## ${name ? `${name}'s collection` : 'Collection'}`)];
+  const heading = `## ${name ? `${name}'s collection` : 'Collection'}`;
+  // Plain text right under the title, not a small footer.
+  const owns = ownsRiotGunbuddy(details) ? `\n${RIOT_GUNBUDDY_EMOJI} This user owns a Riot Gunbuddy` : '';
+  const parts = [text(heading + owns)];
   if (cardUrl) {
     parts.push(gallery(cardUrl, false));
   } else {
@@ -184,7 +187,6 @@ function buildCollectionMessage(details, name, cardUrl) {
       parts.push(text(lines.join('\n')));
     }
   }
-  if (ownsRiotGunbuddy(details)) parts.push(text(`-# ${RIOT_GUNBUDDY_EMOJI} This user owns a Riot Gunbuddy`));
   return { flags: V2, components: [container(COLORS.main, parts)] };
 }
 
