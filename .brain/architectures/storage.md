@@ -40,6 +40,7 @@ Schema: [database-schema](database-schema.md).
 | `accshop_sent:<discordId>:<puuid>` | app.js cron | marker | last sent accessory rotation |
 | `dailyshop:<discordId>` | legacy | | retired subscription, imported once by `loadPrefsWithLegacy` |
 | `bundle_seen` (`BUNDLE_SEEN_KEY`) | app.js cron | 60 d | `{ ids: {bundleId: ts}, at }` |
+| `refresh_lock:<discordId>:<puuid>` | shop.js | 30 s | lock row (`kvLock`, insert-only) |
 | `rl:<scope>` | app.js `rateLimitShared` | window + 1 s | array of hit timestamps |
 
 ## State Invariants

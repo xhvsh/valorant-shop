@@ -37,7 +37,7 @@ updated: 2026-10-26
 
 ## State Invariants
 - Only `invalid_grant` means re-link. Rate limits, timeouts, outages must stay transient.
-- `refreshLocks` single-flights refresh per `discordId:puuid`, because refresh tokens rotate and a double spend poisons the account. Lock is per process only. Two serverless instances can still race.
+- Refresh tokens rotate, so a double spend poisons the account. `refreshLocks` single-flights per process. Across serverless instances `refreshAcrossInstances` takes a `refresh_lock:<discordId>:<puuid>` row in `kv` (`storage.kvLock`, insert-only, 30 s TTL). Losers poll the stored auth and reuse the winner's tokens (12 s wait, then TRANSIENT). Tokens are persisted before the lock is released. `shop.refreshTokens` exports this for the cron.
 - `ensureAccessToken` mutates the passed `auth` object in place before persisting.
 
 ## Dependencies & Contracts

@@ -55,6 +55,8 @@ Related notes: [discord-bot](discord-bot.md), [cron-jobs](cron-jobs.md), [shop-s
 | Discord | `POST /api/interactions`, `POST /api/interactions/followup` |
 | Cron | `GET /api/cron/refresh`, `/api/cron/dailyshop`, `/api/cron/bundles` |
 | Session | `POST /auth/logout`, `GET /link` (redirect to `/`) |
+| Data wipe | `POST /api/me/delete` (body `{confirm: "DELETE"}`): `wipeUserData` removes accounts, prefs, wishlist, owned shares (recipients lose access), imported shares, markers and sessions |
+| Pages | `GET /legal`; dashboard routes `/wishlist`, `/bundles`, `/settings`, `/a/:puuid(/:tab)` all return the shell (History API routing, old `#/` links are rewritten client side) |
 
 ## Data Flow: Add Riot Account
 1. `add/start`: makes `flowId`, PKCE pair. Saves `pkce:add:<flowId>` (15 min) with verifier and `discordId`. Returns a Riot authorize URL (`client_id=ritoplus`, `redirect_uri=http://localhost/redirect`).

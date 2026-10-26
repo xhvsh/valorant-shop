@@ -22,5 +22,4 @@ Request path: `api/index.js` (Vercel) or `server.js` (local) -> `app.js` -> `src
 | Decision | Remove Mock Mode and Test Night Market | `decisions/remove-mock-mode.md` | `app.js`, `server.js`, `package.json`, `.env.example` | 2026-10-26 |
 
 ## Open Observations (not yet faults or decisions)
-- Refresh single-flight lock in `src/shop.js` is per instance. Concurrent serverless instances can still spend a rotating refresh token twice. See `architectures/shop-service.md`.
-- `/api/cron/dailyshop` walks users serially inside a 60 s limit. See `architectures/cron-jobs.md`.
+- `/api/cron/bundles` timing depends entirely on the external scheduler; bundles are only seen as fast as it polls.
