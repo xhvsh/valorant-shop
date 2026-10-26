@@ -848,6 +848,83 @@ async function revokeShareFor(discordId, puuid) {
   return rec.name || puuid;
 }
 
+// Full data wipe for one Discord user: every linked Riot account and its stored
+// tokens, alert settings, wishlist, share codes they own (recipients lose access
+// at once), shares they imported, markers, and every website session. Returns a
+// summary of what was removed.
+const WIPE_MARKER_PREFIXES = ['shop_reset:', 'dailyshop_sent:', 'accshop_sent:', 'wishlist_notify:'];
+async function wipeUserData(discordId) {
+  const summary = { accounts: 0, sharesRevoked: 0, recipientsRemoved: 0, importsRemoved: 0 };
+
+  const accounts = await storage.listAccountsByUser(discordId);
+  summary.accounts = accounts.length;
+
+  // Shares the user owns: drop each code, which also detaches every recipient.
+  const ownerItems = await storage.getOwnerShares(discordId).catch(() => ({}));
+  for (const entry of Object.values(ownerItems)) {
+    if (!entry || !entry.code) continue;
+    const digest = storage.hashShareCode(entry.code);
+    const rec = await storage.getShare(digest).catch(() => null);
+    if (rec && rec.owner_id === discordId) {
+      summary.recipientsRemoved += Object.keys(rec.recipients || {}).length;
+      await dropShare(discordId, rec, digest);
+      summary.sharesRevoked += 1;
+    }
+  }
+
+  // Shares the user imported: take them off the owner's recipient list.
+  const imported = await storage.getImportedShares(discordId).catch(() => ({}));
+  for (const item of Object.values(imported)) {
+    if (!item || !item.code) continue;
+    const digest = storage.hashShareCode(item.code);
+    const rec = await storage.getShare(digest).catch(() => null);
+    if (rec && rec.recipients && rec.recipients[discordId]) {
+      delete rec.recipients[discordId];
+      await storage.putShare(digest, rec).catch(() => {});
+    }
+    summary.importsRemoved += 1;
+  }
+
+  await storage.deleteAccount(discordId);
+
+  const keys = [
+    `alertprefs:${discordId}`,
+    `wishlist:${discordId}`,
+    `dailyshop:${discordId}`,
+    `nm_announced:${discordId}`,
+    `share:owner:${discordId}`,
+    `share:user:${discordId}`,
+    `shop_reset:${discordId}`,
+  ];
+  for (const a of accounts) keys.push(`share:puuid:${a.puuid}`);
+  for (const prefix of WIPE_MARKER_PREFIXES) {
+    const rows = await storage.kvList(`${prefix}${discordId}:`).catch(() => []);
+    for (const row of rows) if (row.key.startsWith(`${prefix}${discordId}:`)) keys.push(row.key);
+  }
+  for (const key of keys) await storage.kvDel(key).catch(() => {});
+
+  await storage.sessionDestroyForUser(discordId).catch(() => {});
+  return summary;
+}
+
+// Delete everything stored about the signed-in user. The client sends the typed
+// confirmation; the session ends with the response.
+app.post('/api/me/delete', express.json(), requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    if (!req.body || req.body.confirm !== 'DELETE') throw httpError('Type DELETE to confirm.', 400);
+    await rateLimitShared(`wipe:${discordId}`, 3, 60000);
+    const summary = await wipeUserData(discordId);
+    dcLog.sendLog(`${dcLog.userMention(discordId)} deleted all their data (${summary.accounts} account(s), ${summary.sharesRevoked} share(s) revoked, ${summary.recipientsRemoved} recipient(s) lost access)`);
+    req.session.destroy(() => {
+      res.clearCookie('valshops.sid', { httpOnly: true, sameSite: 'lax', secure: BASE_URL.startsWith('https') });
+      res.json({ ok: true, summary });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Create (or return the existing) share code for one of the user's accounts.
 app.post('/api/shares', express.json(), requireDiscord, async (req, res, next) => {
   try {
@@ -2582,3 +2659,4 @@ items.load().catch((err) => console.warn('[items] catalog load failed:', err.mes
 
 module.exports = app;
 module.exports.linkAccount = linkAccount;
+module.exports.wipeUserData = wipeUserData;

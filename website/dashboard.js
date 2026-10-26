@@ -2664,6 +2664,12 @@
         h("div", { class: "row" }, avatarEl(), h("div", { class: "row-text" }, h("b", { text: (S.me && S.me.username) || "Signed in" }), h("span", { text: "Signed in with Discord" })),
           h("button", { class: "btn btn-ghost sm", type: "button", onclick: signOut }, iconEl("logout"), "Sign out")))
     );
+    right.appendChild(h("div", { class: "section-title", style: "margin-top:26px", text: "Your data" }));
+    right.appendChild(
+      h("div", { class: "rows" },
+        h("div", { class: "row" }, iconEl("trash"), h("div", { class: "row-text" }, h("b", { text: "Delete all my data" }), h("span", { text: "Removes your accounts, alerts, wishlist and shares. Cannot be undone." })),
+          h("button", { class: "btn btn-danger sm", type: "button", onclick: openWipe }, "Delete")))
+    );
     const about = h("div", { class: "rows", style: "margin-top:8px" });
     const statsRow = h("div", { class: "about-stats" });
     if (S.stats) {
@@ -2687,6 +2693,35 @@
     const url = kind === "guild" ? S.install.guildInstall : S.install.userInstall;
     if (url) window.open(url, "_blank", "noopener");
     else toast("Install links are still loading. Try again in a moment.");
+  }
+
+  function openWipe() {
+    $("wipeInput").value = "";
+    $("wipeBtn").disabled = true;
+    $("wipeError").hidden = true;
+    $("wipeOverlay").hidden = false;
+    $("wipeInput").focus();
+  }
+  function closeWipe() {
+    $("wipeOverlay").hidden = true;
+  }
+  async function doWipe() {
+    const btn = $("wipeBtn");
+    const errorBox = $("wipeError");
+    if ($("wipeInput").value.trim() !== "DELETE") return;
+    errorBox.hidden = true;
+    btn.classList.add("is-busy");
+    btn.disabled = true;
+    try {
+      await api("/api/me/delete", { method: "POST", json: { confirm: "DELETE" } });
+      history.replaceState({}, "", path("/"));
+      location.reload();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.hidden = false;
+      btn.classList.remove("is-busy");
+      btn.disabled = false;
+    }
   }
 
   async function signOut() {
@@ -2914,6 +2949,13 @@
     $("confirmCancel").addEventListener("click", () => closeConfirm(false));
     onBackdrop($("confirmOverlay"), () => closeConfirm(false));
 
+    $("wipeInput").addEventListener("input", () => { $("wipeBtn").disabled = $("wipeInput").value.trim() !== "DELETE"; });
+    $("wipeInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doWipe(); });
+    $("wipeBtn").addEventListener("click", doWipe);
+    $("wipeCancelBtn").addEventListener("click", closeWipe);
+    $("wipeCancelX").addEventListener("click", closeWipe);
+    onBackdrop($("wipeOverlay"), closeWipe);
+
     $("previewClose").addEventListener("click", closePreview);
     onBackdrop($("previewOverlay"), closePreview);
 
@@ -2947,6 +2989,7 @@
       if (e.key !== "Escape") return;
       if (menuEl) closeMenu();
       else if (!$("confirmOverlay").hidden) closeConfirm(false);
+      else if (!$("wipeOverlay").hidden) closeWipe();
       else if (!$("previewOverlay").hidden) closePreview();
       else if (!$("importOverlay").hidden) closeImport();
       else if (!$("addOverlay").hidden) closeAdd();

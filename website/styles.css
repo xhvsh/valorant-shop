@@ -1468,6 +1468,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .modal p { color: var(--text-2); }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .modal-head .icon-btn { margin: -6px -8px 0 0; }
+.wipe-list { margin: 0 0 12px; padding-left: 18px; color: var(--text-2); font-size: 14px; line-height: 1.55; }
+.wipe-list li + li { margin-top: 4px; }
+.wipe-list b { color: var(--text); }
+.wipe-label { display: block; margin: 14px 0 6px; color: var(--text-2); font-size: 13px; }
+.wipe-label b { color: var(--red-2); font-family: var(--font-mono); }
+#wipeBtn:not(:disabled) { background: var(--red); border-color: var(--red); color: #fff; }
+#wipeBtn:disabled { opacity: .45; cursor: not-allowed; }
 .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .steps { display: grid; gap: 0; margin: 6px 0 0; padding: 0; list-style: none; }
 .steps li { position: relative; display: flex; gap: 16px; padding-bottom: 22px; }

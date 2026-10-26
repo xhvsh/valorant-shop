@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=213" />
+  <link rel="stylesheet" href="/styles.css?v=214" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -184,6 +184,32 @@
     </div>
   </div>
 
+  <!-- Delete all data -->
+  <div class="overlay" id="wipeOverlay" role="alertdialog" aria-modal="true" aria-labelledby="wipeTitle" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="wipeTitle">Delete all my data</h2>
+        <button class="icon-btn" id="wipeCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <p>This permanently deletes everything valorant shop stores about you. It cannot be undone.</p>
+      <ul class="wipe-list">
+        <li>Every linked Riot account and its stored sign-in tokens.</li>
+        <li>Your alert settings, wishlist and account order.</li>
+        <li>Every share code you created. <b>Everyone you shared an account with loses access to it immediately</b>, and the codes stop working.</li>
+        <li>Shared accounts you added from other people.</li>
+        <li>Your website sessions. You will be signed out.</li>
+      </ul>
+      <p>Nothing changes in VALORANT or at Riot. You can link your accounts again later, but your wishlist, alerts and shares will be gone.</p>
+      <label class="wipe-label" for="wipeInput">Type <b>DELETE</b> to confirm</label>
+      <input type="text" id="wipeInput" class="input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE" />
+      <p class="form-error" id="wipeError" hidden></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="wipeCancelBtn" type="button">Cancel</button>
+        <button class="btn btn-danger" id="wipeBtn" type="button" disabled>Delete everything</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Confirm -->
   <div class="overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
     <div class="modal modal-sm">
@@ -214,6 +240,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=213"></script>
+  <script src="/dashboard.js?v=214"></script>
 </body>
 </html>

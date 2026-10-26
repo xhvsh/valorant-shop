@@ -94,6 +94,19 @@ async function sessionTouch(sid, maxAgeMs) {
   if (error) dbFail('session touch', error);
 }
 
+// Drops every website session that belongs to a Discord user (full data wipe).
+async function sessionDestroyForUser(discordId) {
+  const id = String(discordId);
+  if (!hasDb) {
+    for (const [sid, row] of mem.sessions.entries()) {
+      if (row && row.data && String(row.data.discordId) === id) mem.sessions.delete(sid);
+    }
+    return;
+  }
+  const { error } = await client.from('sessions').delete().eq('data->>discordId', id);
+  if (error) dbFail('session destroy user', error);
+}
+
 async function sessionDestroy(sid) {
   if (!hasDb) {
     mem.sessions.delete(sid);
@@ -453,6 +466,7 @@ module.exports = {
   sessionSet,
   sessionTouch,
   sessionDestroy,
+  sessionDestroyForUser,
   kvSet,
   kvGet,
   kvDel,
