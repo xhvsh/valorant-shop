@@ -483,10 +483,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 }
 .splash-brand img, .landing-brand img, .sb-brand img { width: 28px; height: 28px; border-radius: var(--r); object-fit: cover; }
 .splash-title {
-  font: 600 clamp(20px, 5.4vw, 26px)/1 var(--font-head);
-  letter-spacing: .22em;
-  text-indent: .22em;
-  text-transform: uppercase;
+  font: 600 clamp(22px, 6vw, 28px)/1 var(--font-head);
+  letter-spacing: .08em;
+  text-indent: .08em;
 }
 .splash-bar {
   position: relative;
