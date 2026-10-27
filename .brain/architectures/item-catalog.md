@@ -32,6 +32,9 @@ updated: 2026-10-26
 - `normalizeName`.
 
 ## State Invariants
+- Skin eligibility also excludes every skin named in Riot's contracts (battle pass and agent sets, loaded by `loadContracts`), so a new act's pass is hidden before `skin-collections.json` is regenerated. 2026-10-27 audit: 699 eligible skins, none in a pass or agent contract; the 121 eligible collections match `storeCollections`.
+- `bp-accessories.json` is the accessory whitelist: battle pass accessories (not Epilogue, not Coin collection) from passes older than the 3 newest. It goes stale one act at a time on the safe side (items hidden, never wrongly shown); add the newly aged-out act each time. Updated 2026-10-27 with Season 2026 Act I to III.
+- `storeIndex()` also carries skin facets for the wishlist filters: `w` weapon, `g` category, `e` tier, `k` collection (Riot theme name, else the name minus its weapon). `load()` fetches `/v1/themes` for that.
 - Collection matching uses the LONGEST known prefix (store "Celestial" vs pass "Celestia", "Prism II" vs "Prism III"). Keep that rule when editing.
 - Unknown collections count as eligible. Wrongly hiding an item is worse than showing one.
 - `items.js` requires `./riot` for `fetchWithTimeout`. `riot.js` must never require `items.js` (cycle).

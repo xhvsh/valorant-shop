@@ -246,7 +246,7 @@
     me: null,
     accounts: [], // own + shared, each shared one has shared: true
     order: [], // display order (puuids)
-    prefs: { nm: false, bundle: false },
+    prefs: { nm: false, bundle: false, wishlist_nm: false, nm_names: false },
     store: Object.create(null),
     storePending: Object.create(null),
     storeError: Object.create(null),
@@ -321,7 +321,7 @@
     const order = Array.isArray(data.order) ? data.order.filter((p) => known.has(p)) : [];
     for (const a of S.accounts) if (!order.includes(a.puuid)) order.push(a.puuid);
     S.order = order;
-    S.prefs = { nm: data.nm === true, bundle: data.bundle === true };
+    S.prefs = { nm: data.nm === true, bundle: data.bundle === true, wishlist_nm: data.wishlist_nm === true, nm_names: data.nm_names === true };
     return data;
   }
 
@@ -2028,7 +2028,13 @@
   let wlIndexPromise = null;
   let wlIndexFailed = false;
   let wlRenderedKey = "";
-  let wlRows = [];
+  const WL_PAGE = 48;
+  const WL_TIERS = ["Select", "Deluxe", "Premium", "Exclusive", "Ultra"];
+  const WL_CATEGORIES = ["Sidearm", "SMG", "Shotgun", "Rifle", "Sniper", "Heavy", "Melee"];
+  const WL_CATEGORY_LABEL = { Sidearm: "Sidearms", SMG: "SMGs", Shotgun: "Shotguns", Rifle: "Rifles", Sniper: "Snipers", Heavy: "Heavy", Melee: "Melee" };
+  const WL_TYPES = [["", "All"], ["buddy", "Buddies"], ["spray", "Sprays"], ["card", "Cards"], ["title", "Titles"]];
+  const wlFreshFilters = () => ({ weapon: "", tier: "", collection: "", type: "", hide: false });
+  let wlFilters = wlFreshFilters();
   const wlOps = new Map();
   let wlFlushTimer = null;
   let wlFlushActive = false;
@@ -2191,10 +2197,15 @@
   }
 
   function refreshSearchRows() {
-    document.querySelectorAll(".wl-result[data-item-id]").forEach((row) => {
+    // With "hide items on my wishlist" on, an added item has to leave the results.
+    if (wlFilters.hide && $("wlPanel") && !$("wlPanel").hidden) {
+      runWlSearch(true);
+      return;
+    }
+    document.querySelectorAll(".wl-pick[data-item-id]").forEach((row) => {
       const on = isWishlisted({ id: row.dataset.itemId, name: row.dataset.itemName });
       row.classList.toggle("is-added", on);
-      const tag = row.querySelector(".wl-result-tag");
+      const tag = row.querySelector(".wl-pick-tag");
       if (tag) tag.textContent = on ? "Added" : "Add";
     });
   }
@@ -2210,12 +2221,15 @@
     for (const [kind, label] of [["daily", "Weapon skins"], ["accessory", "Accessories"]]) {
       seg.appendChild(h("button", {
         type: "button", role: "tab", class: wlKind === kind ? "is-active" : null, dataset: { kind },
-        onclick: () => { wlKind = kind; closeWlResults(); render(); },
+        onclick: () => { wlKind = kind; wlFilters = wlFreshFilters(); closeWlResults(); render(); },
       }, label, h("span", { class: "n", text: String(S.wishlist[kind].length) })));
     }
-    const input = h("input", { type: "search", id: "wlSearchInput", class: "input", placeholder: wlKind === "daily" ? "Search skins to add..." : "Search buddies, sprays, cards, titles...", autocomplete: "off", spellcheck: "false", "aria-label": "Search items" });
-    const search = h("div", { class: "wl-search" }, h("label", { class: "search" }, iconEl("search"), input), h("div", { class: "wl-results", id: "wlResults", hidden: true }));
+    const input = h("input", { type: "search", id: "wlSearchInput", class: "input", placeholder: wlKind === "daily" ? "Search skins, weapons or collections..." : "Search buddies, sprays, cards, titles...", autocomplete: "off", spellcheck: "false", "aria-label": "Search items" });
+    const search = h("div", { class: "wl-search" }, h("label", { class: "search" }, iconEl("search"), input));
     view.appendChild(h("div", { class: "wl-bar" }, seg, search));
+    view.appendChild(h("div", { class: "wl-filters", id: "wlFilters" }));
+    view.appendChild(h("section", { class: "wl-panel", id: "wlPanel", hidden: true }));
+    view.appendChild(h("div", { class: "section-title wl-list-title", id: "wlListTitle" }));
     view.appendChild(h("div", { class: "wl-grid", id: "wlGrid" }));
     view.appendChild(h("div", { id: "wlEmpty", hidden: true }));
     view.appendChild(
@@ -2225,14 +2239,15 @@
 
     input.addEventListener("input", () => {
       if (wlSearchTimer) clearTimeout(wlSearchTimer);
-      wlSearchTimer = setTimeout(runWlSearch, 90);
+      wlSearchTimer = setTimeout(() => runWlSearch(), 90);
     });
     input.addEventListener("focus", () => {
-      if (input.value.trim() && $("wlResults").hidden) runWlSearch();
-      ensureWlIndex().catch(() => {});
+      ensureWlIndex().then(fillWlFacets).catch(() => {});
     });
+    buildWlFilters();
     renderWishlistGrid();
-    ensureWlIndex().catch(() => {});
+    runWlSearch(true);
+    ensureWlIndex().then(fillWlFacets).catch(() => {});
   }
 
   function renderWishlistGrid() {
@@ -2240,6 +2255,12 @@
     if (!grid) return;
     grid.innerHTML = "";
     const items = S.wishlist[wlKind] || [];
+    const listTitle = $("wlListTitle");
+    if (listTitle) {
+      listTitle.innerHTML = "";
+      listTitle.appendChild(h("span", { text: "On your wishlist" }));
+      listTitle.appendChild(h("span", { class: "count", text: String(items.length) }));
+    }
     for (const item of items) grid.appendChild(wishlistCard(item));
     const empty = $("wlEmpty");
     empty.innerHTML = "";
@@ -2269,13 +2290,21 @@
   }
 
   function closeWlResults() {
-    const box = $("wlResults");
-    if (box) {
-      box.hidden = true;
-      box.innerHTML = "";
+    const panel = $("wlPanel");
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = "";
     }
     wlRenderedKey = "";
-    wlRows = [];
+  }
+
+  // Empties the search box and every filter, then hides the results.
+  function clearWlSearch() {
+    const input = $("wlSearchInput");
+    if (input) input.value = "";
+    wlFilters = wlFreshFilters();
+    syncWlFilterUI();
+    closeWlResults();
   }
 
   function ensureWlIndex() {
@@ -2283,7 +2312,7 @@
     if (wlIndexPromise) return wlIndexPromise;
     wlIndexPromise = api("/api/items/index", { timeoutMs: 30000 })
       .then((data) => {
-        wlIndex = (data.items || []).map((x) => ({ id: x.i, name: x.n, type: x.t, icon: x.c, art: x.a ? { small: x.a.s, wide: x.a.w, large: x.a.l } : null }));
+        wlIndex = (data.items || []).map((x) => ({ id: x.i, name: x.n, type: x.t, icon: x.c, art: x.a ? { small: x.a.s, wide: x.a.w, large: x.a.l } : null, weapon: x.w || null, category: x.g || null, tier: x.e || null, collection: x.k || null }));
         wlIndexFailed = false;
         return wlIndex;
       })
@@ -2295,79 +2324,214 @@
     return wlIndexPromise;
   }
 
+  // Every word of the query has to appear in the skin's name, weapon or
+  // collection ("vandal prime"), and the filters narrow it further.
   function filterWlIndex(q) {
-    const nq = q.toLowerCase();
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const f = wlFilters;
     const out = [];
     for (const item of wlIndex) {
       if ((item.type === "skin" ? "daily" : "accessory") !== wlKind) continue;
-      if (nq && !String(item.name || "").toLowerCase().includes(nq)) continue;
+      if (wlKind === "daily") {
+        if (f.weapon && item.weapon !== f.weapon) continue;
+        if (f.tier && item.tier !== f.tier) continue;
+        if (f.collection && item.collection !== f.collection) continue;
+      } else if (f.type && item.type !== f.type) continue;
+      if (f.hide && isWishlisted(item)) continue;
+      if (words.length) {
+        const hay = `${item.name || ""} ${item.weapon || ""} ${item.collection || ""}`.toLowerCase();
+        if (!words.every((w) => hay.includes(w))) continue;
+      }
       out.push(item);
     }
-    if (nq) {
-      out.sort((a, b) => {
-        const an = String(a.name || "").toLowerCase();
-        const bn = String(b.name || "").toLowerCase();
-        return (an.startsWith(nq) ? 0 : 1) - (bn.startsWith(nq) ? 0 : 1) || an.localeCompare(bn);
-      });
-    }
+    const first = words[0] || "";
+    out.sort((a, b) => {
+      const an = String(a.name || "").toLowerCase();
+      const bn = String(b.name || "").toLowerCase();
+      return (first && (an.startsWith(first) ? 0 : 1) - (bn.startsWith(first) ? 0 : 1)) || an.localeCompare(bn);
+    });
     return out;
   }
 
-  const WL_RENDER_CAP = 300;
+  // Filter row: weapon, tier and collection for skins; type for accessories.
+  // Built once per view, updated in place so a select never loses focus.
+  function buildWlFilters() {
+    const box = $("wlFilters");
+    if (!box) return;
+    box.innerHTML = "";
+    const changed = () => {
+      syncWlFilterUI();
+      runWlSearch(true);
+    };
+    if (wlKind === "daily") {
+      const weapon = h("select", { class: "input select", id: "wlWeapon", "aria-label": "Weapon" }, h("option", { value: "", text: "All weapons" }));
+      const collection = h("select", { class: "input select", id: "wlCollection", "aria-label": "Collection" }, h("option", { value: "", text: "All collections" }));
+      weapon.addEventListener("change", () => { wlFilters.weapon = weapon.value; changed(); });
+      collection.addEventListener("change", () => { wlFilters.collection = collection.value; changed(); });
+      const tiers = h("div", { class: "wl-pills", role: "group", "aria-label": "Tier" });
+      for (const t of WL_TIERS) {
+        const color = tierColor(t);
+        const b = h("button", { type: "button", class: "pill", dataset: { tier: t }, "aria-pressed": "false" }, color ? h("i", { class: "dot", style: `background:${color}` }) : null, t);
+        b.addEventListener("click", () => { wlFilters.tier = wlFilters.tier === t ? "" : t; changed(); });
+        tiers.appendChild(b);
+      }
+      box.appendChild(weapon);
+      box.appendChild(collection);
+      box.appendChild(tiers);
+    } else {
+      const types = h("div", { class: "wl-pills", role: "group", "aria-label": "Type" });
+      for (const [value, label] of WL_TYPES) {
+        const b = h("button", { type: "button", class: "pill", dataset: { type: value }, "aria-pressed": "false" }, label);
+        b.addEventListener("click", () => { wlFilters.type = value; changed(); });
+        types.appendChild(b);
+      }
+      box.appendChild(types);
+    }
+    const hide = h("input", { type: "checkbox", id: "wlHide" });
+    hide.addEventListener("change", () => { wlFilters.hide = hide.checked; changed(); });
+    box.appendChild(h("label", { class: "wl-check" }, hide, h("span", { text: "Hide items on my wishlist" })));
+    const clear = h("button", { type: "button", class: "btn btn-quiet sm wl-clear", id: "wlClear", hidden: true }, iconEl("x"), "Clear");
+    clear.addEventListener("click", clearWlSearch);
+    box.appendChild(clear);
+    fillWlFacets();
+    syncWlFilterUI();
+  }
 
-  function wlResultRow(item) {
+  // Weapon and collection options come from the loaded index, with counts.
+  function fillWlFacets() {
+    if (!wlIndex || wlKind !== "daily") return;
+    const weaponSel = $("wlWeapon");
+    const collSel = $("wlCollection");
+    if (!weaponSel || !collSel) return;
+    const byCat = new Map();
+    const colls = new Map();
+    for (const it of wlIndex) {
+      if (it.type !== "skin") continue;
+      if (it.weapon) {
+        const cat = it.category || "Other";
+        if (!byCat.has(cat)) byCat.set(cat, new Map());
+        const m = byCat.get(cat);
+        m.set(it.weapon, (m.get(it.weapon) || 0) + 1);
+      }
+      if (it.collection) colls.set(it.collection, (colls.get(it.collection) || 0) + 1);
+    }
+    weaponSel.length = 1;
+    collSel.length = 1;
+    const cats = [...WL_CATEGORIES.filter((c) => byCat.has(c)), ...[...byCat.keys()].filter((c) => !WL_CATEGORIES.includes(c)).sort()];
+    for (const cat of cats) {
+      const group = h("optgroup", { label: WL_CATEGORY_LABEL[cat] || cat });
+      for (const [w, n] of [...byCat.get(cat)].sort((a, b) => a[0].localeCompare(b[0]))) group.appendChild(h("option", { value: w, text: `${w} (${n})` }));
+      weaponSel.appendChild(group);
+    }
+    for (const [c, n] of [...colls].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))) collSel.appendChild(h("option", { value: c, text: `${c} (${n})` }));
+    weaponSel.value = wlFilters.weapon;
+    collSel.value = wlFilters.collection;
+  }
+
+  function syncWlFilterUI() {
+    const f = wlFilters;
+    const weaponSel = $("wlWeapon");
+    const collSel = $("wlCollection");
+    if (weaponSel) weaponSel.value = f.weapon;
+    if (collSel) collSel.value = f.collection;
+    document.querySelectorAll("#wlFilters [data-tier]").forEach((b) => {
+      const on = b.dataset.tier === f.tier;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    document.querySelectorAll("#wlFilters [data-type]").forEach((b) => {
+      const on = b.dataset.type === f.type;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    const hide = $("wlHide");
+    if (hide) hide.checked = f.hide;
+    const input = $("wlSearchInput");
+    const clear = $("wlClear");
+    if (clear) clear.hidden = !(wlHasCriteria() || f.hide || (input && input.value));
+  }
+
+  function wlHasCriteria() {
+    const input = $("wlSearchInput");
+    const f = wlFilters;
+    return Boolean((input && input.value.trim()) || (wlKind === "daily" ? f.weapon || f.tier || f.collection : f.type));
+  }
+
+  // One result: art, name, tier or type, and an Add / Added state.
+  function wlPick(item) {
     const added = isWishlisted(item);
-    const row = h("button", { type: "button", class: added ? "wl-result is-added" : "wl-result", dataset: { itemId: String(item.id || ""), itemName: String(item.name || "") } });
+    const color = tierColor(item.tier);
+    const thumb = h("div", { class: "wl-pick-thumb" });
     const src = (item.type === "card" && item.art && item.art.small) || item.icon;
-    row.appendChild(src ? makeImg(src, "") : h("span", { class: "wl-result-thumb" }, iconEl("star")));
-    row.appendChild(h("span", { class: "wl-result-name", text: item.name || "Unknown" }));
-    row.appendChild(h("span", { class: "wl-result-tag", text: added ? "Added" : "Add" }));
-    row.addEventListener("click", () => {
+    if (item.type === "title") thumb.appendChild(h("span", { class: "title-text", text: titleName(item.name) }));
+    else if (src) thumb.appendChild(imgOrFallback(src, item.name));
+    else thumb.appendChild(fallbackText(item.name));
+    const sub = h("span", { class: "wl-pick-sub" });
+    if (item.type === "skin") {
+      if (item.tier) sub.appendChild(h("span", { style: color ? `color:${color}` : null, text: item.tier }));
+      if (item.tier && item.weapon) sub.appendChild(document.createTextNode(" · "));
+      if (item.weapon) sub.appendChild(document.createTextNode(item.weapon));
+    } else sub.textContent = TYPE_LABEL[item.type] || "";
+    const el = h("button", { type: "button", class: `wl-pick${added ? " is-added" : ""}`, style: color ? `--tier:${color}` : null, dataset: { itemId: String(item.id || ""), itemName: String(item.name || "") } },
+      thumb,
+      h("span", { class: "wl-pick-name", text: item.name || "Unknown", title: item.name || "" }),
+      h("span", { class: "wl-pick-meta" }, sub, h("span", { class: "wl-pick-tag", text: added ? "Added" : "Add" })));
+    el.addEventListener("click", () => {
       if (isWishlisted(item)) removeWishlist(item);
       else addWishlist(item);
     });
-    return row;
+    return el;
   }
 
-  function renderWlResults(items) {
-    const box = $("wlResults");
-    if (!box) return;
-    box.innerHTML = "";
-    wlRows = [];
-    if (!items.length) {
-      box.appendChild(h("div", { class: "wl-result empty-row", text: "No matching items." }));
-      box.hidden = false;
+  function renderWlPanel(list) {
+    const panel = $("wlPanel");
+    if (!panel) return;
+    panel.innerHTML = "";
+    panel.appendChild(
+      h("div", { class: "wl-panel-head" },
+        h("span", { class: "wl-panel-count", text: `${fmt(list.length)} ${list.length === 1 ? "result" : "results"}` }),
+        h("button", { class: "btn btn-quiet sm", type: "button", onclick: clearWlSearch }, iconEl("x"), "Close"))
+    );
+    if (!list.length) {
+      panel.appendChild(h("div", { class: "wl-empty", text: "Nothing matches. Try fewer filters." }));
+      panel.hidden = false;
       return;
     }
-    const shown = items.length > WL_RENDER_CAP ? items.slice(0, WL_RENDER_CAP) : items;
-    const frag = document.createDocumentFragment();
-    for (const item of shown) {
-      const row = wlResultRow(item);
-      wlRows.push(row);
-      frag.appendChild(row);
-    }
-    box.appendChild(frag);
-    if (items.length > WL_RENDER_CAP) box.appendChild(h("div", { class: "wl-result wl-more", text: `Showing ${WL_RENDER_CAP} of ${items.length}, keep typing to narrow.` }));
-    box.hidden = false;
+    const grid = h("div", { class: "wl-picks" });
+    let shown = 0;
+    const more = h("button", { class: "btn btn-ghost sm wl-more", type: "button" });
+    const showNext = () => {
+      for (const item of list.slice(shown, shown + WL_PAGE)) grid.appendChild(wlPick(item));
+      shown = Math.min(list.length, shown + WL_PAGE);
+      if (shown >= list.length) more.remove();
+      else more.textContent = `Show more (${fmt(list.length - shown)} left)`;
+    };
+    more.addEventListener("click", showNext);
+    panel.appendChild(grid);
+    panel.appendChild(more);
+    showNext();
+    panel.hidden = false;
   }
 
-  async function runWlSearch() {
+  async function runWlSearch(force) {
     const input = $("wlSearchInput");
-    if (!input) return;
+    const panel = $("wlPanel");
+    if (!input || !panel) return;
+    syncWlFilterUI();
     const q = input.value.trim();
-    if (!q) {
+    if (!wlHasCriteria()) {
       closeWlResults();
       return;
     }
-    const key = `${wlKind}|${q}`;
-    if (key === wlRenderedKey) return;
+    const key = JSON.stringify([wlKind, q, wlFilters]);
+    if (!force && key === wlRenderedKey) return;
     if (!wlIndex && !wlIndexFailed) {
-      const box = $("wlResults");
-      box.innerHTML = "";
-      box.appendChild(h("div", { class: "wl-result empty-row", text: "Loading items..." }));
-      box.hidden = false;
+      panel.innerHTML = "";
+      panel.appendChild(h("div", { class: "wl-empty", text: "Loading items..." }));
+      panel.hidden = false;
       try {
         await ensureWlIndex();
+        fillWlFacets();
       } catch {
         /* fall back to server search */
       }
@@ -2376,23 +2540,14 @@
     if (!wlIndex) {
       try {
         const data = await api(`/api/items/search?q=${encodeURIComponent(q)}&kind=${wlKind}`);
-        if ($("wlSearchInput") && $("wlSearchInput").value.trim() === q) renderWlResults(data.results || []);
+        if ($("wlSearchInput") && $("wlSearchInput").value.trim() === q) renderWlPanel(data.results || []);
       } catch (err) {
         toast(err.message, "error");
       }
       return;
     }
-    renderWlResults(filterWlIndex(q));
+    renderWlPanel(filterWlIndex(q));
     wlRenderedKey = key;
-  }
-
-  function moveWlActive(dir) {
-    if (!wlRows.length) return;
-    let idx = wlRows.findIndex((r) => r.classList.contains("is-active"));
-    idx = idx < 0 ? (dir > 0 ? 0 : wlRows.length - 1) : idx + dir;
-    idx = Math.max(0, Math.min(wlRows.length - 1, idx));
-    wlRows.forEach((r, i) => r.classList.toggle("is-active", i === idx));
-    wlRows[idx].scrollIntoView({ block: "nearest" });
   }
 
   /* ==========================================================================
@@ -2643,10 +2798,16 @@
 
     // Global alerts
     left.appendChild(h("div", { class: "section-title", text: "Global alerts" }));
+    const namesRow = h("div", { class: "row row-sub", hidden: !S.prefs.wishlist_nm },
+      iconEl("eye"), h("div", { class: "row-text" }, h("b", { text: "Show item names" }), h("span", { text: "Off keeps it a surprise: the DM only says an item from your wishlist is in your Night Market." })),
+      switchEl(S.prefs.nm_names, "Show item names in Night Market wishlist alerts", (on) => { S.prefs.nm_names = on; patchPrefs({ nm_names: on }).then(() => toast(`Item names ${on ? "shown" : "hidden"} in Night Market alerts.`, "ok"), () => {}); }));
     left.appendChild(
       h("div", { class: "rows" },
         h("div", { class: "row" }, iconEl("moon"), h("div", { class: "row-text" }, h("b", { text: "Night Market opens" }), h("span", { text: "One DM when the Night Market starts, for your main account." })),
           switchEl(S.prefs.nm, "Night Market alerts", (on) => { S.prefs.nm = on; patchPrefs({ nm: on }).then(() => toast(`Night Market alerts ${on ? "on" : "off"}.`, "ok"), () => {}); })),
+        h("div", { class: "row" }, iconEl("star"), h("div", { class: "row-text" }, h("b", { text: "Wishlist in Night Market" }), h("span", { text: "A DM when a skin from your wishlist is in the Night Market of any of your accounts." })),
+          switchEl(S.prefs.wishlist_nm, "Wishlist in Night Market alerts", (on) => { S.prefs.wishlist_nm = on; namesRow.hidden = !on; patchPrefs({ wishlist_nm: on }).then(() => toast(`Night Market wishlist alerts ${on ? "on" : "off"}.`, "ok"), () => {}); })),
+        namesRow,
         h("div", { class: "row" }, iconEl("layers"), h("div", { class: "row-text" }, h("b", { text: "New bundles" }), h("span", { text: "A DM the moment a new bundle hits the store." })),
           switchEl(S.prefs.bundle, "New bundle alerts", (on) => { S.prefs.bundle = on; patchPrefs({ bundle: on }).then(() => toast(`New bundle alerts ${on ? "on" : "off"}.`, "ok"), () => {}); })))
     );
@@ -2998,29 +3159,12 @@
 
     document.addEventListener("pointerdown", (e) => {
       if (menuEl && !menuEl.contains(e.target) && !(menuAnchor && menuAnchor.contains(e.target))) closeMenu();
-      const box = $("wlResults");
-      if (box && !box.hidden && !e.target.closest(".wl-search")) closeWlResults();
     });
     window.addEventListener("resize", closeMenu);
     window.addEventListener("scroll", closeMenu, { passive: true });
 
     document.addEventListener("keydown", (e) => {
-      const box = $("wlResults");
-      if (box && !box.hidden) {
-        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-          e.preventDefault();
-          moveWlActive(e.key === "ArrowDown" ? 1 : -1);
-          return;
-        }
-        if (e.key === "Enter" && document.activeElement === $("wlSearchInput")) {
-          const active = document.querySelector(".wl-result.is-active");
-          if (active) {
-            e.preventDefault();
-            active.click();
-            return;
-          }
-        }
-      }
+      const box = $("wlPanel");
       if (e.key !== "Escape") return;
       if (menuEl) closeMenu();
       else if (!$("confirmOverlay").hidden) closeConfirm(false);
@@ -3028,7 +3172,7 @@
       else if (!$("previewOverlay").hidden) closePreview();
       else if (!$("importOverlay").hidden) closeImport();
       else if (!$("addOverlay").hidden) closeAdd();
-      else if (box && !box.hidden) closeWlResults();
+      else if (box && !box.hidden) clearWlSearch();
       else if ($("sidebar").classList.contains("is-open")) closeSidebar();
     });
 

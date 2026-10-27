@@ -199,7 +199,7 @@ const SOURCES = [
         icon: l.displayIcon || icon,
       }));
       const render = (chroma0 && chroma0.fullRender) || icon;
-      const extra = { skinId: d.uuid, render, chromas, levels };
+      const extra = { skinId: d.uuid, render, chromas, levels, themeUuid: d.themeUuid || null };
       const out = [{ id: d.uuid, name: d.displayName, icon, tier, edition, ...extra }];
       for (const level of d.levels || []) {
         // Ownership grants every level of a skin, and a skin's later levels often
@@ -343,7 +343,7 @@ async function load(force = false) {
   if (loading) return loading;
 
   loading = (async () => {
-    const [results, weapons] = await Promise.all([
+    const [results, weapons, themes] = await Promise.all([
       Promise.allSettled(
         SOURCES.map(async (src) => {
           const json = await fetchJson(`${API}${src.path}`);
@@ -354,8 +354,14 @@ async function load(force = false) {
       // endpoint and key it by skin uuid. Without it the owned-skins filters in
       // the account details modal have no category to group by.
       fetchJson(`${API}/v1/weapons`).catch(() => null),
+      // Themes name each skin's collection (Reaver, Prime, ...) for the wishlist filters.
+      fetchJson(`${API}/v1/themes`).catch(() => null),
     ]);
 
+    const themeById = new Map();
+    for (const t of (themes && themes.data) || []) {
+      if (t && t.uuid && t.displayName) themeById.set(String(t.uuid).toLowerCase(), t.displayName);
+    }
     const weaponBySkin = new Map();
     for (const w of (weapons && weapons.data) || []) {
       if (!w || !w.category) continue;
@@ -381,6 +387,8 @@ async function load(force = false) {
                     enriched.category = wt.category;
                     enriched.weapon = wt.weapon;
                   }
+                  const theme = enriched.themeUuid && themeById.get(String(enriched.themeUuid).toLowerCase());
+                  if (theme) enriched.collection = theme;
                 }
                 map.set(key, enriched);
               }
@@ -553,6 +561,10 @@ function isStoreEligible(entry) {
   if (entry.type === 'skin') {
     if (!entry.tier) return false; // Standard defaults and "Random Favorite"
     if (entry.edition === LIMITED_EDITION_UUID) return false; // Champions, Arcane, VCT, ...
+    // Riot's own contracts list every battle pass and agent skin, so a new act's
+    // pass is excluded here even before skin-collections.json is regenerated.
+    const key = normalizeName(entry.name);
+    if (BP_SKIN_NAMES.has(key) || AGENT_SKIN_NAMES.has(key)) return false;
     return !isExcludedSkin(entry.name);
   }
   if (entry.type === 'buddy' || entry.type === 'spray' || entry.type === 'card' || entry.type === 'title') {
@@ -629,6 +641,17 @@ async function search(query, kind, limit = 30) {
   return out;
 }
 
+// Collection a skin belongs to: the Riot theme when the catalog has it, else the
+// name with its trailing weapon removed ("Reaver Vandal" -> "Reaver").
+function collectionOf(entry, resolved) {
+  if (entry.collection) return entry.collection;
+  const weapon = resolved && resolved.weapon;
+  const name = String((resolved && resolved.name) || entry.name || '').trim();
+  if (!weapon || weapon === 'Melee') return null;
+  const stripped = name.replace(new RegExp(`\\s*${weapon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), '').trim();
+  return stripped && stripped !== name ? stripped : null;
+}
+
 // Compact, deduped list of every store-eligible item, used by the dashboard to
 // search the wishlist catalog fully client-side (instant filtering, no cap).
 // Short keys keep the payload small; `kind` is derived from `type` on the client.
@@ -645,6 +668,13 @@ function storeIndex() {
     seen.add(key);
     const r = resolve(entry.id);
     const o = { i: r.id, n: r.name, t: r.type, c: r.icon || null };
+    if (r.type === 'skin') {
+      // Filter facets for the wishlist search: weapon, its category, tier, collection.
+      o.w = r.weapon || null;
+      o.g = r.category || null;
+      o.e = r.tier || null;
+      o.k = collectionOf(entry, r);
+    }
     if (r.type === 'card' && r.art) {
       o.a = { s: r.art.small || null, w: r.art.wide || null, l: r.art.large || null };
     }

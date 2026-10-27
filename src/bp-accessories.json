@@ -280,7 +280,15 @@
     "Bullet Buddy",
     "Radianite Crate Buddy",
     "Toaster Buddy",
-    "Ascent Rising Buddy"
+    "Ascent Rising Buddy",
+    "Insidious Buddy",
+    "Night Regent Buddy",
+    "Keys to Elysium Buddy",
+    "Last Light Buddy",
+    "Shadow Kitty Buddy",
+    "Crash Out Buddy",
+    "Strawberry Lippie Buddy",
+    "Afterboom Buddy"
   ],
   "spray": [
     "Beware of Dog Spray",
@@ -799,7 +807,22 @@
     "Vandal Life Spray",
     "Tactibear Spray",
     "Lethal Crosshair Spray",
-    "Fist Bump Spray"
+    "Fist Bump Spray",
+    "Display Only Spray",
+    "Keys to Elysium Spray",
+    "Insidious Spray",
+    "Boss Bear Spray",
+    "Crash Out Spray",
+    "Green Means Go Spray",
+    "Stained Glass // Rose Spray",
+    "11 - 11 Spray",
+    "Seen Things Spray",
+    "Time Out Spray",
+    "Rage Spray",
+    "Villain Era Spray",
+    "Every. Single. Round. Spray",
+    "Whyyyyy Spray",
+    "Baited Spray"
   ],
   "card": [
     "Paintbrush Tactics Card",
@@ -1220,7 +1243,20 @@
     "VALORANT Dawn Card",
     "OP Schema Card",
     "Vertraulich Card",
-    "MMXX EP1 Card"
+    "MMXX EP1 Card",
+    "Miks ID Card",
+    "Corrode Schema Card",
+    "Insidious Card",
+    "Keys to Elysium Card",
+    "Personal Setup // Sova Card",
+    "Fearmonger Card",
+    "Puzzles & Bears Card",
+    "Ready, Aim Card",
+    "Blue Screen of Death Card",
+    "Crash Out Card",
+    "Brushstroke // Pearl Card",
+    "Out for Blood Card",
+    "Outrun the Night Card"
   ],
   "title": [
     "Tea Title",
@@ -1321,6 +1357,9 @@
     "Catalyst Title",
     "Team Player Title",
     "Day One Title",
-    "Lone Wolf Title"
+    "Lone Wolf Title",
+    "All Gas Title",
+    "From the Grave Title",
+    "Overheating Title"
   ]
 }

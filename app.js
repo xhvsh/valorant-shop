@@ -471,6 +471,8 @@ app.get('/api/accounts', requireDiscord, async (req, res, next) => {
       order: combinedOrder,
       nm: prefs.nm === true,
       bundle: prefs.bundle === true,
+      wishlist_nm: prefs.wishlist_nm === true,
+      nm_names: prefs.nm_names === true,
     });
   } catch (err) {
     next(err);
@@ -587,6 +589,8 @@ app.put('/api/prefs', express.json(), requireDiscord, async (req, res, next) => 
       accounts: clean,
       nm: body.nm === true,
       bundle: body.bundle === true,
+      wishlist_nm: body.wishlist_nm === true,
+      nm_names: body.nm_names === true,
       order: cleanOrder(body.order),
     };
     await storage.setPrefs(discordId, prefs);
@@ -603,14 +607,21 @@ function cleanOrder(order) {
 
 // Partial prefs update: only the fields sent are changed, so toggling one
 // alert or saving a new account order never overwrites the rest. Accepts
-// { accounts: { <puuid>: { shop?, accessory?, wishlist_shop?, wishlist_accessory? } }, nm?, bundle?, order? }.
+// { accounts: { <puuid>: { shop?, accessory?, wishlist_shop?, wishlist_accessory? } }, nm?, bundle?, wishlist_nm?, nm_names?, order? }.
 const ALERT_KINDS = ['shop', 'accessory', 'wishlist_shop', 'wishlist_accessory'];
 app.patch('/api/prefs', express.json(), requireDiscord, async (req, res, next) => {
   try {
     const discordId = req.session.discordId;
     const body = req.body || {};
     const prefs = await storage.getPrefs(discordId);
-    const next_ = { accounts: { ...(prefs.accounts || {}) }, nm: prefs.nm === true, bundle: prefs.bundle === true, order: cleanOrder(prefs.order) };
+    const next_ = {
+      accounts: { ...(prefs.accounts || {}) },
+      nm: prefs.nm === true,
+      bundle: prefs.bundle === true,
+      wishlist_nm: prefs.wishlist_nm === true,
+      nm_names: prefs.nm_names === true,
+      order: cleanOrder(prefs.order),
+    };
     if (body.accounts && typeof body.accounts === 'object') {
       const owned = new Set((await storage.listAccountsByUser(discordId)).map((a) => String(a.puuid)));
       for (const [puuid, v] of Object.entries(body.accounts)) {
@@ -622,6 +633,8 @@ app.patch('/api/prefs', express.json(), requireDiscord, async (req, res, next) =
     }
     if (typeof body.nm === 'boolean') next_.nm = body.nm;
     if (typeof body.bundle === 'boolean') next_.bundle = body.bundle;
+    if (typeof body.wishlist_nm === 'boolean') next_.wishlist_nm = body.wishlist_nm;
+    if (typeof body.nm_names === 'boolean') next_.nm_names = body.nm_names;
     if (Array.isArray(body.order)) next_.order = cleanOrder(body.order);
     await storage.setPrefs(discordId, next_);
     res.json({ ok: true, prefs: next_ });
@@ -2288,7 +2301,7 @@ function sameRotation(a, b) {
 
 // Names of wishlisted items present in a shop's item list, matched by id or
 // normalized name (handles base-vs-skin-level uuid differences). Deduped.
-function wishlistMatches(list, storeItems) {
+function wishlistMatchItems(list, storeItems) {
   if (!list || !list.length || !storeItems || !storeItems.length) return [];
   const nameKey = items.normalizeName;
   const idSet = new Set(list.map((x) => String(x.id)));
@@ -2302,9 +2315,40 @@ function wishlistMatches(list, storeItems) {
     const k = nameKey(it.name);
     if (!k || seen.has(k)) continue;
     seen.add(k);
-    out.push(it.name || 'Wishlisted item');
+    out.push(it);
   }
   return out;
+}
+
+function wishlistMatches(list, storeItems) {
+  return wishlistMatchItems(list, storeItems).map((it) => it.name || 'Wishlisted item');
+}
+
+// Night Market wishlist alert text. Spoiler free by default: it only says an
+// item from the wishlist is in the Night Market ("items" when there are more),
+// so the in-game reveal stays a surprise. With `names` it lists each item and
+// its discount. `hits` is [{ name, matches: [item], expiresAt }].
+function nightMarketWishlistText(hits, names) {
+  const closes = Math.max(...hits.map((h) => h.expiresAt || 0));
+  const lines = ['**Night Market wishlist alert**'];
+  if (closes) lines.push(`-# Closes <t:${Math.floor(closes / 1000)}:R>`);
+  if (names) {
+    for (const h of hits) {
+      if (hits.length > 1) lines.push(`\`${h.name}\``);
+      for (const it of h.matches) lines.push(`• ${it.name || 'Wishlisted item'}${it.discount ? ` (-${it.discount}%)` : ''}`);
+    }
+  } else if (hits.length === 1) {
+    const h = hits[0];
+    lines.push(
+      h.matches.length === 1
+        ? `An item from your wishlist is in your Night Market on \`${h.name}\`.`
+        : `Items from your wishlist are in your Night Market on \`${h.name}\`.`
+    );
+  } else {
+    for (const h of hits) lines.push(`• \`${h.name}\`: ${h.matches.length === 1 ? 'an item' : 'items'} from your wishlist`);
+  }
+  lines.push(`-# Open the dashboard (${APP_URL}) or run /nightmarket to see it.`);
+  return lines.join('\n');
 }
 
 // A rotation with less than this left is the previous one: Riot has not flipped
@@ -2452,6 +2496,41 @@ app.get('/api/cron/dailyshop', async (req, res, next) => {
             await storage.kvSet(`nm_announced:${discordId}`, { at: liveAt }, 60 * 24 * 60 * 60 * 1000).catch(() => {});
             nmSent++;
             okLines.push(`Night Market alert sent to ${dcLog.userMention(discordId)} (${liveNames.length} account(s)).`);
+          }
+        }
+        // Night Market wishlist alert: global like the Night Market alert, one DM
+        // per event across accounts, only when a wishlisted skin is among an
+        // account's offers. Each account is marked once per Night Market (and
+        // per item), so a later wishlist addition still alerts.
+        if (prefs.wishlist_nm === true) {
+          const wlNm = await storage.getWishlist(discordId).catch(() => ({ daily: [], accessory: [] }));
+          const hits = [];
+          for (const acct of accounts) {
+            const result = results.get(acct.puuid);
+            const nm = result && result.status === 'ok' && result.store && result.store.nightMarket;
+            if (!nm || !nm.items || !nm.items.length || !nm.expiresAt) continue;
+            const matches = wishlistMatchItems(wlNm.daily, nm.items);
+            if (!matches.length) continue;
+            const markerKey = `wishlist_nm_notify:${discordId}:${acct.puuid}`;
+            const nmMarker = await storage.kvGet(markerKey).catch(() => null);
+            const sameRot = sameRotation(nmMarker && nmMarker.at, nm.expiresAt);
+            const already = new Set(sameRot && Array.isArray(nmMarker.ids) ? nmMarker.ids : []);
+            const fresh = matches.filter((m) => !already.has(m.name));
+            if (!fresh.length) continue;
+            hits.push({ name: accountDisplayName(acct), matches: fresh, expiresAt: nm.expiresAt, markerKey, ids: [...already, ...fresh.map((m) => m.name)], at: nm.expiresAt });
+          }
+          if (hits.length) {
+            try {
+              await sendDirectMessage(discordId, { content: nightMarketWishlistText(hits, prefs.nm_names === true) }, []);
+              for (const h of hits) await storage.kvSet(h.markerKey, { at: h.at, ids: h.ids }, 30 * 24 * 60 * 60 * 1000).catch(() => {});
+              wishlistSent++;
+              okLines.push(`Night Market wishlist alert sent to ${dcLog.userMention(discordId)} (${hits.length} account(s)).`);
+            } catch (e) {
+              failed++;
+              const msg = (e && e.message) || String(e);
+              console.warn(`[dailyshop] nm wishlist ${discordId} failed: ${msg}`);
+              if (!userFail) userFail = msg;
+            }
           }
         }
         // Wishlist alerts: split into a shop alert and an accessory alert, each

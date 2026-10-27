@@ -12,7 +12,7 @@ updated: 2026-10-26
 # Architecture: Cron Jobs
 
 ## Target Files & Scope
-- `app.js` (Cron section): `cronAuthorized`, `/api/cron/refresh`, `/api/cron/dailyshop`, `/api/cron/bundles`, `runBundleCheck`, `loadPrefsWithLegacy`, `wishlistMatches`, `sameRotation`.
+- `app.js` (Cron section): `cronAuthorized`, `/api/cron/refresh`, `/api/cron/dailyshop`, `/api/cron/bundles`, `runBundleCheck`, `loadPrefsWithLegacy`, `wishlistMatches`, `wishlistMatchItems`, `nightMarketWishlistText`, `sameRotation`.
 - `vercel.json`: schedules for refresh and dailyshop.
 
 ## Auth (`cronAuthorized`)
@@ -37,3 +37,8 @@ Any one of:
 ## Dependencies & Contracts
 - Internal: `src/shop.js`, `src/storage.js`, `src/discord/embeds.js`, `src/discord/log.js`, `src/grid.js`.
 - Related: [discord-bot](discord-bot.md), [vercel-entry](vercel-entry.md).
+
+## Night Market wishlist alert
+- Global prefs `wishlist_nm` (on/off) and `nm_names` (show item names, default off = spoiler free). Handled in `/api/cron/dailyshop` after the Night Market alert: one DM across accounts when a wishlisted skin is in an account's Night Market.
+- Spoiler free text says "an item from your wishlist" (or "items") per account; with names it lists each skin and its discount.
+- Marker `wishlist_nm_notify:<discordId>:<puuid>` holds `{ at: nm.expiresAt, ids }`, so each Night Market alerts once per account and a later wishlist addition still alerts.

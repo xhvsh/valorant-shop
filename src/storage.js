@@ -380,10 +380,12 @@ async function getPrefs(discordId) {
       accounts,
       nm: prefs.nm === true,
       bundle: prefs.bundle === true,
+      wishlist_nm: prefs.wishlist_nm === true,
+      nm_names: prefs.nm_names === true,
       order: Array.isArray(prefs.order) ? prefs.order : [],
     };
   }
-  return { accounts: {}, nm: false, bundle: false, order: [] };
+  return { accounts: {}, nm: false, bundle: false, wishlist_nm: false, nm_names: false, order: [] };
 }
 
 async function setPrefs(discordId, prefs) {
