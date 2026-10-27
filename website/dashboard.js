@@ -1341,6 +1341,7 @@
       media.appendChild(imgOrFallback(banner ? item.art.wide : (item.type === "card" && item.art && item.art.small) || item.icon, item.name));
     }
     if (opts.discount) media.appendChild(h("span", { class: "badge", text: `-${opts.discount}%` }));
+    if (item.owned) markOwned(el, media);
     if (opts.wishlist) {
       const star = makeStar(item);
       if (star) media.appendChild(star);
@@ -1356,6 +1357,12 @@
     el.appendChild(body);
     if (canPreview(item)) previewTrigger(el, item);
     return el;
+  }
+
+  // "Owned" tag for items the account already has (the server flags them).
+  function markOwned(el, media, animate) {
+    el.classList.add("is-owned");
+    media.appendChild(h("span", { class: `owned-tag${animate ? " nm-pop" : ""}`, title: "Already on this account" }, iconEl("check"), "Owned"));
   }
 
   function priceEl(item, oldPrice) {
@@ -1432,6 +1439,7 @@
       const row = h("div", { class: `card-meta${animate ? " nm-pop" : ""}` }, priceEl(item, base));
       body.appendChild(row);
       if (item.discount) media.appendChild(h("span", { class: `badge${animate ? " nm-pop" : ""}`, text: `-${item.discount}%` }));
+      if (item.owned) markOwned(el, media, animate);
       const star = makeStar(item);
       if (star) {
         if (animate) star.classList.add("nm-pop");
@@ -2775,7 +2783,7 @@
 
   function storeSig(store) {
     if (!store) return "";
-    const part = (b) => (b && b.items ? `${b.expiresAt || 0}:${b.items.map((i) => i.id).join(",")}` : "");
+    const part = (b) => (b && b.items ? `${b.expiresAt || 0}:${b.items.map((i) => i.id + (i.owned ? "*" : "")).join(",")}` : "");
     const w = store.wallet || {};
     return [part(store.daily), part(store.kingdomShop), part(store.nightMarket), `${w.vp}|${w.rp}|${w.kc}`].join("~");
   }

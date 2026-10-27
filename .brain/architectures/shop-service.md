@@ -14,7 +14,7 @@ updated: 2026-10-26
 - `src/shop.js`: Business layer between routes and Riot. Token renewal, store fetch + cache, account details (rank, collection, loadout), bundle memory.
 
 ## Public API
-- `getShop(discordId, puuid?, { force })` -> `{ status: 'unlinked'|'ok'|'relink'|'error', store?, account?, cached?, error? }`. No puuid = default account.
+- `getShop(discordId, puuid?, { force, owned })` -> `{ status: 'unlinked'|'ok'|'relink'|'error', store?, account?, cached?, error? }`. No puuid = default account. Returned store items the account already owns carry `owned: true` (see Owned markers); pass `owned: false` to skip that lookup (bundle callers do).
 - `cachedStoreFor(discordId, puuid, account?)`: cache-only fast path for Discord. Never calls Riot.
 - `accountDetails(discordId, puuid)`: rank (`summarizeRank`), owned skins/accessories, equipped loadout.
 - `renewTokens(auth, opts)`: used by `/api/cron/refresh` too.
@@ -29,6 +29,12 @@ updated: 2026-10-26
 6. `storefront` + `wallet` in parallel. Wallet failure is tolerated. Storefront 400 about version -> `resetClientVersion` and retry once.
 7. `buildStoreResponse` ([store-parser](store-parser.md)). Reset instant = now + `SingleItemOffersRemainingDurationInSeconds`, else next UTC midnight.
 8. Save `shop_reset` key (25 h) and `store_cache`.
+
+## Owned markers
+- `withOwned(store, discordId, account, getTokens)` copies the store and sets `owned: true` on daily, accessory and Night Market items found in the account's PD entitlements. Match key is `type:normalizedName`.
+- Never written into `store_cache` (stale as soon as the player buys). Cached in kv `owned:v1:<discordId>:<puuid>` for 3 min, holding only this store's item keys; reused only while the store has no key outside that list. Failure is cached 60 s and the store is returned unmarked.
+- Cached-store path only pays for tokens + one entitlements call on a kv miss.
+- Consumers: `cardCell` in `src/grid.js` (OWNED pill) and `card`/`nmCard` in `website/dashboard.js` (`.owned-tag`).
 
 ## Error Taxonomy
 - `REVOKED`: refresh grant dead (`invalid_grant` on 400/401/403). Mapped to `RELINK` -> status `relink`.

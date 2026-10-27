@@ -116,11 +116,11 @@ async function accountChoices(ctx, discordId, query, opts = {}) {
 async function bundlePayload(ctx, opts = {}) {
   try {
     const t0 = Date.now();
-    let result = await ctx.shop.getShop(BUNDLE_SOURCE_ID);
+    let result = await ctx.shop.getShop(BUNDLE_SOURCE_ID, undefined, { owned: false });
     console.log(`[bundle] getShop -> ${result.status} ${Date.now() - t0}ms`);
     if (result.status === 'ok' && (!result.store.bundles || !result.store.bundles.length)) {
       const t1 = Date.now();
-      result = await ctx.shop.getShop(BUNDLE_SOURCE_ID, undefined, { force: true });
+      result = await ctx.shop.getShop(BUNDLE_SOURCE_ID, undefined, { force: true, owned: false });
       console.log(`[bundle] getShop force -> ${result.status} ${Date.now() - t1}ms`);
     }
     let bundles = result.status === 'ok' ? result.store.bundles || [] : [];

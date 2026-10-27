@@ -29,7 +29,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '6';
+const GRID_CACHE_VERSION = '7';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -242,6 +242,7 @@ function cardCell(item, i, cx, cy, icon, curIcons, opts = {}) {
     s += `<rect x="${cx + CELL_W - 52}" y="${cy + 12}" width="40" height="40" rx="6" fill="#0b0c0f" fill-opacity=".72" stroke="#f4c150" stroke-opacity=".5" stroke-width="2"/>`;
     s += wishStar(cx + CELL_W - 32, cy + 32, 14);
   }
+  if (opts.owned) s += ownedBadge(cx + CELL_W - 12 - (opts.wished ? 48 : 0), cy + 12);
   return { defs, svg: s };
 }
 
@@ -294,6 +295,20 @@ function wishStar(cx, cy, r) {
     pts.push(`${(cx + rad * Math.cos(ang)).toFixed(1)},${(cy + rad * Math.sin(ang)).toFixed(1)}`);
   }
   return `<polygon points="${pts.join(' ')}" fill="#f4c150" stroke="#12141a" stroke-width="1.5" stroke-linejoin="round"/>`;
+}
+
+// Green "OWNED" pill (check + label) marking items the account already has. The
+// right edge sits at `right`, so it can slide left of the wishlist star.
+function ownedBadge(right, top) {
+  const w = 118;
+  const h = 40;
+  const x = right - w;
+  const mid = top + h / 2;
+  return (
+    `<rect x="${x}" y="${top}" width="${w}" height="${h}" rx="6" fill="#0b0c0f" fill-opacity=".78" stroke="#46d39a" stroke-opacity=".6" stroke-width="2"/>` +
+    `<path d="M${x + 14} ${mid} l6 6 l11 -12" fill="none" stroke="#46d39a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<text x="${x + 42}" y="${mid + 7}" font-family="Anton" font-size="21" letter-spacing="2" fill="#46d39a">OWNED</text>`
+  );
 }
 
 function rowSvg(r, x, centerY, emojis) {
@@ -370,7 +385,7 @@ async function renderSkinGrid(store, opts = {}) {
     const col = i % cols;
     const cx = row === rows - 1 ? lastRowX + col * (CELL_W + GAP) : PAD + col * (CELL_W + GAP);
     const cy = PAD + row * (CELL_H + GAP);
-    const c = cardCell(item, i, cx, cy, icons[i], curIcons, { showType: opts.showType, discount: Boolean(opts.discount), wished: isWished(item) });
+    const c = cardCell(item, i, cx, cy, icons[i], curIcons, { showType: opts.showType, discount: Boolean(opts.discount), wished: isWished(item), owned: Boolean(item.owned) });
     cardDefs += c.defs;
     cells += c.svg;
   });
@@ -637,7 +652,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
     const cx = row === rows - 1 ? lastRowX + col * (CELL_W + GAP) : PAD + col * (CELL_W + GAP);
     const cy = PAD + row * (CELL_H + GAP);
     // Animated cells are drawn without artwork here; each frame paints it in.
-    const c = cardCell(item, i, cx, cy, staticIcons[i], curIcons, { showType, wished: isWished(item) });
+    const c = cardCell(item, i, cx, cy, staticIcons[i], curIcons, { showType, wished: isWished(item), owned: Boolean(item.owned) });
     cardDefs += c.defs;
     cells += c.svg;
     return { cx, cy };

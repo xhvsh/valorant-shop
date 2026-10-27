@@ -248,14 +248,96 @@ async function freshStore(store) {
   return items.refreshIcons(store);
 }
 
+// ---- Owned markers -------------------------------------------------------------
+// Items in the daily shop, accessory shop and Night Market that the account
+// already owns get `owned: true`, so the website and Discord can show a
+// "purchased" mark. Ownership comes from the PD entitlements list and is applied
+// to a copy on the way out: the saved store_cache never carries it, because it
+// goes stale the moment the player buys something.
+const OWNED_TTL = 3 * 60 * 1000;
+const OWNED_FAIL_TTL = 60 * 1000;
+const OWNABLE = new Set(['skin', 'buddy', 'spray', 'card', 'title', 'flex']);
+
+function ownedKey(item) {
+  const name = items.normalizeName(item && item.name);
+  return item && OWNABLE.has(item.type) && name ? `${item.type}:${name}` : null;
+}
+
+function storeBoxes(store) {
+  return [store && store.daily, store && store.kingdomShop, store && store.nightMarket];
+}
+
+// getTokens() runs only on a cache miss, so a cached shop still costs no Riot
+// call while the ownership answer is fresh. The cache keeps just this store's
+// item keys (checked) and which of them are owned, and is reused only while the
+// store holds nothing outside `checked`.
+async function withOwned(store, discordId, account, getTokens) {
+  if (!store) return store;
+  const keys = new Set();
+  for (const box of storeBoxes(store)) {
+    for (const it of (box && box.items) || []) {
+      const k = ownedKey(it);
+      if (k) keys.add(k);
+    }
+  }
+  if (!keys.size) return store;
+
+  const cacheKey = `owned:v1:${discordId}:${account.puuid}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  let owned = null;
+  if (box && box.at && Date.now() - box.at < (box.failed ? OWNED_FAIL_TTL : OWNED_TTL)) {
+    if (box.failed) return store;
+    const checked = new Set(box.checked || []);
+    if ([...keys].every((k) => checked.has(k))) owned = new Set(box.owned || []);
+  }
+  if (!owned) {
+    try {
+      const tokens = await getTokens();
+      const res = await riot.accountEntitlements(account.shard || 'na', account.puuid, tokens);
+      const have = new Set();
+      for (const e of entitlementList(res)) {
+        if (!e || !e.ItemID) continue;
+        const k = ownedKey(items.resolve(e.ItemID));
+        if (k) have.add(k);
+      }
+      owned = new Set([...keys].filter((k) => have.has(k)));
+      await storage
+        .kvSet(cacheKey, { at: Date.now(), checked: [...keys], owned: [...owned] }, OWNED_TTL)
+        .catch(() => {});
+    } catch (e) {
+      console.warn(`[shop] owned lookup failed for ${discordId}: ${(e && e.message) || e}`);
+      await storage.kvSet(cacheKey, { at: Date.now(), failed: true }, OWNED_FAIL_TTL).catch(() => {});
+      return store;
+    }
+  }
+  if (!owned.size) return store;
+
+  const mark = (b) =>
+    b && Array.isArray(b.items)
+      ? { ...b, items: b.items.map((it) => (owned.has(ownedKey(it)) ? { ...it, owned: true } : it)) }
+      : b;
+  return { ...store, daily: mark(store.daily), kingdomShop: mark(store.kingdomShop), nightMarket: mark(store.nightMarket) };
+}
+
+// Tokens for an account whose store came from cache (no tokens in hand yet).
+async function tokensFor(discordId, account) {
+  const token = await ensureAccessToken(discordId, account.puuid, storage.decrypt(account.auth_encrypted));
+  return { ...token, entitlement: await entitlementFor(token.access_token) };
+}
+
 // Returns { status: 'unlinked' | 'ok' | 'relink' | 'error', store?, account?, error? }
-// Omit puuid to use the user's default account.
+// Omit puuid to use the user's default account. Pass `owned: false` when the
+// caller only needs the store itself (e.g. bundles) to skip the ownership lookup.
 async function getShop(discordId, puuid, opts = {}) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
   const cached = opts.force ? null : cachedStore(account, await resetAtFor(discordId, account.puuid));
-  if (cached) return { status: 'ok', store: await freshStore(cached), account, cached: true };
+  if (cached) {
+    const fresh = await freshStore(cached);
+    const store = opts.owned === false ? fresh : await withOwned(fresh, discordId, account, () => tokensFor(discordId, account));
+    return { status: 'ok', store, account, cached: true };
+  }
 
   let auth;
   try {
@@ -310,7 +392,12 @@ async function getShop(discordId, puuid, opts = {}) {
     } catch (e) {
       console.warn(`[shop] cache persist failed for ${discordId}: ${(e && e.message) || e}`);
     }
-    return { status: 'ok', store: items.refreshIcons(store), account };
+    const out = items.refreshIcons(store);
+    return {
+      status: 'ok',
+      store: opts.owned === false ? out : await withOwned(out, discordId, account, async () => tokens),
+      account,
+    };
   } catch (err) {
     if (err.code === 'RELINK') return { status: 'relink', account };
     return { status: 'error', account, error: err.message };

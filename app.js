@@ -1349,9 +1349,9 @@ app.get('/api/shop', requireDiscord, async (req, res, next) => {
 
 app.get('/api/bundles', requireDiscord, async (req, res, next) => {
   try {
-    let result = await shop.getShop(BUNDLE_SOURCE_ID);
+    let result = await shop.getShop(BUNDLE_SOURCE_ID, undefined, { owned: false });
     if (result.status === 'ok' && (!result.store.bundles || !result.store.bundles.length)) {
-      result = await shop.getShop(BUNDLE_SOURCE_ID, undefined, { force: true }).catch(() => result);
+      result = await shop.getShop(BUNDLE_SOURCE_ID, undefined, { force: true, owned: false }).catch(() => result);
     }
     let raw = result.status === 'ok' ? result.store.bundles || [] : [];
     if (!raw.length) {
@@ -1457,7 +1457,7 @@ app.post('/api/accounts/add/complete', express.json(), requireDiscord, async (re
       }
       const result = await linkAccount(req.session.discordId, tokens, null, { displayName });
       if (result.puuid) {
-        await shop.getShop(req.session.discordId, result.puuid).catch(() => null);
+        await shop.getShop(req.session.discordId, result.puuid, { owned: false }).catch(() => null);
       }
       dcLog.sendLog(`${dcLog.userMention(req.session.discordId)} linked account **${result.name}**`);
       res.json({ ...result, hasRefreshToken: Boolean(tokens.refresh_token) });
@@ -2553,7 +2553,7 @@ const BUNDLE_SEEN_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
 // leave its "already announced" marker untouched.
 async function fetchSourceBundles() {
   const result = await shop
-    .getShop(BUNDLE_SOURCE_ID, undefined, { force: true })
+    .getShop(BUNDLE_SOURCE_ID, undefined, { force: true, owned: false })
     .catch((e) => ({ status: 'error', error: (e && e.message) || e }));
   let bundles = result.status === 'ok' && result.store ? result.store.bundles || [] : [];
   let reliable = result.status === 'ok';
