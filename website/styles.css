@@ -481,6 +481,15 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .splash-mark i:nth-of-type(3) { bottom: -18px; left: -18px; border-width: 0 0 2px 2px; }
 .splash-mark i:nth-of-type(4) { bottom: -18px; right: -18px; border-width: 0 2px 2px 0; }
 @keyframes splash-brackets { 0%, 100% { opacity: .35; transform: scale(1); } 50% { opacity: 1; transform: scale(.88); } }
+.splash-brand, .landing-brand, .sb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 19px/1 var(--font-head);
+  letter-spacing: .03em;
+  text-decoration: none;
+}
+.splash-brand img, .landing-brand img, .sb-brand img { width: 28px; height: 28px; border-radius: var(--r); object-fit: cover; }
 .splash-title {
   font: 600 clamp(20px, 5.4vw, 26px)/1 var(--font-head);
   letter-spacing: .22em;
