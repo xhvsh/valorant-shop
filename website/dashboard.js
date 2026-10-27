@@ -2035,6 +2035,7 @@
   const WL_TYPES = [["", "All"], ["buddy", "Buddies"], ["spray", "Sprays"], ["card", "Cards"], ["title", "Titles"]];
   const wlFreshFilters = () => ({ weapon: "", tier: "", collection: "", type: "", hide: false });
   let wlFilters = wlFreshFilters();
+  let wlDD = {};
   const wlOps = new Map();
   let wlFlushTimer = null;
   let wlFlushActive = false;
@@ -2353,21 +2354,196 @@
     return out;
   }
 
+  /* ---------- custom dropdown ---------- */
+  // A button plus a listbox popover, so the closed control and the open list both
+  // match the rest of the UI. `searchable` adds a filter box for long lists.
+  // groups: [{ label: string | null, options: [{ value, text, n? }] }].
+  let openDropdown = null;
+  let ddBound = false;
+
+  function closeDropdown() {
+    if (openDropdown) openDropdown.close();
+  }
+
+  function dropdownEl({ id, label, allLabel, searchable, onChange }) {
+    if (!ddBound) {
+      ddBound = true;
+      document.addEventListener("pointerdown", (e) => {
+        if (openDropdown && !openDropdown.root.contains(e.target)) openDropdown.close();
+      });
+      window.addEventListener("resize", closeDropdown);
+    }
+    const labelEl = h("span", { class: "dd-label", text: allLabel });
+    const btn = h("button", { type: "button", class: "dd-btn", "aria-haspopup": "listbox", "aria-expanded": "false", "aria-label": label }, labelEl, iconEl("chevron-down"));
+    const search = searchable
+      ? h("input", { type: "search", class: "dd-search", placeholder: `Search ${label.toLowerCase()}s...`, "aria-label": `Search ${label.toLowerCase()}s`, autocomplete: "off", spellcheck: "false" })
+      : null;
+    const list = h("div", { class: "dd-list", role: "listbox", "aria-label": label });
+    const pop = h("div", { class: "dd-pop", hidden: true }, search ? h("div", { class: "dd-search-wrap" }, iconEl("search"), search) : null, list);
+    const root = h("div", { class: "dd", id }, btn, pop);
+    let groups = [];
+    let value = "";
+    let opts = [];
+
+    const visible = () => opts.filter((o) => !o.hidden);
+    const render = () => {
+      list.innerHTML = "";
+      opts = [];
+      for (const g of groups) {
+        if (g.label) list.appendChild(h("div", { class: "dd-group", role: "presentation", text: g.label, dataset: { group: g.label } }));
+        for (const o of g.options) {
+          const el = h("button", { type: "button", class: "dd-opt", role: "option", tabindex: "-1", dataset: { value: o.value, group: g.label || "" } },
+            h("span", { class: "dd-check" }, iconEl("check")),
+            h("span", { class: "dd-text", text: o.text }),
+            o.n != null ? h("span", { class: "dd-n", text: String(o.n) }) : null);
+          el.addEventListener("click", () => pick(o.value));
+          list.appendChild(el);
+          opts.push(el);
+        }
+      }
+      list.appendChild(h("div", { class: "dd-empty", hidden: true, text: "No matches." }));
+      mark();
+    };
+    const mark = () => {
+      let text = allLabel;
+      for (const g of groups) for (const o of g.options) if (o.value === value && value !== "") text = o.text;
+      labelEl.textContent = text;
+      btn.classList.toggle("is-set", value !== "");
+      for (const el of opts) {
+        const on = el.dataset.value === value;
+        el.classList.toggle("is-selected", on);
+        el.setAttribute("aria-selected", on ? "true" : "false");
+      }
+    };
+    const filter = (q) => {
+      const needle = q.trim().toLowerCase();
+      let any = false;
+      const shownGroups = new Set();
+      for (const el of opts) {
+        const text = el.querySelector(".dd-text").textContent.toLowerCase();
+        const show = !needle || el.dataset.value === "" ? !needle : text.includes(needle);
+        el.hidden = !show;
+        if (show) {
+          any = true;
+          if (el.dataset.group) shownGroups.add(el.dataset.group);
+        }
+      }
+      list.querySelectorAll(".dd-group").forEach((g) => { g.hidden = !shownGroups.has(g.dataset.group); });
+      const empty = list.querySelector(".dd-empty");
+      if (empty) empty.hidden = any;
+    };
+    const pick = (v) => {
+      value = v;
+      mark();
+      close(true);
+      onChange(v);
+    };
+    const place = () => {
+      root.classList.remove("dd-up", "dd-right");
+      const r = pop.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      if (r.bottom > innerHeight - 8 && b.top > r.height + 16) root.classList.add("dd-up");
+      if (r.right > innerWidth - 8) root.classList.add("dd-right");
+    };
+    const open = () => {
+      if (openDropdown && openDropdown.root !== root) openDropdown.close();
+      pop.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+      root.classList.add("is-open");
+      place();
+      openDropdown = api;
+      const selected = opts.find((o) => o.classList.contains("is-selected") && !o.hidden);
+      if (selected) selected.scrollIntoView({ block: "nearest" });
+      const touch = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+      if (search && !touch) search.focus();
+      else (selected || visible()[0] || btn).focus();
+    };
+    function close(restoreFocus) {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+      root.classList.remove("is-open", "dd-up", "dd-right");
+      if (search) {
+        search.value = "";
+        filter("");
+      }
+      if (openDropdown === api) openDropdown = null;
+      if (restoreFocus) btn.focus();
+    }
+    const move = (from, dir) => {
+      const list_ = visible();
+      if (!list_.length) return;
+      const i = list_.indexOf(from);
+      const next = i < 0 ? (dir > 0 ? list_[0] : list_[list_.length - 1]) : list_[Math.max(0, Math.min(list_.length - 1, i + dir))];
+      if (i === 0 && dir < 0 && search) search.focus();
+      else next.focus();
+    };
+
+    btn.addEventListener("click", () => (pop.hidden ? open() : close(false)));
+    btn.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (pop.hidden) open();
+      }
+    });
+    if (search) search.addEventListener("input", () => filter(search.value));
+    pop.addEventListener("keydown", (e) => {
+      const el = document.activeElement;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        close(true);
+      } else if (e.key === "Tab") {
+        close(false);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        move(el === search ? null : el, e.key === "ArrowDown" ? 1 : -1);
+      } else if (e.key === "Home" || e.key === "End") {
+        if (el === search) return;
+        e.preventDefault();
+        const v = visible();
+        (e.key === "Home" ? v[0] : v[v.length - 1]).focus();
+      } else if (e.key === "Enter" && el === search) {
+        e.preventDefault();
+        const first = visible().find((o) => o.dataset.value !== "") || visible()[0];
+        if (first) pick(first.dataset.value);
+      } else if (e.key.length === 1 && el !== search && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const hit = visible().find((o) => o.querySelector(".dd-text").textContent.toLowerCase().startsWith(e.key.toLowerCase()));
+        if (hit) hit.focus();
+      }
+    });
+
+    const api = {
+      root,
+      close,
+      setGroups(next) {
+        groups = next;
+        render();
+      },
+      setValue(v) {
+        value = v || "";
+        mark();
+      },
+    };
+    render();
+    return api;
+  }
+
   // Filter row: weapon, tier and collection for skins; type for accessories.
   // Built once per view, updated in place so a select never loses focus.
   function buildWlFilters() {
     const box = $("wlFilters");
     if (!box) return;
     box.innerHTML = "";
+    closeDropdown();
+    wlDD = {};
     const changed = () => {
       syncWlFilterUI();
       runWlSearch(true);
     };
     if (wlKind === "daily") {
-      const weapon = h("select", { class: "input select", id: "wlWeapon", "aria-label": "Weapon" }, h("option", { value: "", text: "All weapons" }));
-      const collection = h("select", { class: "input select", id: "wlCollection", "aria-label": "Collection" }, h("option", { value: "", text: "All collections" }));
-      weapon.addEventListener("change", () => { wlFilters.weapon = weapon.value; changed(); });
-      collection.addEventListener("change", () => { wlFilters.collection = collection.value; changed(); });
+      wlDD.weapon = dropdownEl({ id: "wlWeapon", label: "Weapon", allLabel: "All weapons", onChange: (v) => { wlFilters.weapon = v; changed(); } });
+      wlDD.collection = dropdownEl({ id: "wlCollection", label: "Collection", allLabel: "All collections", searchable: true, onChange: (v) => { wlFilters.collection = v; changed(); } });
       const tiers = h("div", { class: "wl-pills", role: "group", "aria-label": "Tier" });
       for (const t of WL_TIERS) {
         const color = tierColor(t);
@@ -2375,8 +2551,8 @@
         b.addEventListener("click", () => { wlFilters.tier = wlFilters.tier === t ? "" : t; changed(); });
         tiers.appendChild(b);
       }
-      box.appendChild(weapon);
-      box.appendChild(collection);
+      box.appendChild(wlDD.weapon.root);
+      box.appendChild(wlDD.collection.root);
       box.appendChild(tiers);
     } else {
       const types = h("div", { class: "wl-pills", role: "group", "aria-label": "Type" });
@@ -2387,9 +2563,10 @@
       }
       box.appendChild(types);
     }
-    const hide = h("input", { type: "checkbox", id: "wlHide" });
-    hide.addEventListener("change", () => { wlFilters.hide = hide.checked; changed(); });
-    box.appendChild(h("label", { class: "wl-check" }, hide, h("span", { text: "Hide items on my wishlist" })));
+    const hide = h("button", { type: "button", class: "wl-hide", id: "wlHide", role: "switch", "aria-checked": "false" },
+      h("span", { class: "wl-hide-track", "aria-hidden": "true" }), h("span", { text: "Hide items on my wishlist" }));
+    hide.addEventListener("click", () => { wlFilters.hide = !wlFilters.hide; changed(); });
+    box.appendChild(hide);
     const clear = h("button", { type: "button", class: "btn btn-quiet sm wl-clear", id: "wlClear", hidden: true }, iconEl("x"), "Clear");
     clear.addEventListener("click", clearWlSearch);
     box.appendChild(clear);
@@ -2399,10 +2576,7 @@
 
   // Weapon and collection options come from the loaded index, with counts.
   function fillWlFacets() {
-    if (!wlIndex || wlKind !== "daily") return;
-    const weaponSel = $("wlWeapon");
-    const collSel = $("wlCollection");
-    if (!weaponSel || !collSel) return;
+    if (!wlIndex || wlKind !== "daily" || !wlDD.weapon || !wlDD.collection) return;
     const byCat = new Map();
     const colls = new Map();
     for (const it of wlIndex) {
@@ -2415,25 +2589,25 @@
       }
       if (it.collection) colls.set(it.collection, (colls.get(it.collection) || 0) + 1);
     }
-    weaponSel.length = 1;
-    collSel.length = 1;
     const cats = [...WL_CATEGORIES.filter((c) => byCat.has(c)), ...[...byCat.keys()].filter((c) => !WL_CATEGORIES.includes(c)).sort()];
+    const weaponGroups = [{ label: null, options: [{ value: "", text: "All weapons" }] }];
     for (const cat of cats) {
-      const group = h("optgroup", { label: WL_CATEGORY_LABEL[cat] || cat });
-      for (const [w, n] of [...byCat.get(cat)].sort((a, b) => a[0].localeCompare(b[0]))) group.appendChild(h("option", { value: w, text: `${w} (${n})` }));
-      weaponSel.appendChild(group);
+      weaponGroups.push({
+        label: WL_CATEGORY_LABEL[cat] || cat,
+        options: [...byCat.get(cat)].sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ value: w, text: w, n })),
+      });
     }
-    for (const [c, n] of [...colls].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))) collSel.appendChild(h("option", { value: c, text: `${c} (${n})` }));
-    weaponSel.value = wlFilters.weapon;
-    collSel.value = wlFilters.collection;
+    wlDD.weapon.setGroups(weaponGroups);
+    wlDD.collection.setGroups([
+      { label: null, options: [{ value: "", text: "All collections" }] },
+      { label: null, options: [...colls].sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" })).map(([c, n]) => ({ value: c, text: c, n })) },
+    ]);
   }
 
   function syncWlFilterUI() {
     const f = wlFilters;
-    const weaponSel = $("wlWeapon");
-    const collSel = $("wlCollection");
-    if (weaponSel) weaponSel.value = f.weapon;
-    if (collSel) collSel.value = f.collection;
+    if (wlDD.weapon) wlDD.weapon.setValue(f.weapon);
+    if (wlDD.collection) wlDD.collection.setValue(f.collection);
     document.querySelectorAll("#wlFilters [data-tier]").forEach((b) => {
       const on = b.dataset.tier === f.tier;
       b.classList.toggle("is-active", on);
@@ -2445,7 +2619,7 @@
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     const hide = $("wlHide");
-    if (hide) hide.checked = f.hide;
+    if (hide) hide.setAttribute("aria-checked", f.hide ? "true" : "false");
     const input = $("wlSearchInput");
     const clear = $("wlClear");
     if (clear) clear.hidden = !(wlHasCriteria() || f.hide || (input && input.value));
