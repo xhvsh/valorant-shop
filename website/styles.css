@@ -2141,10 +2141,9 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   .overlay.is-closing .modal, .overlay.is-closing .modal.modal-sm, .overlay.is-closing .modal.modal-wide { animation: sheet-out .24s cubic-bezier(.4, 0, 1, 1) forwards; }
   .modal-actions .btn { flex: 1; }
   .modal { margin: auto 0 0; }
-  .menu.sheet { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; }
   .toasts { right: 16px; left: 16px; width: auto; }
   .update-pill { left: 12px; right: 12px; transform: none; justify-content: space-between; animation-name: pill-up-mobile; }
-  .menu { width: min(300px, calc(100vw - 24px)); }
+  .menu { width: min(320px, calc(100vw - 24px)); }
 }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes sheet-out { from { transform: translateY(var(--drag, 0px)); } to { transform: translateY(100%); } }

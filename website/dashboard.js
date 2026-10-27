@@ -986,25 +986,22 @@
       menu.appendChild(btn);
     }
     document.body.appendChild(menu);
-    if (window.innerWidth < 720) {
-      // Phones: a bottom sheet, always fully on screen.
-      menu.classList.add("sheet");
-    } else {
-      const r = anchor.getBoundingClientRect();
-      const vw = document.documentElement.clientWidth;
-      const vh = window.innerHeight;
-      const mw = menu.offsetWidth;
-      const mh = Math.min(menu.offsetHeight, vh - 24);
-      // Right-align to the anchor when it sits in the right half of the screen.
-      let left = r.left + r.width / 2 > vw / 2 ? r.right - mw : r.left;
-      left = Math.max(12, Math.min(left, vw - mw - 12));
-      let top = r.bottom + 6;
-      if (top + mh > vh - 12) top = r.top - mh - 6 >= 12 ? r.top - mh - 6 : Math.max(12, vh - mh - 12);
-      menu.style.left = `${left}px`;
-      menu.style.top = `${top}px`;
-      menu.style.maxHeight = `${vh - 24}px`;
-      menu.style.overflowY = "auto";
-    }
+    // Opens right under the anchor (above it when there is no room below), kept
+    // fully on screen, on phones too.
+    const r = anchor.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    const mw = menu.offsetWidth;
+    const mh = Math.min(menu.offsetHeight, vh - 24);
+    // Right-align to the anchor when it sits in the right half of the screen.
+    let left = r.left + r.width / 2 > vw / 2 ? r.right - mw : r.left;
+    left = Math.max(12, Math.min(left, vw - mw - 12));
+    let top = r.bottom + 6;
+    if (top + mh > vh - 12) top = r.top - mh - 6 >= 12 ? r.top - mh - 6 : Math.max(12, vh - mh - 12);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.maxHeight = `${vh - 24}px`;
+    menu.style.overflowY = "auto";
     anchor.setAttribute("aria-expanded", "true");
     menuEl = menu;
     menuAnchor = anchor;
