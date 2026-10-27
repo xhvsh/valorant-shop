@@ -927,6 +927,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 }
 .acct-card:hover { border-color: var(--line-2); transform: translateY(-2px); box-shadow: var(--shadow); }
 .acct-card.is-main { border-top: 2px solid var(--red); }
+.acct-card.is-shared { border-top: 2px solid var(--blue); }
 .acct-card-top { display: flex; align-items: center; gap: 12px; padding: 16px 16px 12px; }
 .acct-card-id { min-width: 0; flex: 1; }
 .acct-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/1.2 var(--font); }

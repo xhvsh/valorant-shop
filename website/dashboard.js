@@ -1167,7 +1167,7 @@
   }
 
   function accountCardEl(a) {
-    const card = h("a", { class: `acct-card${a.is_default ? " is-main" : ""}`, href: acctHref(a.puuid), dataset: { card: a.puuid } });
+    const card = h("a", { class: `acct-card${a.is_default ? " is-main" : ""}${a.shared ? " is-shared" : ""}`, href: acctHref(a.puuid), dataset: { card: a.puuid } });
     const chips = h("div", { class: "acct-card-chips" });
     if (a.shard) chips.appendChild(h("span", { class: "chip", text: a.shard.toUpperCase() }));
     if (a.is_default) chips.appendChild(h("span", { class: "chip main" }, iconEl("crown"), "Main"));
