@@ -1120,11 +1120,14 @@
     const d = S.details[a.puuid];
     const loading = !d && S.detailsPending[a.puuid];
     const stats = h("div", { class: "stats" });
-    const stat = (label, ...content) => h("div", { class: "stat" }, h("div", { class: "stat-label", text: label }), ...content);
-    const skLine = () => h("div", { class: "stat-value" }, h("span", { class: "sk sk-line w60" }));
+    // label on top, content in the middle, an optional footer pinned to the bottom
+    const stat = (label, body, foot) =>
+      h("div", { class: "stat" }, h("div", { class: "stat-label", text: label }), h("div", { class: "stat-body" }, ...body), foot ? h("div", { class: "stat-foot" }, foot) : null);
+    const sk = () => [h("span", { class: "sk sk-line w60" })];
+    const emblem = (icon) => (icon ? h("span", { class: "emblem md", style: "background:transparent" }, makeImg(icon, "")) : null);
 
     // Rank
-    if (loading) stats.appendChild(stat("Rank", skLine()));
+    if (loading) stats.appendChild(stat("Rank", sk()));
     else if (d && d.rank) {
       const rank = d.rank;
       const ranked = Number(rank.tier) >= 3;
@@ -1134,41 +1137,53 @@
       const sub = !ranked ? "No placement this act" : top ? `${fmt(rr)} RR${rank.leaderboard ? ` · #${fmt(rank.leaderboard)}` : ""}` : `${fmt(rr)} / 100 RR`;
       stats.appendChild(
         stat("Rank",
-          h("div", { class: "stat-value" },
-            rank.icon ? h("span", { class: "emblem md", style: "background:transparent" }, makeImg(rank.icon, "")) : null,
-            h("div", { style: "min-width:0" }, h("div", { class: "stat-big", text: ranked ? rank.tierName : "Unranked" }), h("div", { class: "stat-sub", text: sub }))),
+          [emblem(rank.icon), h("div", null, h("div", { class: "stat-big", text: ranked ? rank.tierName : "Unranked" }), h("div", { class: "stat-sub", text: sub }))],
           ranked ? h("div", { class: "rr-bar", style: `--tier:${color}` }, h("span", { style: `width:${top ? 100 : Math.min(100, rr)}%` })) : null)
       );
-    } else stats.appendChild(stat("Rank", h("div", { class: "stat-value faint", text: "Unavailable" })));
+    } else stats.appendChild(stat("Rank", [h("span", { class: "faint", text: "Unavailable" })]));
 
     // Peak
-    if (loading) stats.appendChild(stat("Peak rank", skLine()));
+    if (loading) stats.appendChild(stat("Peak rank", sk()));
     else {
       const rank = d && d.rank;
       const hasPeak = rank && Number(rank.peakTier) >= 3 && rank.peakName;
       stats.appendChild(
-        stat("Peak rank",
-          h("div", { class: "stat-value" },
-            hasPeak && rank.peakIcon ? h("span", { class: "emblem md", style: "background:transparent" }, makeImg(rank.peakIcon, "")) : null,
-            h("div", { class: "stat-big", text: hasPeak ? rank.peakName : "-" })))
+        stat("Peak rank", [
+          hasPeak ? emblem(rank.peakIcon) : null,
+          h("div", null, h("div", { class: "stat-big", text: hasPeak ? rank.peakName : "-" }), h("div", { class: "stat-sub", text: hasPeak ? "Best across all acts" : "No ranked games" })),
+        ])
       );
     }
 
     // Collection
-    if (loading) stats.appendChild(stat("Collection", skLine()));
+    if (loading) stats.appendChild(stat("Collection", sk()));
     else {
       const skins = d && d.skins ? d.skins.count || 0 : null;
       const acc = d ? ["buddies", "sprays", "cards", "flexes"].reduce((n, k) => n + (Array.isArray(d[k]) ? d[k].length : 0), 0) : null;
-      stats.appendChild(
-        stat("Collection",
-          h("div", { class: "stat-value" },
-            h("div", null, h("div", { class: "stat-big", text: skins === null ? "-" : `${fmt(skins)} skins` }), acc ? h("div", { class: "stat-sub", text: `${fmt(acc)} accessories` }) : null)))
-      );
+      const num = (v, unit) => h("div", { class: "stat-num" }, h("b", { text: v === null ? "-" : fmt(v) }), h("span", { text: unit }));
+      stats.appendChild(stat("Collection", [h("div", { class: "stat-pair" }, num(skins, "Skins"), num(acc, "Accessories"))]));
     }
 
     // Wallet
-    stats.appendChild(stat("Wallet", walletEl(a)));
+    stats.appendChild(stat("Wallet", [walletRowsEl(a)]));
     return stats;
+  }
+
+  // Stacked currency rows for the stat box: icon and code on the left, the
+  // balance right-aligned so the numbers line up.
+  function walletRowsEl(a) {
+    const w = walletOf(a);
+    if (!w && a.linked && S.storePending[a.puuid]) {
+      return h("div", { class: "wallet-rows" }, ...[0, 1, 2].map(() => h("span", { class: "sk", style: "height:18px" })));
+    }
+    const ww = w || {};
+    const row = (code) => {
+      const v = ww[code];
+      const na = v === null || v === undefined;
+      return h("div", { class: `wallet-row${na ? " na" : ""}`, title: code.toUpperCase() },
+        makeImg(CURRENCY_ICON[code], code.toUpperCase()), h("span", { class: "wr-code", text: code.toUpperCase() }), h("span", { class: "wr-val", text: na ? "-" : fmt(v) }));
+    };
+    return h("div", { class: "wallet-rows" }, row("vp"), row("rp"), row("kc"));
   }
 
   function accountMenu(a) {

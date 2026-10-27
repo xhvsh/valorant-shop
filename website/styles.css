@@ -443,31 +443,23 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .splash > :nth-child(3) { animation-delay: .16s; }
 .splash > :nth-child(4) { animation-delay: .24s; }
 @keyframes splash-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-/* The Valorant V, dim, with a red copy that fills in from the bottom on a loop.
-   Four sharp corner brackets frame it. */
+/* The shop logo, breathing, framed by four sharp corner brackets. */
 .splash-mark {
   position: relative;
-  width: clamp(64px, 18vw, 88px);
+  width: clamp(76px, 22vw, 96px);
   aspect-ratio: 1;
   margin-bottom: clamp(28px, 4.5vh, 36px);
 }
-.splash-v {
+.splash-logo {
   position: absolute;
   inset: 0;
-  background: var(--surface-3);
-  -webkit-mask: url("valorant-v.svg") center / contain no-repeat;
-  mask: url("valorant-v.svg") center / contain no-repeat;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  animation: splash-logo 1.9s ease-in-out infinite;
 }
-.splash-v.fill {
-  background: var(--red);
-  animation: splash-fill 1.9s var(--ease) infinite;
-}
-@keyframes splash-fill {
-  0% { clip-path: inset(100% 0 0 0); opacity: 1; }
-  60% { clip-path: inset(0); opacity: 1; }
-  85% { clip-path: inset(0); opacity: 1; }
-  100% { clip-path: inset(0); opacity: 0; }
-}
+@keyframes splash-logo { 0%, 100% { opacity: .72; transform: scale(.97); } 50% { opacity: 1; transform: scale(1); } }
 .splash-mark i {
   position: absolute;
   width: 14px;
@@ -513,7 +505,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
 @media (prefers-reduced-motion: reduce) {
   .splash > * { animation: none; }
-  .splash-v.fill { animation: none; }
+  .splash-logo { animation: none; }
   .splash-mark i { animation: none; opacity: .8; }
   .splash-bar span { animation: none; width: 100%; opacity: .5; }
 }
@@ -1072,18 +1064,32 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   margin-bottom: var(--gap);
 }
 .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 14px 16px 16px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--surface);
 }
-.stat-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.stat-value { display: flex; align-items: center; gap: 10px; margin-top: 8px; min-height: 34px; }
-.stat-big { font: 600 clamp(15px, 1.5vw, 20px)/1.15 var(--font-head); letter-spacing: .04em; text-transform: uppercase; }
-.stat-sub { color: var(--text-2); font: 500 12px/1.2 var(--font-mono); }
-.stat .rr-bar { margin-top: 10px; }
-.stat .wallet { margin-top: 8px; }
+.stat-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.stat-body { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; min-height: 52px; }
+.stat-body > div { min-width: 0; }
+.stat-foot { margin-top: auto; }
+.stat-big { font: 600 clamp(17px, 1.6vw, 22px)/1.1 var(--font-head); letter-spacing: .04em; text-transform: uppercase; overflow-wrap: anywhere; }
+.stat-sub { margin-top: 4px; color: var(--text-3); font: 500 12px/1.2 var(--font-mono); }
+.stat .emblem.md { width: 52px; height: 52px; }
+.stat-pair { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.stat-num { display: grid; gap: 4px; }
+.stat-num b { font: 600 clamp(24px, 2.3vw, 32px)/1 var(--font-head); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.stat-num span { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.wallet-rows { display: grid; gap: 7px; width: 100%; }
+.wallet-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wallet-row img { width: 18px; height: 18px; flex: none; }
+.wallet-row .wr-code { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; }
+.wallet-row .wr-val { margin-left: auto; font: 500 14px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.wallet-row.na .wr-val { color: var(--text-3); }
 
 /* tabs */
 .tabs {
@@ -1358,12 +1364,10 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .about-stats span { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 
 /* ---------- sharing panel ---------- */
-.share-box { display: grid; gap: var(--gap); max-width: 1000px; }
+.share-box { display: grid; gap: var(--gap); }
 .share-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); align-items: start; }
-.share-cols > .share-card { max-width: 560px; }
 @media (min-width: 1180px) {
   .share-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .share-cols > .share-card { max-width: none; }
 }
 .share-card {
   display: grid;
@@ -1375,7 +1379,6 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   border-radius: var(--r-lg);
   background: var(--surface);
 }
-.share-intro { max-width: 560px; }
 .share-note { margin: 0; font-size: 12.5px; line-height: 1.5; }
 .share-code {
   display: flex;
@@ -1861,9 +1864,10 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   .hero-actions { width: 100%; }
   .hero-actions .btn { flex: 1; }
   .stats { gap: 8px; }
-  .stat { padding: 12px; }
+  .stat { padding: 12px 12px 14px; gap: 10px; }
   .stat-big { font-size: 16px; }
-  .stat .emblem.md { width: 34px; height: 34px; }
+  .stat .emblem.md { width: 40px; height: 40px; }
+  .stat-body { gap: 10px; min-height: 44px; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .grid.acc, .grid.daily { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .card-media { height: 104px; padding: 10px; }
@@ -1910,6 +1914,11 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   .menu { width: min(300px, calc(100vw - 24px)); }
 }
 @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (max-width: 520px) {
+  .stat-pair { flex-direction: column; gap: 6px; }
+  .stat-num { display: flex; align-items: baseline; gap: 7px; }
+}
 
 @media (max-width: 340px) {
   .grid, .grid.acc, .grid.daily, .nm-grid { grid-template-columns: minmax(0, 1fr); }
