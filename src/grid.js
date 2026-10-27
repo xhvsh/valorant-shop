@@ -297,17 +297,21 @@ function wishStar(cx, cy, r) {
   return `<polygon points="${pts.join(' ')}" fill="#f4c150" stroke="#12141a" stroke-width="1.5" stroke-linejoin="round"/>`;
 }
 
-// Green "OWNED" pill (check + label) marking items the account already has. The
-// right edge sits at `right`, so it can slide left of the wishlist star.
+// Solid green "OWNED" pill (dark check disc + label) marking items the account
+// already has. The right edge sits at `right`, so it can slide left of the
+// wishlist star.
 function ownedBadge(right, top) {
-  const w = 118;
+  const w = 128;
   const h = 40;
   const x = right - w;
   const mid = top + h / 2;
   return (
-    `<rect x="${x}" y="${top}" width="${w}" height="${h}" rx="6" fill="#0b0c0f" fill-opacity=".78" stroke="#46d39a" stroke-opacity=".6" stroke-width="2"/>` +
-    `<path d="M${x + 14} ${mid} l6 6 l11 -12" fill="none" stroke="#46d39a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<text x="${x + 42}" y="${mid + 7}" font-family="Anton" font-size="21" letter-spacing="2" fill="#46d39a">OWNED</text>`
+    `<rect x="${x}" y="${top + 2}" width="${w}" height="${h}" rx="${h / 2}" fill="#000000" fill-opacity=".35"/>` +
+    `<rect x="${x}" y="${top}" width="${w}" height="${h}" rx="${h / 2}" fill="#46d39a"/>` +
+    `<rect x="${x + 1.5}" y="${top + 1.5}" width="${w - 3}" height="${h - 3}" rx="${(h - 3) / 2}" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="1.5"/>` +
+    `<circle cx="${x + 22}" cy="${mid}" r="12" fill="#0b2a1f"/>` +
+    `<path d="M${x + 16.5} ${mid + 0.5} l4 4 l7.5 -8.5" fill="none" stroke="#46d39a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<text x="${x + 42}" y="${mid + 7.5}" font-family="Anton" font-size="21" letter-spacing="2.5" fill="#0b2a1f">OWNED</text>`
   );
 }
 

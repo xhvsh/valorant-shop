@@ -1147,7 +1147,6 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   text-transform: uppercase;
 }
 .owned-tag .i { font-size: 12px; }
-.card.is-owned { border-color: rgba(70, 211, 154, .3); }
 .card.is-owned .card-media img { opacity: .72; }
 .star-btn {
   position: absolute;
