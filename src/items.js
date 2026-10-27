@@ -652,6 +652,21 @@ function collectionOf(entry, resolved) {
   return stripped && stripped !== name ? stripped : null;
 }
 
+// Wishlist collection filter groups bundles of the same line: sequels and
+// remasters share one entry ("Prime" + "Prime//2.0", "Prism" + "Prism II" +
+// "Prism//Reloaded Outlaw", "VALORANT GO! Vol. 1-3"). Strips anything after
+// "//", a trailing "Vol. N", a roman numeral II-X and a version like "2.0".
+function collectionFamily(name) {
+  if (!name) return name;
+  const base = String(name)
+    .replace(/\s*\/\/.*$/, '')
+    .replace(/\s+Vol\.?\s*\d+$/i, '')
+    .replace(/\s+(?:II|III|IV|V|VI|VII|VIII|IX|X)$/, '')
+    .replace(/\s+\d\.\d$/, '')
+    .trim();
+  return base || name;
+}
+
 // Compact, deduped list of every store-eligible item, used by the dashboard to
 // search the wishlist catalog fully client-side (instant filtering, no cap).
 // Short keys keep the payload small; `kind` is derived from `type` on the client.
@@ -673,7 +688,7 @@ function storeIndex() {
       o.w = r.weapon || null;
       o.g = r.category || null;
       o.e = r.tier || null;
-      o.k = collectionOf(entry, r);
+      o.k = collectionFamily(collectionOf(entry, r));
     }
     if (r.type === 'card' && r.art) {
       o.a = { s: r.art.small || null, w: r.art.wide || null, l: r.art.large || null };
