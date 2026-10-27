@@ -1478,6 +1478,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 }
 .wl-pills .pill:hover { border-color: var(--text-3); }
 .wl-pills .pill.is-active { border-color: var(--red-line); background: var(--red-soft); color: var(--text); }
+.tier-icon { display: block; width: 20px; height: 20px; object-fit: contain; }
+.card-tier { display: inline-flex; flex: none; align-items: center; }
+.card-tier .tier-icon { width: 22px; height: 22px; }
+.wl-pick-sub .tier-icon { width: 18px; height: 18px; }
+.wl-pills .pill-tier { justify-content: center; min-width: 42px; padding: 0 10px; }
+.wl-pills .pill-tier .tier-icon { width: 20px; height: 20px; opacity: .65; transition: opacity .15s; }
+.wl-pills .pill-tier:hover .tier-icon, .wl-pills .pill-tier.is-active .tier-icon { opacity: 1; }
 .pill .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; vertical-align: 0; }
 .wl-hide {
   display: inline-flex;

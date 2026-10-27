@@ -131,6 +131,23 @@
     const key = String(tier || "").toLowerCase().replace(/\s*edition/gi, "").trim();
     return TIER_COLORS[key] || null;
   }
+  // Riot's content tier icons (valorant-api.com), keyed like TIER_COLORS.
+  const TIER_ICON_IDS = {
+    select: "12683d76-48d7-84a3-4e09-6985794f0445",
+    deluxe: "0cebb8be-46d7-c12a-d306-e9907bfc5a25",
+    premium: "60bca009-4182-7998-dee7-b8a2558dc369",
+    exclusive: "e046854e-406c-37f4-6607-19a9ba8426fc",
+    ultra: "411e4a55-4e59-7757-41f0-86a53f101bb5",
+  };
+  // The tier as its icon, with the name as tooltip and accessible label. Null for
+  // items without a known tier.
+  function tierIconEl(tier) {
+    const key = String(tier || "").toLowerCase().replace(/\s*edition/gi, "").trim();
+    const id = TIER_ICON_IDS[key];
+    if (!id) return null;
+    const name = `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+    return h("img", { class: "tier-icon", src: `https://media.valorant-api.com/contenttiers/${id}/displayicon.png`, alt: name, title: name, loading: "lazy", decoding: "async" });
+  }
   function hexTint(hex, alpha) {
     const n = parseInt(String(hex || "#8b929c").replace("#", "").slice(0, 6), 16) || 0;
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -1372,7 +1389,10 @@
     const meta = h("div", { class: "card-meta" });
     meta.appendChild(priceEl(item, opts.oldPrice));
     if (opts.showType && TYPE_LABEL[item.type]) meta.appendChild(h("span", { class: "card-type", text: TYPE_LABEL[item.type] }));
-    else if (item.tier) meta.appendChild(h("span", { class: "card-type", style: color ? `color:${color}` : null, text: item.tier }));
+    else if (item.tier) {
+      const icon = tierIconEl(item.tier);
+      meta.appendChild(icon ? h("span", { class: "card-tier" }, icon) : h("span", { class: "card-type", style: color ? `color:${color}` : null, text: item.tier }));
+    }
     body.appendChild(meta);
     el.appendChild(body);
     if (canPreview(item)) previewTrigger(el, item);
@@ -2634,8 +2654,7 @@
       wlDD.collection = dropdownEl({ id: "wlCollection", label: "Collection", allLabel: "Collection", searchable: true, toggle: true, onChange: (v) => { wlFilters.collection = v; changed(); } });
       const tiers = h("div", { class: "wl-pills", role: "group", "aria-label": "Tier" });
       for (const t of WL_TIERS) {
-        const color = tierColor(t);
-        const b = h("button", { type: "button", class: "pill", dataset: { tier: t }, "aria-pressed": "false" }, color ? h("i", { class: "dot", style: `background:${color}` }) : null, t);
+        const b = h("button", { type: "button", class: "pill pill-tier", title: t, "aria-label": t, dataset: { tier: t }, "aria-pressed": "false" }, tierIconEl(t) || t);
         b.addEventListener("click", () => { wlFilters.tier = wlFilters.tier === t ? "" : t; changed(); });
         tiers.appendChild(b);
       }
@@ -2739,7 +2758,7 @@
     if (canPreview(item)) thumb.addEventListener("click", () => openPreview(item));
     const sub = h("span", { class: "wl-pick-sub" });
     if (item.type === "skin") {
-      if (item.tier) sub.appendChild(h("span", { style: color ? `color:${color}` : null, text: item.tier }));
+      if (item.tier) sub.appendChild(tierIconEl(item.tier) || h("span", { style: color ? `color:${color}` : null, text: item.tier }));
     } else sub.textContent = TYPE_LABEL[item.type] || "";
     const label = added ? `Remove ${item.name || "item"} from wishlist` : `Add ${item.name || "item"} to wishlist`;
     const body = h("button", { type: "button", class: "wl-pick-body", title: added ? "Remove from wishlist" : "Add to wishlist", "aria-label": label },

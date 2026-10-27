@@ -29,7 +29,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '7';
+const GRID_CACHE_VERSION = '8';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -164,6 +164,16 @@ function tierColor(tier) {
 }
 
 // Artwork a card should show: player cards use their wide banner.
+// Content tier icon (data URI) per item, null when it has no tier or it failed to load.
+function loadTierIcons(items) {
+  return Promise.all(
+    items.map(async (it) => {
+      const url = it && it.tier ? await tierIcon(it.tier) : null;
+      return url ? cachedIcon(url) : null;
+    })
+  );
+}
+
 function cardArtUrl(item) {
   if (item.type === 'card' && item.art && (item.art.wide || item.art.small)) return item.art.wide || item.art.small;
   return item.staticIcon || item.icon || null;
@@ -225,9 +235,13 @@ function cardCell(item, i, cx, cy, icon, curIcons, opts = {}) {
     const label = item.price === null || item.price === undefined ? priceStr : priceLabel(item);
     s += `<text x="${px}" y="${base}" font-family="JetBrains Mono" font-size="26" fill="${CARD_TEXT}">${esc(label)}</text>`;
   }
-  // Tier (in its colour) when the item has one, else the type when asked for.
+  // Tier icon when the item has one (the name in its colour if the icon is
+  // unavailable), else the type when asked for.
   const tag = item.tier || (opts.showType && TYPE_LABEL[item.type]) || '';
-  if (tag) {
+  if (item.tier && opts.tierIcon) {
+    const ts = 40;
+    s += `<image xlink:href="${opts.tierIcon}" x="${cx + CELL_W - 22 - ts + 4}" y="${base - ts + 8}" width="${ts}" height="${ts}" preserveAspectRatio="xMidYMid meet"/>`;
+  } else if (tag) {
     s += `<text x="${cx + CELL_W - 22}" y="${base - 1}" text-anchor="end" font-family="Anton" font-size="20" letter-spacing="2" fill="${item.tier && color ? color : CARD_MUTED}">${esc(String(tag).toUpperCase())}</text>`;
   }
   s += '</g>';
@@ -362,6 +376,7 @@ async function renderSkinGrid(store, opts = {}) {
   );
   const [vpI, kcI] = await Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]);
   const curIcons = { vp: vpI, kc: kcI };
+  const tierIcons = await loadTierIcons(items);
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);
@@ -389,7 +404,7 @@ async function renderSkinGrid(store, opts = {}) {
     const col = i % cols;
     const cx = row === rows - 1 ? lastRowX + col * (CELL_W + GAP) : PAD + col * (CELL_W + GAP);
     const cy = PAD + row * (CELL_H + GAP);
-    const c = cardCell(item, i, cx, cy, icons[i], curIcons, { showType: opts.showType, discount: Boolean(opts.discount), wished: isWished(item), owned: Boolean(item.owned) });
+    const c = cardCell(item, i, cx, cy, icons[i], curIcons, { showType: opts.showType, discount: Boolean(opts.discount), wished: isWished(item), owned: Boolean(item.owned), tierIcon: tierIcons[i] });
     cardDefs += c.defs;
     cells += c.svg;
   });
@@ -629,6 +644,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
   );
   const [vpI, kcI] = await Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]);
   const curIcons = { vp: vpI, kc: kcI };
+  const tierIcons = await loadTierIcons(items);
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);
@@ -656,7 +672,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
     const cx = row === rows - 1 ? lastRowX + col * (CELL_W + GAP) : PAD + col * (CELL_W + GAP);
     const cy = PAD + row * (CELL_H + GAP);
     // Animated cells are drawn without artwork here; each frame paints it in.
-    const c = cardCell(item, i, cx, cy, staticIcons[i], curIcons, { showType, wished: isWished(item), owned: Boolean(item.owned) });
+    const c = cardCell(item, i, cx, cy, staticIcons[i], curIcons, { showType, wished: isWished(item), owned: Boolean(item.owned), tierIcon: tierIcons[i] });
     cardDefs += c.defs;
     cells += c.svg;
     return { cx, cy };
@@ -1234,7 +1250,7 @@ async function renderInventoryImage(details, opts = {}) {
   // ---- artwork pass ----
   const [skinIcons, tierImgs, cardIcons, sprayIcons, buddyIcons] = await Promise.all([
     Promise.all(skinList.map((x) => (x.icon ? fetchIconData(x.icon) : null))),
-    Promise.all(skinList.map((x) => (x.tier ? cachedIcon(tierIcon(x.tier)) : null))),
+    loadTierIcons(skinList),
     Promise.all(cardList.map((c) => fetchIconData((c.art && c.art.wide) || c.icon))),
     Promise.all(sprayList.map((x) => fetchIconData(x.staticIcon || x.icon))),
     Promise.all(buddyList.map((x) => fetchIconData(x.icon))),
@@ -1376,9 +1392,7 @@ async function renderOwnedGrid(opts = {}) {
   const SECTION_H = 52; // per-section mini-title row
 
   const icons = await Promise.all(items.map((i) => (i && (i.staticIcon || i.icon) ? fetchIconData(i.staticIcon || i.icon) : null)));
-  const tierImgs = await Promise.all(
-    items.map((i) => (i && i.tier ? cachedIcon(tierIcon(i.tier)) : null))
-  );
+  const tierImgs = await loadTierIcons(items);
 
   // ---- geometry pass ----
   let total = 0;
