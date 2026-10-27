@@ -2593,13 +2593,14 @@
     prefetchPreviews(S.bundles.flatMap((b) => b.items || []));
   }
 
-  // Bundle items reuse the shop card (tier glow, art, name, price, wishlist star).
+  // Bundle items reuse the shop card (tier glow, art, name, price). No wishlist
+  // star here: bundle items are not added to the wishlist from this page.
   // Prices stay at their base value: the discount is a whole-bundle deal, so
   // per-item strike-throughs would mislead. Skins show their tier, everything
   // else shows its type.
   function bundleItemEl(it) {
     const price = it.base != null ? it.base : it.disc;
-    return card({ ...it, price: price != null ? price : null, currency: "vp" }, { wishlist: true, banner: true, showType: it.type !== "skin" });
+    return card({ ...it, price: price != null ? price : null, currency: "vp" }, { banner: true, showType: it.type !== "skin" });
   }
 
   function bundleCard(b) {
