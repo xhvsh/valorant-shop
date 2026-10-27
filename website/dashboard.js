@@ -231,7 +231,7 @@
       const iconBox = $("confirmIcon");
       const iconName = icon || (danger ? "alert" : null);
       iconBox.hidden = !iconName;
-      iconBox.className = `confirm-icon${danger ? " is-danger" : ""}`;
+      iconBox.className = `dlg-icon${danger ? " is-danger" : ""}`;
       iconBox.replaceChildren(...(iconName ? [iconEl(iconName)] : []));
       const subjectBox = $("confirmSubject");
       subjectBox.hidden = !subject;
@@ -1757,7 +1757,20 @@
     });
     const stop = h("button", { class: "btn btn-danger", type: "button" }, iconEl("x"), "Stop sharing");
     stop.addEventListener("click", async () => {
-      const ok = await confirmDialog({ title: "Stop sharing", message: `Stop sharing ${acctName(a)}? Everyone you shared it with loses access and the code stops working.`, okLabel: "Stop sharing", danger: true });
+      const sharedWith = (share.recipients || []).length;
+      const ok = await confirmDialog({
+        title: "Stop sharing?",
+        message: "Read-only access to this account ends for everyone you shared it with.",
+        okLabel: "Stop sharing",
+        danger: true,
+        icon: "share",
+        subject: acctSubject(a),
+        points: [
+          "The share code stops working right away.",
+          sharedWith ? `${sharedWith} ${sharedWith === 1 ? "person loses" : "people lose"} access immediately.` : "Nobody has imported it yet, so no one is affected.",
+          "You can create a new code any time.",
+        ],
+      });
       if (!ok) return;
       stop.classList.add("is-busy");
       try {
@@ -1787,7 +1800,18 @@
       for (const r of people) {
         const rm = h("button", { class: "icon-btn sm danger", type: "button", title: "Remove access", "aria-label": `Remove ${r.name || r.id}` }, iconEl("x"));
         rm.addEventListener("click", async () => {
-          const ok = await confirmDialog({ title: "Remove access", message: `Remove ${r.name || r.id}? They lose access to this account.`, okLabel: "Remove", danger: true });
+          const ok = await confirmDialog({
+            title: "Remove access?",
+            message: "They can no longer see this account's shops.",
+            okLabel: "Remove access",
+            danger: true,
+            icon: "user",
+            subject: personSubject(r.name || r.id, "Read-only access to this account"),
+            points: [
+              "They lose access right away and it disappears from their list.",
+              "They could import it again with the same code. Create a new code to prevent that.",
+            ],
+          });
           if (!ok) return;
           try {
             await api(`/api/shares/${encodeURIComponent(share.code)}/recipients/${encodeURIComponent(r.id)}`, { method: "DELETE" });
@@ -1842,10 +1866,17 @@
   /* ---------- account actions ---------- */
 
   async function setMain(a) {
+    const current = S.accounts.find((x) => !x.shared && x.is_default && x.puuid !== a.puuid);
     const ok = await confirmDialog({
-      title: "Set main account",
-      message: `Make ${acctName(a)} your main account? Discord commands use it when you do not pick an account.`,
+      title: "Set as main account?",
+      message: "Discord commands like /shop use your main account when you do not pick one.",
       okLabel: "Set as main",
+      icon: "crown",
+      subject: acctSubject(a),
+      points: [
+        "It is pinned first in your account list.",
+        current ? `${acctName(current)} stays linked and keeps its alerts.` : "Your other accounts stay linked and keep their alerts.",
+      ],
     });
     if (!ok) return;
     const before = S.accounts.map((x) => [x, x.is_default]);
@@ -1868,6 +1899,11 @@
     btn.classList.remove("is-busy");
     if (S.storeError[a.puuid]) toast(S.storeError[a.puuid], "error");
     else toast("Account refreshed.", "ok");
+  }
+
+  // A person (share recipient) as the same small card, for confirmation dialogs.
+  function personSubject(name, meta) {
+    return h("div", { class: "confirm-account" }, h("span", { class: "emblem" }, iconEl("user")), h("div", { class: "row-text" }, h("b", { text: name }), h("span", { text: meta })));
   }
 
   // The account as a small card (emblem, name, region) for confirmation dialogs.

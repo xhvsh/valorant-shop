@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=235" />
+  <link rel="stylesheet" href="/styles.css?v=236" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -47,6 +47,8 @@
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
     <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m5 8 4 4-4 4M12 17h7"/></symbol>
   </svg>
 
@@ -137,8 +139,12 @@
   <!-- Add Riot account -->
   <div class="overlay" id="addOverlay" role="dialog" aria-modal="true" aria-labelledby="addTitle" hidden>
     <div class="modal">
-      <div class="modal-head">
-        <h2 id="addTitle">Add a Riot account</h2>
+      <div class="dlg-head">
+        <span class="dlg-icon"><svg class="i"><use href="#i-link"/></svg></span>
+        <div class="dlg-titles">
+          <h2 id="addTitle">Add a Riot account</h2>
+          <p class="dlg-sub">Three quick steps, about a minute.</p>
+        </div>
         <button class="icon-btn" id="addCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
       <ol class="steps">
@@ -162,10 +168,14 @@
           <div class="step-body">
             <b>Paste it here</b>
             <input type="text" id="addUrlInput" class="input" spellcheck="false" autocomplete="off" placeholder="http://localhost/redirect?code=..." />
-            <p class="step-hint">It starts with http://localhost/redirect. Your password never reaches this site.</p>
+            <p class="step-hint">It starts with http://localhost/redirect.</p>
           </div>
         </li>
       </ol>
+      <div class="dlg-note">
+        <svg class="i"><use href="#i-shield"/></svg>
+        <p>Your password never reaches valorant shop. Only an encrypted sign-in token is stored so your shops can load, and you can remove the account any time.</p>
+      </div>
       <p class="form-error" id="addError" hidden></p>
       <div class="modal-actions split">
         <button class="btn btn-ghost" id="addCancelBtn" type="button">Cancel</button>
@@ -177,11 +187,20 @@
   <!-- Import shared account -->
   <div class="overlay" id="importOverlay" role="dialog" aria-modal="true" aria-labelledby="importTitle" hidden>
     <div class="modal">
-      <div class="modal-head">
-        <h2 id="importTitle">Import shared account</h2>
+      <div class="dlg-head">
+        <span class="dlg-icon"><svg class="i"><use href="#i-share"/></svg></span>
+        <div class="dlg-titles">
+          <h2 id="importTitle">Import shared account</h2>
+          <p class="dlg-sub">Add a friend's account with their share code.</p>
+        </div>
         <button class="icon-btn" id="importCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
-      <p>Enter the code someone shared with you. Their account shows up in your list as read-only. On Discord you can also use <code>/share import</code>.</p>
+      <ul class="dlg-points">
+        <li>Read-only: you see their shops, never their Riot login.</li>
+        <li>It stays in your list until you or the owner removes it.</li>
+        <li>On Discord, use <code>/share import</code> instead.</li>
+      </ul>
+      <label class="wipe-label" for="shareCodeInput">Share code</label>
       <input type="text" id="shareCodeInput" class="input code-input" placeholder="ABCD2345" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Share code" />
       <p class="form-error" id="importError" hidden></p>
       <div class="modal-actions">
@@ -194,19 +213,26 @@
   <!-- Delete all data -->
   <div class="overlay" id="wipeOverlay" role="alertdialog" aria-modal="true" aria-labelledby="wipeTitle" hidden>
     <div class="modal">
-      <div class="modal-head">
-        <h2 id="wipeTitle">Delete all my data</h2>
+      <div class="dlg-head">
+        <span class="dlg-icon is-danger"><svg class="i"><use href="#i-trash"/></svg></span>
+        <div class="dlg-titles">
+          <h2 id="wipeTitle">Delete all my data</h2>
+          <p class="dlg-sub">Permanent. This cannot be undone.</p>
+        </div>
         <button class="icon-btn" id="wipeCancelX" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
-      <p>This permanently deletes everything valorant shop stores about you. It cannot be undone.</p>
-      <ul class="wipe-list">
+      <p>This permanently deletes everything valorant shop stores about you:</p>
+      <ul class="dlg-points">
         <li>Every linked Riot account and its stored sign-in tokens.</li>
         <li>Your alert settings, wishlist and account order.</li>
         <li>Every share code you created. <b>Everyone you shared an account with loses access to it immediately</b>, and the codes stop working.</li>
         <li>Shared accounts you added from other people.</li>
         <li>Your website sessions. You will be signed out.</li>
       </ul>
-      <p>Nothing changes in VALORANT or at Riot. You can link your accounts again later, but your wishlist, alerts and shares will be gone.</p>
+      <div class="dlg-note">
+        <svg class="i"><use href="#i-info"/></svg>
+        <p>Nothing changes in VALORANT or at Riot. You can link your accounts again later, but your wishlist, alerts and shares will be gone.</p>
+      </div>
       <label class="wipe-label" for="wipeInput">Type <b>DELETE</b> to confirm</label>
       <input type="text" id="wipeInput" class="input" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE" />
       <p class="form-error" id="wipeError" hidden></p>
@@ -220,13 +246,13 @@
   <!-- Confirm -->
   <div class="overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
     <div class="modal modal-sm confirm">
-      <div class="confirm-head">
-        <span class="confirm-icon" id="confirmIcon" hidden></span>
-        <h2 id="confirmTitle">Are you sure?</h2>
+      <div class="dlg-head">
+        <span class="dlg-icon" id="confirmIcon" hidden></span>
+        <div class="dlg-titles"><h2 id="confirmTitle">Are you sure?</h2></div>
       </div>
       <div class="confirm-subject" id="confirmSubject" hidden></div>
       <p id="confirmMessage"></p>
-      <ul class="confirm-points" id="confirmPoints" hidden></ul>
+      <ul class="dlg-points" id="confirmPoints" hidden></ul>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
         <button class="btn" id="confirmOk" type="button">Confirm</button>
@@ -252,6 +278,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=235"></script>
+  <script src="/dashboard.js?v=236"></script>
 </body>
 </html>

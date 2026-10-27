@@ -1770,9 +1770,13 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 .modal > h2 { margin-bottom: 10px; }
 .modal p { color: var(--text-2); }
 .modal.confirm { width: min(440px, 100%); }
-.confirm-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-.confirm-head h2 { min-width: 0; }
-.confirm-icon {
+/* Shared dialog header: icon box, title with an optional line under it, close. */
+.dlg-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.dlg-titles { min-width: 0; flex: 1; }
+.dlg-titles h2 { margin: 0; }
+.modal .dlg-sub { margin: 4px 0 0; color: var(--text-3); font-size: 13px; line-height: 1.4; }
+.dlg-head .icon-btn { align-self: flex-start; margin: -4px -6px 0 0; }
+.dlg-icon {
   display: grid;
   flex: none;
   place-items: center;
@@ -1783,8 +1787,23 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   background: var(--surface-3);
   color: var(--text-2);
 }
-.confirm-icon.is-danger { border-color: var(--red-line); background: var(--red-soft); color: var(--red-2); }
-.confirm-icon .i { font-size: 20px; }
+.dlg-icon.is-danger { border-color: var(--red-line); background: var(--red-soft); color: var(--red-2); }
+.dlg-icon .i { font-size: 20px; }
+.dlg-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.dlg-note .i { flex: none; margin-top: 1px; color: var(--text-3); font-size: 16px; }
+.modal .dlg-note p { margin: 0; color: inherit; }
 .confirm-subject:not([hidden]) { margin-bottom: 14px; }
 .confirm-account {
   display: flex;
@@ -1800,15 +1819,14 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 .confirm-account .row-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .confirm-account .row-text span { color: var(--text-3); font-size: 12px; letter-spacing: .04em; }
 .confirm #confirmMessage { margin: 0; font-size: 14px; line-height: 1.5; }
-.confirm-points { display: grid; gap: 8px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-2); list-style: none; }
-.confirm-points[hidden] { display: none; }
-.confirm-points li { position: relative; padding-left: 16px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
-.confirm-points li::before { content: ""; position: absolute; top: .55em; left: 1px; width: 5px; height: 5px; background: var(--red); }
+.dlg-points { display: grid; gap: 8px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-2); list-style: none; }
+.dlg-points[hidden] { display: none; }
+.dlg-points li { position: relative; padding-left: 16px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+.dlg-points li::before { content: ""; position: absolute; top: .55em; left: 1px; width: 5px; height: 5px; background: var(--red); }
+.dlg-points li b { color: var(--text); }
+.confirm-account .emblem .i { font-size: 18px; }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .modal-head .icon-btn { margin: -6px -8px 0 0; }
-.wipe-list { margin: 0 0 12px; padding-left: 18px; color: var(--text-2); font-size: 14px; line-height: 1.55; }
-.wipe-list li + li { margin-top: 4px; }
-.wipe-list b { color: var(--text); }
 .wipe-label { display: block; margin: 14px 0 6px; color: var(--text-2); font-size: 13px; }
 .wipe-label b { color: var(--red-2); font-family: var(--font-mono); }
 #wipeBtn:not(:disabled) { background: var(--red); border-color: var(--red); color: #fff; }
