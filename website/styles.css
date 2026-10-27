@@ -1554,16 +1554,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bundle-price .old { color: var(--text-3); text-decoration: line-through; font-weight: 400; font-size: 12px; }
 .bundle-off { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border-radius: var(--r); background: var(--red); font: 600 12px/1 var(--font-mono); }
 .bundle-countdown { height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: var(--r); background: rgba(11, 12, 15, .7); color: var(--text-2); font: 500 12px/1 var(--font-mono); }
-.bundle-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; padding: 14px; }
-.bundle-item { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2); transition: border-color .2s; }
-.bundle-item.is-previewable { cursor: pointer; }
-.bundle-item.is-previewable:hover { border-color: var(--line-2); }
-.bundle-item-thumb { display: flex; align-items: center; justify-content: center; height: 72px; padding: 8px; }
-.bundle-item-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.bundle-item-thumb .fallback { color: var(--text-3); font: 600 13px/1 var(--font-head); }
-.bundle-item-name { overflow: hidden; padding: 0 9px; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.bundle-item-price { display: flex; align-items: center; gap: 5px; padding: 3px 9px 8px; color: var(--text-2); font: 500 11.5px/1 var(--font-mono); }
-.bundle-item-price img { width: 13px; height: 13px; }
+/* Item cards are the shop cards. Flex-wrap with a centred last row keeps a
+   5, 7 or 8 item bundle balanced; --cols steps down with the screen. */
+.bundle-items { --cols: 4; --bgap: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--bgap); padding: 14px; }
+.bundle-items > .card { flex: 0 0 calc((100% - (var(--cols) - 1) * var(--bgap)) / var(--cols)); }
+@media (max-width: 1180px) { .bundle-items { --cols: 3; } }
+@media (max-width: 700px) { .bundle-items { --cols: 2; --bgap: 8px; padding: 10px; } }
+@media (max-width: 340px) { .bundle-items { --cols: 1; } }
 
 /* ==========================================================================
    Menus, modals, toasts

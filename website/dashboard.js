@@ -2578,7 +2578,7 @@
         return;
       }
       const list = h("div", { class: "bundle-list" });
-      for (let i = 0; i < 2; i++) list.appendChild(h("div", { class: "bundle-card" }, h("div", { class: "bundle-banner sk", style: "border-radius:0" }), h("div", { class: "bundle-items" }, ...Array.from({ length: 4 }, () => h("div", { class: "sk", style: "height:110px" })))));
+      for (let i = 0; i < 2; i++) list.appendChild(h("div", { class: "bundle-card" }, h("div", { class: "bundle-banner sk", style: "border-radius:0" }), h("div", { class: "bundle-items" }, ...Array.from({ length: 4 }, () => h("div", { class: "card grid-sk" }, h("div", { class: "card-media sk", style: "border-radius:0" }), h("div", { class: "card-body" }, h("div", { class: "sk sk-line w80" }), h("div", { class: "sk sk-line w40" })))))));
       view.appendChild(list);
       loadBundles().catch(() => {});
       return;
@@ -2593,18 +2593,13 @@
     prefetchPreviews(S.bundles.flatMap((b) => b.items || []));
   }
 
+  // Bundle items reuse the shop card (tier glow, art, name, price, wishlist star).
+  // Prices stay at their base value: the discount is a whole-bundle deal, so
+  // per-item strike-throughs would mislead. Skins show their tier, everything
+  // else shows its type.
   function bundleItemEl(it) {
-    const thumb = h("div", { class: "bundle-item-thumb" });
-    const src = (it.type === "card" && it.art && it.art.small) || it.icon;
-    if (src) thumb.appendChild(imgOrFallback(src, it.name));
-    else thumb.appendChild(fallbackText(it.type === "title" ? titleName(it.name) : it.name, 3));
-    const el = h("div", { class: "bundle-item" }, thumb, h("div", { class: "bundle-item-name", text: it.type === "title" ? titleName(it.name) : it.name || "Unknown", title: it.name || "" }));
-    // Item prices are shown at their base value only: the bundle discount is a
-    // whole-bundle deal, so per-item strike-throughs would mislead.
-    const priceVal = it.base != null ? it.base : it.disc;
-    if (priceVal != null) el.appendChild(h("div", { class: "bundle-item-price" }, makeImg(CURRENCY_ICON.vp, "VP"), fmt(priceVal)));
-    if (canPreview(it)) previewTrigger(el, it);
-    return el;
+    const price = it.base != null ? it.base : it.disc;
+    return card({ ...it, price: price != null ? price : null, currency: "vp" }, { wishlist: true, banner: true, showType: it.type !== "skin" });
   }
 
   function bundleCard(b) {
