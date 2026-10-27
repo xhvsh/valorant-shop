@@ -259,10 +259,116 @@
       const ok = $("confirmOk");
       ok.textContent = okLabel;
       ok.classList.toggle("btn-danger", danger);
-      $("confirmOverlay").hidden = false;
+      showOverlay($("confirmOverlay"));
       (danger ? $("confirmCancel") : ok).focus();
     });
   }
+  /* ---------- dialog open / close animation ---------- */
+
+  const CLOSE_MS = 240;
+  const isTouchLayout = () => window.matchMedia("(max-width: 719px), (pointer: coarse)").matches;
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const isClosing = (el) => el.classList.contains("is-closing");
+
+  function showOverlay(el) {
+    clearTimeout(el._closeTimer);
+    el._closeTimer = null;
+    resetSheet(el);
+    el.classList.remove("is-closing");
+    el.hidden = false;
+  }
+
+  // Plays the close animation, then hides the overlay and runs `done`.
+  function hideOverlay(el, done) {
+    if (el.hidden || isClosing(el)) return;
+    const finish = () => {
+      el._closeTimer = null;
+      el.hidden = true;
+      el.classList.remove("is-closing");
+      resetSheet(el);
+      if (done) done();
+    };
+    if (reducedMotion()) return finish();
+    el.classList.add("is-closing");
+    el._closeTimer = setTimeout(finish, CLOSE_MS);
+  }
+
+  function resetSheet(el) {
+    const modal = el.querySelector(".modal");
+    if (modal) {
+      modal.style.transform = "";
+      modal.style.transition = "";
+      modal.style.removeProperty("--drag");
+    }
+    el.style.backgroundColor = "";
+    el.style.backdropFilter = "";
+    el.style.webkitBackdropFilter = "";
+  }
+
+  // Phone sheets: pull the sheet down by its top (or anywhere once its content is
+  // scrolled to the top). Past a third of its height, or flicked, it slides away;
+  // a shorter pull springs back.
+  function initSheetDrag(overlay, close) {
+    const modal = overlay.querySelector(".modal");
+    if (!modal) return;
+    let startY = 0;
+    let lastY = 0;
+    let startT = 0;
+    let tracking = false;
+    let dragging = false;
+    const offset = () => Math.max(0, lastY - startY);
+
+    modal.addEventListener("touchstart", (e) => {
+      tracking = e.touches.length === 1 && !isClosing(overlay) && window.matchMedia("(max-width: 719px)").matches && modal.scrollTop <= 0;
+      dragging = false;
+      startY = lastY = e.touches[0].clientY;
+      startT = Date.now();
+    }, { passive: true });
+
+    modal.addEventListener("touchmove", (e) => {
+      if (!tracking) return;
+      lastY = e.touches[0].clientY;
+      const dy = lastY - startY;
+      if (!dragging) {
+        if (dy < -6 || modal.scrollTop > 0) {
+          tracking = false;
+          return;
+        }
+        if (dy < 6) return;
+        dragging = true;
+        modal.style.transition = "none";
+      }
+      e.preventDefault();
+      const dim = Math.max(0, 1 - offset() / Math.max(1, modal.offsetHeight));
+      modal.style.transform = `translateY(${offset()}px)`;
+      overlay.style.backgroundColor = `rgba(4, 4, 6, ${(0.72 * dim).toFixed(3)})`;
+      overlay.style.backdropFilter = overlay.style.webkitBackdropFilter = `blur(${(4 * dim).toFixed(1)}px)`;
+    }, { passive: false });
+
+    const end = () => {
+      if (!tracking || !dragging) {
+        tracking = false;
+        return;
+      }
+      tracking = false;
+      dragging = false;
+      const dy = offset();
+      const speed = dy / Math.max(1, Date.now() - startT);
+      if (dy > modal.offsetHeight / 3 || (speed > 0.6 && dy > 40)) {
+        modal.style.setProperty("--drag", `${dy}px`);
+        close();
+      } else {
+        modal.style.transition = "transform .28s var(--ease)";
+        modal.style.transform = "";
+        overlay.style.backgroundColor = "";
+        overlay.style.backdropFilter = overlay.style.webkitBackdropFilter = "";
+        setTimeout(() => { if (!dragging) modal.style.transition = ""; }, 300);
+      }
+    };
+    modal.addEventListener("touchend", end);
+    modal.addEventListener("touchcancel", end);
+  }
+
   /* ---------- dialog focus ---------- */
 
   // Opening a dialog moves focus into it, Tab and Shift+Tab stay inside the
@@ -315,7 +421,7 @@
   }
 
   function closeConfirm(result) {
-    $("confirmOverlay").hidden = true;
+    hideOverlay($("confirmOverlay"));
     const resolve = confirmResolve;
     confirmResolve = null;
     if (resolve) resolve(result);
@@ -2086,11 +2192,11 @@
     closeSidebar();
     $("addUrlInput").value = "";
     $("addError").hidden = true;
-    $("addOverlay").hidden = false;
+    showOverlay($("addOverlay"));
     prepareAddLink();
   }
   function closeAdd() {
-    $("addOverlay").hidden = true;
+    hideOverlay($("addOverlay"));
     addFlowId = null;
   }
 
@@ -2136,11 +2242,11 @@
     closeSidebar();
     $("shareCodeInput").value = "";
     $("importError").hidden = true;
-    $("importOverlay").hidden = false;
+    showOverlay($("importOverlay"));
     $("shareCodeInput").focus();
   }
   function closeImport() {
-    $("importOverlay").hidden = true;
+    hideOverlay($("importOverlay"));
   }
 
   async function importShared() {
@@ -2968,7 +3074,7 @@
     body.innerHTML = "";
     body.appendChild(h("div", { class: "preview-stage sk" }));
     if (item.type === "skin") body.appendChild(previewFactsSkeleton());
-    $("previewOverlay").hidden = false;
+    showOverlay($("previewOverlay"));
     let data;
     try {
       data = await previewData(item);
@@ -2977,7 +3083,7 @@
       body.appendChild(h("p", { class: "preview-empty", text: err.message || "Could not load this preview." }));
       return;
     }
-    if ($("previewOverlay").hidden) return;
+    if ($("previewOverlay").hidden || $("previewOverlay").classList.contains("is-closing")) return;
     setPreviewHead(item, data);
     if (item.type === "card") renderCardPreview(data);
     else renderSkinPreview(item, data);
@@ -3084,8 +3190,7 @@
   }
 
   function closePreview() {
-    $("previewOverlay").hidden = true;
-    $("previewBody").innerHTML = "";
+    hideOverlay($("previewOverlay"), () => { $("previewBody").innerHTML = ""; });
   }
 
   /* ==========================================================================
@@ -3287,11 +3392,12 @@
     $("wipeInput").value = "";
     $("wipeBtn").disabled = true;
     $("wipeError").hidden = true;
-    $("wipeOverlay").hidden = false;
-    $("wipeInput").focus();
+    showOverlay($("wipeOverlay"));
+    // On a phone the keyboard would cover the dialog the moment it opens.
+    if (!isTouchLayout()) $("wipeInput").focus();
   }
   function closeWipe() {
-    $("wipeOverlay").hidden = true;
+    hideOverlay($("wipeOverlay"));
   }
   async function doWipe() {
     const btn = $("wipeBtn");
@@ -3579,6 +3685,11 @@
       for (const r of records) if (r.target.classList && r.target.classList.contains("overlay")) onDialogToggle(r.target);
     });
     initDialogFocus();
+    initSheetDrag($("addOverlay"), closeAdd);
+    initSheetDrag($("importOverlay"), closeImport);
+    initSheetDrag($("wipeOverlay"), closeWipe);
+    initSheetDrag($("confirmOverlay"), () => closeConfirm(false));
+    initSheetDrag($("previewOverlay"), closePreview);
     document.querySelectorAll(".overlay").forEach((o) => observer.observe(o, { attributes: true, attributeFilter: ["hidden"] }));
     observer.observe($("sidebar"), { attributes: true, attributeFilter: ["class"] });
 

@@ -1772,6 +1772,11 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   animation: modal-in .2s var(--ease);
 }
 @keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes modal-out { to { opacity: 0; transform: translateY(8px) scale(.985); } }
+.overlay.is-closing { animation: fade-out .22s ease forwards; pointer-events: none; }
+.overlay.is-closing .modal { animation: modal-out .22s ease forwards; }
+@media (prefers-reduced-motion: reduce) { .overlay, .modal { animation: none !important; } }
 .modal.modal-sm { width: min(420px, 100%); }
 .modal.modal-wide { width: min(980px, 100%); }
 .modal h2 { margin: 0; font: 600 20px/1.15 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
@@ -2108,16 +2113,32 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   .preview-displays .is-tall img { width: 100%; height: auto !important; max-height: 420px; }
   .coll-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .acct-panel > .seg { overflow-x: auto; flex-wrap: nowrap; }
-  .overlay { place-items: end center; padding: 0; }
+  .overlay { place-items: end center; padding: 0; overflow: hidden; }
   .modal, .modal.modal-sm, .modal.modal-wide {
     width: 100%;
     max-height: 92vh;
     max-height: 92dvh;
     overflow-y: auto;
     border-radius: 10px 10px 0 0;
+    padding-top: 30px;
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    animation: sheet-in .25s var(--ease);
+    animation: sheet-in .34s cubic-bezier(.22, 1, .36, 1);
+    will-change: transform;
   }
+  /* Grab handle: the sheet can be pulled down to close. */
+  .modal::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    margin-left: -19px;
+    border-radius: 2px;
+    background: var(--text-3);
+    opacity: .45;
+  }
+  .overlay.is-closing .modal, .overlay.is-closing .modal.modal-sm, .overlay.is-closing .modal.modal-wide { animation: sheet-out .24s cubic-bezier(.4, 0, 1, 1) forwards; }
   .modal-actions .btn { flex: 1; }
   .modal { margin: auto 0 0; }
   .menu.sheet { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; }
@@ -2125,7 +2146,8 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   .update-pill { left: 12px; right: 12px; transform: none; justify-content: space-between; animation-name: pill-up-mobile; }
   .menu { width: min(300px, calc(100vw - 24px)); }
 }
-@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-out { from { transform: translateY(var(--drag, 0px)); } to { transform: translateY(100%); } }
 
 @media (max-width: 520px) {
   .stat-pair { flex-direction: column; gap: 6px; }
