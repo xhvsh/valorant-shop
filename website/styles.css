@@ -782,16 +782,34 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .footer {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 18px;
-  padding: 18px var(--pad) calc(18px + var(--bottom-nav));
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 16px var(--pad) calc(16px + var(--bottom-nav));
   border-top: 1px solid var(--line);
   color: var(--text-3);
-  font-size: 11.5px;
-  text-align: center;
+  font-size: 12px;
 }
-.footer b { color: var(--text-2); }
-.foot-ver { font-family: var(--font-mono); }
+.foot-note { margin: 0; }
+.foot-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 0; }
+.foot-links > * + *::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 11px;
+  margin: 0 12px;
+  vertical-align: -1px;
+  background: var(--line-2);
+}
+.footer a { color: var(--text-2); text-decoration: none; transition: color .15s; }
+.footer a:hover { color: var(--red-2); }
+.footer b { color: var(--text-2); font-weight: 600; }
+.foot-ver { font-family: var(--font-mono); font-size: 11px; }
+.foot-ver:empty { display: none; }
+@media (max-width: 640px) {
+  .footer { flex-direction: column; justify-content: center; gap: 10px; text-align: center; }
+  .foot-links { justify-content: center; }
+}
 
 /* With the sidebar docked, the account row and the footer share one height so
    their top borders line up along the bottom of the page. */

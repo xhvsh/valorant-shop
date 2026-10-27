@@ -2671,13 +2671,7 @@
     ];
     right.appendChild(h("div", { class: "rows", style: "margin-top:8px" }, h("ul", { class: "cmd-list" }, cmds.map(([c, d]) => h("li", null, h("code", { text: c }), h("span", { text: d }))))));
 
-    // Session + about
-    right.appendChild(h("div", { class: "section-title", style: "margin-top:26px", text: "Session" }));
-    right.appendChild(
-      h("div", { class: "rows" },
-        h("div", { class: "row" }, avatarEl(), h("div", { class: "row-text" }, h("b", { text: (S.me && S.me.username) || "Signed in" }), h("span", { text: "Signed in with Discord" })),
-          h("button", { class: "btn btn-ghost sm", type: "button", onclick: signOut }, iconEl("logout"), "Sign out")))
-    );
+    // Your data + about
     right.appendChild(h("div", { class: "section-title", style: "margin-top:26px", text: "Your data" }));
     right.appendChild(
       h("div", { class: "rows" },
