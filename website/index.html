@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=219" />
+  <link rel="stylesheet" href="/styles.css?v=220" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -52,7 +52,8 @@
 
   <!-- Boot splash: only while the session check runs. -->
   <div class="splash" id="splash" role="status" aria-live="polite">
-    <div class="splash-brand"><img src="/logo.png" alt="" /><span>valorant shop</span></div>
+    <div class="splash-mark" aria-hidden="true"><span class="splash-v"></span><span class="splash-v fill"></span><i></i><i></i><i></i><i></i></div>
+    <div class="splash-title">valorant shop</div>
     <div class="splash-bar"><span></span></div>
     <div class="splash-text" id="splashText">Signing in...</div>
   </div>
@@ -243,6 +244,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=219"></script>
+  <script src="/dashboard.js?v=220"></script>
 </body>
 </html>
