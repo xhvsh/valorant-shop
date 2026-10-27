@@ -875,8 +875,7 @@
   }
 
   // Overview strip: when each rotation ends, so nothing has to be opened to find out.
-  // Shop and accessory resets are the soonest across the loaded accounts; the bundle
-  // is the featured one leaving first.
+  // Shop and accessory resets are the soonest across the loaded accounts.
   function renderSummary() {
     const box = $("summary");
     if (!box) return;
@@ -891,9 +890,8 @@
       nextAcc = soonest(nextAcc, s && s.kingdomShop && s.kingdomShop.expiresAt);
     }
     const nm = nightMarketState();
-    let nextBundle = 0;
-    for (const b of S.bundles || []) nextBundle = soonest(nextBundle, b.leavesAt);
-    const bundleCount = (S.bundles || []).length;
+    const accts = ordered();
+    const own = ownAccounts().length;
 
     const item = (icon, label, value, extra) =>
       h("div", { class: `summary-item ${extra || ""}` }, iconEl(icon), h("div", { class: "summary-text" }, h("span", { class: "summary-label", text: label }), value));
@@ -909,7 +907,7 @@
         nm.open ? "is-night" : "")
     );
     box.appendChild(
-      item("layers", "Next bundle ends", nextBundle ? countdownEl(nextBundle, "summary-value") : dash(S.bundles && !bundleCount ? "None" : "-"))
+      item("user", "Accounts", h("span", { class: "summary-value", text: `${own} own${accts.length > own ? ` · ${accts.length - own} shared` : ""}` }))
     );
   }
 
@@ -2905,10 +2903,7 @@
       .finally(() => {
         S.bundlesPending = null;
         if (S.route.name === "bundles") render();
-        else {
-          updateNav();
-          if (S.route.name === "home") renderSummary();
-        }
+        else updateNav();
         scheduleAutoRefresh();
       });
     return S.bundlesPending;
