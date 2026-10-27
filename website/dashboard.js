@@ -1699,7 +1699,6 @@
     body.innerHTML = "";
 
     if (!share) {
-      body.appendChild(h("p", { class: "muted", style: "margin:0", text: "Create a code and send it to anyone you want to share this account's shops with. They get read-only access and never see your Riot login. You can revoke it any time." }));
       const create = h("button", { class: "btn", type: "button" }, iconEl("share"), "Create share code");
       create.addEventListener("click", async () => {
         create.classList.add("is-busy");
@@ -1712,17 +1711,15 @@
           create.classList.remove("is-busy");
         }
       });
-      body.appendChild(h("div", null, create));
+      body.appendChild(
+        h("section", { class: "share-card share-intro" },
+          h("p", { class: "muted", style: "margin:0", text: "Create a code and send it to anyone you want to share this account's shops with. They get read-only access and never see your Riot login. You can revoke it any time." }),
+          h("div", null, create))
+      );
       body.appendChild(discordShareTip());
       return;
     }
 
-    body.appendChild(h("div", { class: "section-title", style: "margin:0", text: "Share code" }));
-    body.appendChild(
-      h("div", { class: "share-code" },
-        h("span", { class: "share-code-text", text: share.code }),
-        h("button", { class: "btn btn-quiet sm", type: "button", onclick: () => copyText(share.code, "Share code copied") }, iconEl("copy"), "Copy"))
-    );
     const refresh = h("button", { class: "btn btn-quiet", type: "button" }, iconEl("refresh"), "New code");
     refresh.addEventListener("click", async () => {
       refresh.classList.add("is-busy");
@@ -1747,11 +1744,20 @@
       }
       renderPanel();
     });
-    body.appendChild(h("div", { class: "page-actions" }, refresh, stop));
+
+    const codeCard = h("section", { class: "share-card" },
+      h("div", { class: "section-title", style: "margin:0", text: "Share code" }),
+      h("div", { class: "share-code" },
+        h("span", { class: "share-code-text", text: share.code }),
+        h("button", { class: "btn btn-quiet sm", type: "button", onclick: () => copyText(share.code, "Share code copied") }, iconEl("copy"), "Copy")),
+      h("div", { class: "page-actions" }, refresh, stop),
+      h("p", { class: "faint share-note", text: "A new code keeps everyone who already imported it. Stopping sharing removes the code and everyone you shared it with." })
+    );
 
     const people = share.recipients || [];
-    body.appendChild(h("div", { class: "section-title", style: "margin:6px 0 0" }, h("span", { text: "People with access" }), h("span", { class: "count", text: String(people.length) })));
-    if (!people.length) body.appendChild(h("p", { class: "muted", style: "margin:0", text: "Nobody has imported this code yet." }));
+    const peopleCard = h("section", { class: "share-card" },
+      h("div", { class: "section-title", style: "margin:0" }, h("span", { text: "People with access" }), h("span", { class: "count", text: String(people.length) })));
+    if (!people.length) peopleCard.appendChild(h("p", { class: "muted", style: "margin:0", text: "Nobody has imported this code yet." }));
     else {
       const list = h("div", { class: "share-people" });
       for (const r of people) {
@@ -1769,16 +1775,26 @@
         });
         list.appendChild(h("div", { class: "share-person" }, iconEl("user"), h("span", { text: r.name || r.id }), rm));
       }
-      body.appendChild(list);
+      peopleCard.appendChild(list);
     }
-    body.appendChild(h("p", { class: "faint", style: "margin:0;font-size:12.5px", text: "A new code keeps everyone who already imported it. Stopping sharing removes the code and everyone you shared it with." }));
+
+    body.appendChild(h("div", { class: "share-cols" }, codeCard, peopleCard));
     body.appendChild(discordShareTip());
     applyRotateCooldown(refresh, share.rotated_at);
   }
 
+  // Three command cards. Commands never wrap; the short description under each
+  // one does, and the grid drops to one column on narrow screens.
   function discordShareTip() {
-    return h("div", { class: "tip" }, iconEl("terminal"),
-      h("span", null, "On Discord: ", h("code", { text: "/share code" }), " shows this code, ", h("code", { text: "/share import" }), " adds a friend's account, ", h("code", { text: "/share stop" }), " revokes it."));
+    const cmds = [
+      ["/share code", "Shows this code"],
+      ["/share import", "Adds a friend's account"],
+      ["/share stop", "Revokes it"],
+    ];
+    return h("section", { class: "share-discord" },
+      h("div", { class: "section-title", style: "margin:0" }, h("span", { class: "share-discord-head" }, iconEl("terminal"), "On Discord")),
+      h("ul", null, cmds.map(([c, d]) => h("li", null, h("code", { text: c }), h("span", { text: d }))))
+    );
   }
 
   function applyRotateCooldown(btn, rotatedAt) {
