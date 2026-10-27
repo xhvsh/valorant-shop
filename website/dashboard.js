@@ -765,6 +765,10 @@
     const badge = $("navWishCount");
     badge.hidden = !count;
     badge.textContent = String(count);
+    const accts = $("navAcctCount");
+    const na = S.accounts.length;
+    accts.hidden = !na;
+    accts.textContent = String(na);
     const bundles = $("navBundleCount");
     const nb = (S.bundles || []).length;
     bundles.hidden = !nb;
