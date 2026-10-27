@@ -487,7 +487,7 @@ function ownedSkins(res) {
   return { count: out.length, items: out, kinds };
 }
 
-// Owned collectibles (cards / sprays / buddies / flexes) from the same entitlements
+// Owned collectibles (cards / sprays / buddies / titles / flexes) from the same entitlements
 // list. Deduped by display name like skins; each entry keeps both its animated
 // (gif) and static icon where the type has them.
 function ownedAccessories(res, type) {
@@ -542,7 +542,7 @@ async function accountDetails(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
-  const cacheKey = `acctdetails:v9:${discordId}:${account.puuid}`;
+  const cacheKey = `acctdetails:v10:${discordId}:${account.puuid}`;
   const box = await storage.kvGet(cacheKey).catch(() => null);
   if (box && box.details && box.at && Date.now() - box.at < DETAILS_TTL) {
     return { status: 'ok', details: box.details, cached: true, account };
@@ -591,6 +591,7 @@ async function accountDetails(discordId, puuid) {
       cards: [],
       sprays: [],
       buddies: [],
+      titles: [],
       flexes: [],
       equipped: { identityCard: null, identityTitle: null, sprays: [] },
       updatedAt: Date.now(),
@@ -628,6 +629,7 @@ async function accountDetails(discordId, puuid) {
       details.cards = ownedAccessories(entRes.value, 'card');
       details.sprays = ownedAccessories(entRes.value, 'spray');
       details.buddies = ownedAccessories(entRes.value, 'buddy');
+      details.titles = ownedAccessories(entRes.value, 'title');
       details.flexes = ownedAccessories(entRes.value, 'flex');
     }
     if (loadoutRes.status === 'fulfilled') {

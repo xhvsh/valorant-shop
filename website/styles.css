@@ -1317,6 +1317,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tile-media img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .tile.is-previewable { position: relative; cursor: pointer; transition: border-color .15s, transform .15s var(--ease); }
 .tile.is-previewable:hover { border-color: var(--line-2); transform: translateY(-2px); }
+.tiles.titles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+.tiles.titles .tile-media { height: 64px; padding: 8px 10px; }
+.tile-media .title-text { color: var(--text); font: 600 14px/1.25 var(--font-head); letter-spacing: .06em; text-align: center; text-transform: uppercase; overflow-wrap: anywhere; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }

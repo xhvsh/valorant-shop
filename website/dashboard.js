@@ -1159,7 +1159,7 @@
     if (loading) stats.appendChild(stat("Collection", sk()));
     else {
       const skins = d && d.skins ? d.skins.count || 0 : null;
-      const acc = d ? ["buddies", "sprays", "cards", "flexes"].reduce((n, k) => n + (Array.isArray(d[k]) ? d[k].length : 0), 0) : null;
+      const acc = d ? ["buddies", "sprays", "cards", "titles", "flexes"].reduce((n, k) => n + (Array.isArray(d[k]) ? d[k].length : 0), 0) : null;
       const num = (v, unit) => h("div", { class: "stat-num" }, h("b", { text: v === null ? "-" : fmt(v) }), h("span", { text: unit }));
       stats.appendChild(stat("Collection", [h("div", { class: "stat-pair" }, num(skins, "Skins"), num(acc, "Accessories"))]));
     }
@@ -1542,9 +1542,10 @@
       buddies: d.buddies || [],
       sprays: d.sprays || [],
       cards: d.cards || [],
+      titles: d.titles || [],
       flexes: d.flexes || [],
     };
-    const labels = { skins: "Skins", buddies: "Gun buddies", sprays: "Sprays", cards: "Player cards", flexes: "Flexes" };
+    const labels = { skins: "Skins", buddies: "Gun buddies", sprays: "Sprays", cards: "Player cards", titles: "Titles", flexes: "Flexes" };
     const counts = { ...Object.fromEntries(Object.entries(lists).map(([k, v]) => [k, v.length])), skins: (d.skins && d.skins.count) || skins.length };
 
     const seg = h("div", { class: "seg", role: "tablist" });
@@ -1611,13 +1612,16 @@
       return;
     }
 
-    const square = st.section !== "skins" && st.section !== "flexes";
-    const tiles = h("div", { class: `tiles${square ? " square" : st.section === "flexes" ? " wide" : ""}` });
+    const square = st.section !== "skins" && st.section !== "flexes" && st.section !== "titles";
+    const tiles = h("div", { class: `tiles${square ? " square" : st.section === "flexes" ? " wide" : st.section === "titles" ? " titles" : ""}` });
     const nodes = [];
     for (const it of list) {
       // Sprays use the animated GIF when Riot has one (icon), else the still.
       const src = st.section === "cards" ? (it.art && it.art.small) || it.icon : it.icon || it.staticIcon;
-      const tile = h("div", { class: "tile", title: it.name || "" }, h("div", { class: "tile-media" }, imgOrFallback(src, it.name)), h("div", { class: "tile-name", text: it.name || "Unknown" }));
+      // Titles are text only: the title itself fills the tile, no caption.
+      const isTitle = st.section === "titles";
+      const media = isTitle ? h("div", { class: "title-text", text: titleName(it.name) }) : imgOrFallback(src, it.name);
+      const tile = h("div", { class: "tile", title: it.name || "" }, h("div", { class: "tile-media" }, media), isTitle ? null : h("div", { class: "tile-name", text: it.name || "Unknown" }));
       if (st.section === "skins" && it.id) previewTrigger(tile, { ...it, type: "skin" });
       if (st.section === "cards" && it.art) previewTrigger(tile, { ...it, type: "card" });
       tiles.appendChild(tile);

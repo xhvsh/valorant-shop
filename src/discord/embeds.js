@@ -156,6 +156,7 @@ function collectionColumns(details) {
     { label: 'Flexes', value: count('flexes') },
     { label: 'Gunbuddies', value: count('buddies') },
     { label: 'Player cards', value: count('cards') },
+    { label: 'Titles', value: count('titles') },
   ];
   return [
     {
