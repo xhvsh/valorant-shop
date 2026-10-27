@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=234" />
+  <link rel="stylesheet" href="/styles.css?v=235" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -219,9 +219,14 @@
 
   <!-- Confirm -->
   <div class="overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
-    <div class="modal modal-sm">
-      <h2 id="confirmTitle">Are you sure?</h2>
+    <div class="modal modal-sm confirm">
+      <div class="confirm-head">
+        <span class="confirm-icon" id="confirmIcon" hidden></span>
+        <h2 id="confirmTitle">Are you sure?</h2>
+      </div>
+      <div class="confirm-subject" id="confirmSubject" hidden></div>
       <p id="confirmMessage"></p>
+      <ul class="confirm-points" id="confirmPoints" hidden></ul>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="confirmCancel" type="button">Cancel</button>
         <button class="btn" id="confirmOk" type="button">Confirm</button>
@@ -247,6 +252,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=234"></script>
+  <script src="/dashboard.js?v=235"></script>
 </body>
 </html>

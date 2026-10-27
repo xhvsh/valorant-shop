@@ -1769,6 +1769,41 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 .modal h2 { margin: 0; font: 600 20px/1.15 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
 .modal > h2 { margin-bottom: 10px; }
 .modal p { color: var(--text-2); }
+.modal.confirm { width: min(440px, 100%); }
+.confirm-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.confirm-head h2 { min-width: 0; }
+.confirm-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.confirm-icon.is-danger { border-color: var(--red-line); background: var(--red-soft); color: var(--red-2); }
+.confirm-icon .i { font-size: 20px; }
+.confirm-subject:not([hidden]) { margin-bottom: 14px; }
+.confirm-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+}
+.confirm-account .row-text { min-width: 0; }
+.confirm-account .row-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.confirm-account .row-text span { color: var(--text-3); font-size: 12px; letter-spacing: .04em; }
+.confirm #confirmMessage { margin: 0; font-size: 14px; line-height: 1.5; }
+.confirm-points { display: grid; gap: 8px; margin: 14px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-2); list-style: none; }
+.confirm-points[hidden] { display: none; }
+.confirm-points li { position: relative; padding-left: 16px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+.confirm-points li::before { content: ""; position: absolute; top: .55em; left: 1px; width: 5px; height: 5px; background: var(--red); }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .modal-head .icon-btn { margin: -6px -8px 0 0; }
 .wipe-list { margin: 0 0 12px; padding-left: 18px; color: var(--text-2); font-size: 14px; line-height: 1.55; }

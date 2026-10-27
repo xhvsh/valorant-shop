@@ -219,16 +219,31 @@
   /* ---------- confirm dialog ---------- */
 
   let confirmResolve = null;
-  function confirmDialog({ title, message, okLabel = "Confirm", danger = false }) {
+  // Confirmation dialog. Optional extras: an icon (danger defaults to an alert), a
+  // `subject` node shown in a card under the title (e.g. the account), and
+  // `points`, a list of what will happen. Destructive dialogs focus Cancel.
+  function confirmDialog({ title, message, okLabel = "Confirm", danger = false, icon, subject, points }) {
     return new Promise((resolve) => {
       confirmResolve = resolve;
       $("confirmTitle").textContent = title;
-      $("confirmMessage").textContent = message;
+      $("confirmMessage").textContent = message || "";
+      $("confirmMessage").hidden = !message;
+      const iconBox = $("confirmIcon");
+      const iconName = icon || (danger ? "alert" : null);
+      iconBox.hidden = !iconName;
+      iconBox.className = `confirm-icon${danger ? " is-danger" : ""}`;
+      iconBox.replaceChildren(...(iconName ? [iconEl(iconName)] : []));
+      const subjectBox = $("confirmSubject");
+      subjectBox.hidden = !subject;
+      subjectBox.replaceChildren(...(subject ? [subject] : []));
+      const list = $("confirmPoints");
+      list.hidden = !(points && points.length);
+      list.replaceChildren(...(points || []).map((t) => h("li", { text: t })));
       const ok = $("confirmOk");
       ok.textContent = okLabel;
       ok.classList.toggle("btn-danger", danger);
       $("confirmOverlay").hidden = false;
-      ok.focus();
+      (danger ? $("confirmCancel") : ok).focus();
     });
   }
   function closeConfirm(result) {
@@ -897,6 +912,9 @@
       h("div", { class: `summary-item ${extra || ""}` }, iconEl(icon), h("div", { class: "summary-text" }, h("span", { class: "summary-label", text: label }), value));
     const dash = (text) => h("span", { class: "summary-value faint", text: text || "-" });
 
+    box.appendChild(
+      item("user", "Accounts", h("span", { class: "summary-value", text: `${own} own${accts.length > own ? ` · ${accts.length - own} shared` : ""}` }))
+    );
     box.appendChild(item("bag", "Shop resets", nextDaily ? countdownEl(nextDaily, "summary-value") : dash()));
     box.appendChild(item("sparkle", "Accessories reset", nextAcc ? countdownEl(nextAcc, "summary-value") : dash()));
     box.appendChild(
@@ -905,9 +923,6 @@
           ? (nm.expiresAt ? countdownEl(nm.expiresAt, "summary-value") : h("span", { class: "summary-value", text: "Open" }))
           : dash(nm.known ? "Closed" : "-"),
         nm.open ? "is-night" : "")
-    );
-    box.appendChild(
-      item("user", "Accounts", h("span", { class: "summary-value", text: `${own} own${accts.length > own ? ` · ${accts.length - own} shared` : ""}` }))
     );
   }
 
@@ -1855,8 +1870,30 @@
     else toast("Account refreshed.", "ok");
   }
 
+  // The account as a small card (emblem, name, region) for confirmation dialogs.
+  function acctSubject(a) {
+    const meta = a.shared ? (a.sharedBy && a.sharedBy.name ? `Shared by ${a.sharedBy.name}` : "Shared with you") : a.is_default ? `Main account · ${(a.shard || "").toUpperCase()}` : (a.shard || "").toUpperCase();
+    return h("div", { class: "confirm-account" }, emblemEl(a), h("div", { class: "row-text" }, h("b", null, nameNodes(acctName(a))), h("span", { text: meta })));
+  }
+
   async function removeAccount(a) {
-    const ok = await confirmDialog({ title: "Remove account", message: `Remove ${acctName(a)}? Its alerts stop and any share code for it is revoked.`, okLabel: "Remove", danger: true });
+    const own = ownAccounts();
+    const points = [
+      "Its alerts stop.",
+      "Any share code for it is revoked, and everyone it was shared with loses access.",
+      "Its saved Riot sign-in is deleted from valorant shop.",
+    ];
+    if (a.is_default && own.length > 1) points.push("Another account becomes your main account.");
+    if (own.length === 1) points.push("Your alert settings are cleared, since no accounts remain.");
+    const ok = await confirmDialog({
+      title: "Remove account?",
+      message: "Nothing changes in VALORANT or at Riot. You can link it again any time, and your wishlist is kept.",
+      okLabel: "Remove account",
+      danger: true,
+      icon: "trash",
+      subject: acctSubject(a),
+      points,
+    });
     if (!ok) return;
     try {
       await api(`/api/accounts/${encodeURIComponent(a.puuid)}`, { method: "DELETE" });
@@ -1871,7 +1908,14 @@
   }
 
   async function removeShared(a) {
-    const ok = await confirmDialog({ title: "Remove shared account", message: `Remove ${acctName(a)} from your list? You can import it again later if you still have the code.`, okLabel: "Remove", danger: true });
+    const ok = await confirmDialog({
+      title: "Remove shared account?",
+      message: "It leaves your list. You can import it again later if you still have the code.",
+      okLabel: "Remove",
+      danger: true,
+      icon: "trash",
+      subject: acctSubject(a),
+    });
     if (!ok) return;
     try {
       await api(`/api/shares/imported/${encodeURIComponent(a.puuid)}`, { method: "DELETE" });
