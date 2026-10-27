@@ -874,51 +874,43 @@
     view.appendChild(grid);
   }
 
+  // Overview strip: when each rotation ends, so nothing has to be opened to find out.
+  // Shop and accessory resets are the soonest across the loaded accounts; the bundle
+  // is the featured one leaving first.
   function renderSummary() {
     const box = $("summary");
     if (!box) return;
     box.innerHTML = "";
-    const accts = ordered();
     const now = Date.now();
     let nextDaily = 0;
-    for (const a of accts) {
+    let nextAcc = 0;
+    const soonest = (cur, at) => (at && at > now && (!cur || at < cur) ? at : cur);
+    for (const a of ordered()) {
       const s = S.store[a.puuid];
-      const at = s && s.daily && s.daily.expiresAt;
-      if (at && at > now && (!nextDaily || at < nextDaily)) nextDaily = at;
+      nextDaily = soonest(nextDaily, s && s.daily && s.daily.expiresAt);
+      nextAcc = soonest(nextAcc, s && s.kingdomShop && s.kingdomShop.expiresAt);
     }
     const nm = nightMarketState();
-    const wlCount = S.wishlist.daily.length + S.wishlist.accessory.length;
-    const hits = wishlistHits();
+    let nextBundle = 0;
+    for (const b of S.bundles || []) nextBundle = soonest(nextBundle, b.leavesAt);
+    const bundleCount = (S.bundles || []).length;
+
     const item = (icon, label, value, extra) =>
       h("div", { class: `summary-item ${extra || ""}` }, iconEl(icon), h("div", { class: "summary-text" }, h("span", { class: "summary-label", text: label }), value));
+    const dash = (text) => h("span", { class: "summary-value faint", text: text || "-" });
 
-    box.appendChild(item("user", "Accounts", h("span", { class: "summary-value", text: `${ownAccounts().length} own${accts.length > ownAccounts().length ? ` · ${accts.length - ownAccounts().length} shared` : ""}` })));
-    box.appendChild(item("clock", "Daily reset", nextDaily ? countdownEl(nextDaily, "summary-value") : h("span", { class: "summary-value faint", text: "-" })));
+    box.appendChild(item("bag", "Shop resets", nextDaily ? countdownEl(nextDaily, "summary-value") : dash()));
+    box.appendChild(item("sparkle", "Accessories reset", nextAcc ? countdownEl(nextAcc, "summary-value") : dash()));
     box.appendChild(
-      item("moon", "Night Market",
+      item("moon", nm.open && nm.expiresAt ? "Night Market ends" : "Night Market",
         nm.open
-          ? (nm.expiresAt ? countdownEl(nm.expiresAt, "summary-value", "Open · ") : h("span", { class: "summary-value", text: "Open" }))
-          : h("span", { class: "summary-value faint", text: nm.known ? "Closed" : "-" }),
+          ? (nm.expiresAt ? countdownEl(nm.expiresAt, "summary-value") : h("span", { class: "summary-value", text: "Open" }))
+          : dash(nm.known ? "Closed" : "-"),
         nm.open ? "is-night" : "")
     );
-    box.appendChild(item("star", "Wishlist", h("span", { class: "summary-value", text: hits ? `${hits} in shops now` : `${wlCount} ${wlCount === 1 ? "item" : "items"}` })));
-  }
-
-  // How many wishlisted items are in any loaded daily or accessory shop now.
-  function wishlistHits() {
-    let n = 0;
-    const seen = new Set();
-    for (const a of S.accounts) {
-      const s = S.store[a.puuid];
-      if (!s) continue;
-      for (const it of [...((s.daily && s.daily.items) || []), ...((s.kingdomShop && s.kingdomShop.items) || [])]) {
-        if (isWishlisted(it) && !seen.has(`${a.puuid}:${it.id}`)) {
-          seen.add(`${a.puuid}:${it.id}`);
-          n += 1;
-        }
-      }
-    }
-    return n;
+    box.appendChild(
+      item("layers", "Next bundle ends", nextBundle ? countdownEl(nextBundle, "summary-value") : dash(S.bundles && !bundleCount ? "None" : "-"))
+    );
   }
 
   const PROMO_HIDE_KEY = "vs.addApp.hidden";
@@ -2913,7 +2905,10 @@
       .finally(() => {
         S.bundlesPending = null;
         if (S.route.name === "bundles") render();
-        else updateNav();
+        else {
+          updateNav();
+          if (S.route.name === "home") renderSummary();
+        }
         scheduleAutoRefresh();
       });
     return S.bundlesPending;
