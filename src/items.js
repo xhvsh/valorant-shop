@@ -532,6 +532,7 @@ async function details(id) {
       ...base,
       render: found.render || base.icon,
       tierIcon: tierName ? tierIcons.get(tierName) || null : null,
+      collection: collectionOf(found, base),
       chromas: (found.chromas || []).map((c) => ({ id: c.id, name: c.name, render: c.render, swatch: c.swatch })),
       levels: (found.levels || []).map((l) => ({ id: l.id, name: l.name, icon: l.icon })),
     };

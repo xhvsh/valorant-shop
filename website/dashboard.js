@@ -263,6 +263,57 @@
       (danger ? $("confirmCancel") : ok).focus();
     });
   }
+  /* ---------- dialog focus ---------- */
+
+  // Opening a dialog moves focus into it, Tab and Shift+Tab stay inside the
+  // topmost one, and closing it hands focus back to what opened it.
+  const dlgStack = [];
+  let lastOutsideFocus = null;
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const dlgFocusables = (overlay) => [...overlay.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest("[hidden]") && el.offsetParent !== null);
+
+  function onDialogToggle(overlay) {
+    const at = dlgStack.findIndex((d) => d.overlay === overlay);
+    if (!overlay.hidden && at === -1) {
+      dlgStack.push({ overlay, opener: lastOutsideFocus });
+      const modal = overlay.querySelector(".modal");
+      if (modal) modal.tabIndex = -1;
+      if (!overlay.contains(document.activeElement)) (modal || overlay).focus({ preventScroll: true });
+    } else if (overlay.hidden && at !== -1) {
+      const [{ opener }] = dlgStack.splice(at, 1);
+      if (opener && opener.isConnected && typeof opener.focus === "function") opener.focus({ preventScroll: true });
+    }
+  }
+
+  function initDialogFocus() {
+    document.addEventListener("focusin", (e) => {
+      if (e.target instanceof Element && !e.target.closest(".overlay")) lastOutsideFocus = e.target;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab" || !dlgStack.length) return;
+      const { overlay } = dlgStack[dlgStack.length - 1];
+      const items = dlgFocusables(overlay);
+      const modal = overlay.querySelector(".modal");
+      if (!items.length) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const now = document.activeElement;
+      if (!overlay.contains(now)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && (now === first || now === modal)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && now === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+  }
+
   function closeConfirm(result) {
     $("confirmOverlay").hidden = true;
     const resolve = confirmResolve;
@@ -1363,6 +1414,15 @@
     syncStars();
   }
 
+  // Placeholder tiles shaped like wishlist pick cards, shown while data loads.
+  function wlSkeleton(n) {
+    const grid = h("div", { class: "wl-picks", "aria-hidden": "true" });
+    for (let i = 0; i < n; i++) {
+      grid.appendChild(h("div", { class: "wl-pick" }, h("div", { class: "wl-pick-thumb sk", style: "border-radius:0" }), h("div", { class: "wl-pick-body" }, h("span", { class: "sk sk-line w80" }), h("span", { class: "sk sk-line w40" }))));
+    }
+    return grid;
+  }
+
   const TYPE_LABEL = { skin: "Weapon skin", buddy: "Gun buddy", spray: "Spray", card: "Player card", title: "Title", flex: "Flex" };
 
   function card(item, opts = {}) {
@@ -2389,8 +2449,10 @@
     empty.innerHTML = "";
     if (!items.length) {
       empty.appendChild(
-        h("div", { class: "empty-state" }, iconEl("star"), h("h3", { text: S.wlLoaded ? "Nothing here yet" : "Loading..." }),
-          h("p", { text: "Search above to add items, or tap the star on anything in a shop." }))
+        S.wlLoaded
+          ? h("div", { class: "empty-state" }, iconEl("star"), h("h3", { text: "Nothing here yet" }),
+              h("p", { text: "Search above to add items, or tap the star on anything in a shop." }))
+          : wlSkeleton(6)
       );
     }
     empty.hidden = items.length > 0;
@@ -2813,7 +2875,7 @@
     if (!force && key === wlRenderedKey) return;
     if (!wlIndex && !wlIndexFailed) {
       panel.innerHTML = "";
-      panel.appendChild(h("div", { class: "wl-empty", text: "Loading items..." }));
+      panel.appendChild(wlSkeleton(8));
       panel.hidden = false;
       try {
         await ensureWlIndex();
@@ -2901,10 +2963,11 @@
 
   async function openPreview(item) {
     if (!canPreview(item)) return;
-    $("previewTitle").textContent = item.name || "Item";
+    setPreviewHead(item, null);
     const body = $("previewBody");
     body.innerHTML = "";
     body.appendChild(h("div", { class: "preview-stage sk" }));
+    if (item.type === "skin") body.appendChild(previewFactsSkeleton());
     $("previewOverlay").hidden = false;
     let data;
     try {
@@ -2915,8 +2978,48 @@
       return;
     }
     if ($("previewOverlay").hidden) return;
+    setPreviewHead(item, data);
     if (item.type === "card") renderCardPreview(data);
     else renderSkinPreview(item, data);
+  }
+
+  // Header of the preview dialog: the rarity icon in the icon box, the item name,
+  // and "rarity · weapon" (or "Player card") under it. Called once with what the
+  // card already knows and again when the full details arrive.
+  function setPreviewHead(item, data) {
+    const d = { ...item, ...(data || {}) };
+    $("previewTitle").textContent = d.name || "Item";
+    const box = $("previewIcon");
+    const color = d.type === "skin" ? tierColor(d.tier) : null;
+    const tierImg = d.type === "skin" ? tierIconEl(d.tier) : null;
+    box.hidden = false;
+    box.className = `dlg-icon${color ? " has-tier" : ""}`;
+    box.style.cssText = color ? `--tier:${color}` : "";
+    box.replaceChildren(tierImg || iconEl("sparkle"));
+    const sub = $("previewSub");
+    const parts = d.type === "skin" ? [d.tier, d.weapon] : [TYPE_LABEL[d.type]];
+    const text = parts.filter(Boolean).join(" \u00b7 ");
+    sub.textContent = text;
+    sub.hidden = !text;
+  }
+
+  // Label and value tiles under the artwork. Only tiles with a value are shown.
+  function previewFacts(d) {
+    const fact = (label, ...value) => h("div", { class: "fact" }, h("span", { class: "fact-label", text: label }), h("b", { class: "fact-value" }, ...value));
+    const tiles = [];
+    if (d.tier) tiles.push(fact("Rarity", tierIconEl(d.tier), d.tier));
+    if (d.weapon) tiles.push(fact("Weapon", d.weapon));
+    if (d.collection) {
+      const t = fact("Collection", h("span", { class: "fact-text", text: d.collection, title: d.collection }));
+      tiles.push(t);
+    }
+    const levels = (d.levels || []).length;
+    if (levels > 1) tiles.push(fact("Levels", String(levels)));
+    return tiles.length ? h("div", { class: "preview-facts" }, ...tiles) : null;
+  }
+
+  function previewFactsSkeleton() {
+    return h("div", { class: "preview-facts" }, ...[0, 1, 2].map(() => h("div", { class: "fact" }, h("span", { class: "sk sk-line w40" }), h("span", { class: "sk sk-line w80" }))));
   }
 
   function renderSkinPreview(item, data) {
@@ -2925,7 +3028,10 @@
     const chromas = (data.chromas || []).filter((c) => c && c.render);
     const stageImg = makeImg((chromas[0] && chromas[0].render) || data.render || item.icon || "", item.name || "Item", (img) => img.replaceWith(fallbackText(item.name)));
     stageImg.loading = "eager";
-    body.appendChild(h("div", { class: "preview-stage" }, stageImg));
+    const color = tierColor(item.tier || data.tier);
+    body.appendChild(h("div", { class: `preview-stage${color ? " has-tier" : ""}`, style: color ? `--tier:${color}` : null }, stageImg));
+    const facts = previewFacts({ ...item, ...data });
+    if (facts) body.appendChild(facts);
     if (chromas.length > 1) {
       const row = h("div", { class: "preview-swatches" });
       const buttons = [];
@@ -3468,7 +3574,11 @@
       const locked = Boolean(document.querySelector(".overlay:not([hidden])")) || $("sidebar").classList.contains("is-open");
       document.documentElement.style.overflow = locked ? "hidden" : "";
     };
-    const observer = new MutationObserver(lock);
+    const observer = new MutationObserver((records) => {
+      lock();
+      for (const r of records) if (r.target.classList && r.target.classList.contains("overlay")) onDialogToggle(r.target);
+    });
+    initDialogFocus();
     document.querySelectorAll(".overlay").forEach((o) => observer.observe(o, { attributes: true, attributeFilter: ["hidden"] }));
     observer.observe($("sidebar"), { attributes: true, attributeFilter: ["class"] });
 

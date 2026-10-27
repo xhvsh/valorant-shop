@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=237" />
+  <link rel="stylesheet" href="/styles.css?v=238" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -263,8 +263,12 @@
   <!-- Item preview -->
   <div class="overlay" id="previewOverlay" role="dialog" aria-modal="true" aria-labelledby="previewTitle" hidden>
     <div class="modal modal-wide preview">
-      <div class="modal-head">
-        <h2 id="previewTitle">Item</h2>
+      <div class="dlg-head">
+        <span class="dlg-icon" id="previewIcon" hidden></span>
+        <div class="dlg-titles">
+          <h2 id="previewTitle">Item</h2>
+          <p class="dlg-sub" id="previewSub" hidden></p>
+        </div>
         <button class="icon-btn" id="previewClose" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
       <div class="preview-body" id="previewBody"></div>
@@ -278,6 +282,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=237"></script>
+  <script src="/dashboard.js?v=238"></script>
 </body>
 </html>

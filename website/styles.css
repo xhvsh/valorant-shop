@@ -1616,6 +1616,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 }
 .wl-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .wl-panel-count { color: var(--text-2); font: 500 12px/1 var(--font-mono); }
+.wl-pick .wl-pick-body .sk-line { height: 12px; }
 .wl-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px; }
 .wl-pick {
   display: flex;
@@ -1873,6 +1874,19 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
   border-radius: var(--r-lg);
   background: radial-gradient(80% 80% at 50% 60%, rgba(255, 255, 255, .05), transparent 70%), var(--bg-2);
 }
+.preview-stage.has-tier {
+  border-bottom: 2px solid color-mix(in srgb, var(--tier) 70%, transparent);
+  background: radial-gradient(80% 80% at 50% 100%, color-mix(in srgb, var(--tier) 20%, transparent), transparent 70%), var(--bg-2);
+}
+.dlg-icon.has-tier { border-color: color-mix(in srgb, var(--tier) 45%, transparent); background: color-mix(in srgb, var(--tier) 12%, var(--surface-3)); }
+.dlg-icon .tier-icon { width: 28px; height: 28px; }
+.preview-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fact { display: grid; gap: 5px; min-width: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-2); }
+.fact-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.fact-value { display: flex; align-items: center; gap: 8px; min-width: 0; font: 600 15px/1.2 var(--font-head); letter-spacing: .04em; }
+.fact-value .tier-icon { flex: none; width: 20px; height: 20px; }
+.fact-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modal:focus { outline: none; }
 .preview-stage img { width: 100%; max-height: 340px; object-fit: contain; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .6)); }
 .preview-heading { margin: 0 0 8px; color: var(--text-2); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .preview-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
