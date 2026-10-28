@@ -1,6 +1,7 @@
 'use strict';
 const { CURRENCY_LABEL } = require('../items');
 const { dominantColor } = require('../image-color');
+const storage = require('../storage');
 
 const COLORS = {
   main: 0xff4655,
@@ -219,8 +220,44 @@ function buildBundleMessage(bundles, opts = {}) {
   return { flags: V2, components };
 }
 
+// The accent only tints the message, so it must never hold a command up. The colour
+// of a given bundle art is saved in the database (it never changes); a first-time
+// lookup gets ~2.5s (a second download starts after 1s in case the first stalls)
+// and otherwise the default accent is used while the lookup finishes in the background.
+const ACCENT_WAIT_MS = 2500;
+const ACCENT_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
 async function bundleAccentColor(art) {
-  const color = await dominantColor(art).catch(() => null);
+  if (!art) return COLORS.main;
+  const key = `accent:v1:${art}`;
+  const saved = await storage.kvGet(key).catch(() => null);
+  if (saved && Number.isInteger(saved.color)) return saved.color;
+
+  const attempt = () =>
+    dominantColor(art, { timeoutMs: 8000 }).then((c) => {
+      if (c == null) throw new Error('no colour');
+      return c;
+    });
+  let timer;
+  const second = new Promise((resolve, reject) => {
+    timer = setTimeout(() => attempt().then(resolve, reject), 1000);
+  });
+  const lookup = Promise.any([attempt(), second]);
+  lookup
+    .then((c) => storage.kvSet(key, { color: c }, ACCENT_KEEP_MS).catch(() => {}))
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+  // Keep the function alive after the reply so a slow lookup still gets saved.
+  try {
+    const { waitUntil } = require('@vercel/functions');
+    if (waitUntil) waitUntil(lookup.catch(() => {}));
+  } catch {
+    /* not on Vercel */
+  }
+  const color = await Promise.race([
+    lookup.catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), ACCENT_WAIT_MS)),
+  ]);
   return color != null ? color : COLORS.main;
 }
 
