@@ -21,7 +21,7 @@ const shop = require('./src/shop');
 const PackageStore = require('./src/session');
 const { verifyRequest } = require('./src/discord/verify');
 const { buildNotice, EPHEMERAL, buildShopMessage, buildAccessoryMessage, buildNightMarketMessage, buildBundleMessage, bundleAccentColor, buildRankMessage, buildCollectionMessage, collectionColumns, bundleComponents, dailyFooter, alertFooter } = require('./src/discord/embeds');
-const { handleInteraction, bundlePayload, BUNDLE_SOURCE_ID, accountChoices, OWN_ACCOUNT_COMMANDS } = require('./src/discord/commands');
+const { handleInteraction, bundlePayload, prewarmBundles, BUNDLE_SOURCE_ID, accountChoices, OWN_ACCOUNT_COMMANDS } = require('./src/discord/commands');
 const { dedupeBundles } = require('./src/parse');
 const dcLog = require('./src/discord/log');
 const { waitUntil } = require('@vercel/functions');
@@ -2044,6 +2044,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
 
     const discordPayload = { ...payload };
     delete discordPayload.files;
+    delete discordPayload.prewarm;
     // Already-private replies (and bundle menu edits) are edited in place.
     if (discordPayload.private && (bundleView || ephemeral)) delete discordPayload.private;
     if (discordPayload.private) {
@@ -2080,6 +2081,12 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
     else console.log(`[int] followup patched ok status=${dr.status}`);
     console.log(`[time] followup name=${cmdName || bundleView} total=${Date.now() - t0}ms ${laps.join(' ')}`);
     res.json({ ok: true });
+    // /bundle: the first bundle is out, so render the others now (kept alive past the
+    // response) and a switch in the menu finds them ready.
+    if (cmdName === 'bundle' && payload.prewarm) {
+      const job = prewarmBundles(interactionCtx, payload.prewarm.bundles, payload.prewarm.selectedId).catch(() => {});
+      if (waitUntil) waitUntil(job);
+    }
   } catch (err) {
     console.error(`[int] followup FAILED name=${cmdName || bundleView} id=${interactionId} err=${(err && err.stack) || err}`);
     dcLog.sendLog(`${dcLog.adminMention()} followup failed: ${cmdName || bundleView} for ${dcLog.userMention(discordId || '?')}: ${String((err && err.message) || err).slice(0, 200)}`, { ping: true });

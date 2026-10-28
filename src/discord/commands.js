@@ -1,7 +1,7 @@
 'use strict';
 
 const { dedupeBundles } = require('../parse');
-const { renderBundleMedia } = require('../grid');
+const { renderBundleMedia, GRID_CACHE_VERSION } = require('../grid');
 const { buildNotice, EPHEMERAL } = require('./embeds');
 
 function accountOption() {
@@ -113,6 +113,72 @@ async function accountChoices(ctx, discordId, query, opts = {}) {
     .map((a) => ({ name: String(accountLabel(a)).slice(0, 100), value: String(a.puuid) }));
 }
 
+// Rendered bundle images are kept in the database, so switching to a bundle that
+// was already rendered (see prewarmBundles) is just a lookup. The key carries the
+// render version, so a renderer change never serves old images.
+const BUNDLE_MEDIA_MAX_BYTES = 3 * 1024 * 1024;
+
+function bundleMediaKey(bundle) {
+  return `bundle:media:${GRID_CACHE_VERSION}:${bundle.id}`;
+}
+
+function bundleMediaTtl(bundle) {
+  const left = bundle.leavesAt ? bundle.leavesAt - Date.now() : 0;
+  return Math.min(Math.max(left, 60 * 60 * 1000), 24 * 60 * 60 * 1000);
+}
+
+async function savedBundleMedia(ctx, bundle) {
+  const box = await ctx.storage.kvGet(bundleMediaKey(bundle)).catch(() => null);
+  return box && box.b64 && box.name ? { name: box.name, buf: Buffer.from(box.b64, 'base64') } : null;
+}
+
+async function saveBundleMedia(ctx, bundle, media) {
+  if (!media || media.buf.length > BUNDLE_MEDIA_MAX_BYTES) return;
+  await ctx.storage
+    .kvSet(bundleMediaKey(bundle), { name: media.name, b64: media.buf.toString('base64') }, bundleMediaTtl(bundle))
+    .catch(() => {});
+}
+
+async function bundleMediaFor(ctx, bundle) {
+  if (!bundle.items || !bundle.items.length) return null;
+  const saved = await savedBundleMedia(ctx, bundle);
+  if (saved) return saved;
+  const media = await renderBundleMedia(bundle.items);
+  // Saved after the reply goes out, not before: the first bundle should not wait for the write.
+  keepAlive(saveBundleMedia(ctx, bundle, media));
+  return media;
+}
+
+function keepAlive(promise) {
+  promise.catch(() => {});
+  try {
+    const { waitUntil } = require('@vercel/functions');
+    if (waitUntil) waitUntil(promise.catch(() => {}));
+  } catch {
+    /* not on Vercel */
+  }
+}
+
+// Renders (and saves) every other featured bundle, one at a time, after the first
+// one has been sent. Meant to run in the background (waitUntil), so a later switch
+// to any bundle in the menu is quick.
+async function prewarmBundles(ctx, bundles, selectedId) {
+  const t0 = Date.now();
+  let done = 0;
+  for (const b of bundles || []) {
+    if (!b || String(b.id) === String(selectedId) || !b.items || !b.items.length) continue;
+    try {
+      if (await savedBundleMedia(ctx, b)) continue;
+      const media = await renderBundleMedia(b.items);
+      await saveBundleMedia(ctx, b, media);
+      if (media) done += 1;
+    } catch (e) {
+      console.warn(`[bundle] prewarm failed for ${b.id}: ${(e && e.message) || e}`);
+    }
+  }
+  console.log(`[time] bundle prewarm rendered=${done} in ${Date.now() - t0}ms`);
+}
+
 async function bundlePayload(ctx, opts = {}) {
   try {
     const t0 = Date.now();
@@ -151,7 +217,7 @@ async function bundlePayload(ctx, opts = {}) {
       });
       accentPromise.catch(() => {});
       if (selected.items && selected.items.length) {
-        const media = await renderBundleMedia(selected.items);
+        const media = await bundleMediaFor(ctx, selected);
         if (media) {
           files.push(media);
           imageRefs = { [selected.id]: `attachment://${media.name}` };
@@ -164,7 +230,7 @@ async function bundlePayload(ctx, opts = {}) {
         imageRefs,
         accentColor: await accentPromise,
       });
-      return { ...message, files };
+      return { ...message, files, prewarm: { bundles, selectedId: selected.id } };
     }
     return buildNotice('Bundle data is unavailable right now. Try again in a few minutes.');
   } catch (e) {
@@ -203,4 +269,4 @@ async function handleInteraction(body, ctx) {
   }
 }
 
-module.exports = { COMMANDS, OWN_ACCOUNT_COMMANDS, handleInteraction, bundlePayload, BUNDLE_SOURCE_ID, accountChoices, accountLabel };
+module.exports = { COMMANDS, OWN_ACCOUNT_COMMANDS, handleInteraction, bundlePayload, prewarmBundles, BUNDLE_SOURCE_ID, accountChoices, accountLabel };
