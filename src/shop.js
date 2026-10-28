@@ -634,14 +634,25 @@ function equippedFromLoadout(loadout) {
 }
 
 // Returns { status: 'unlinked' | 'ok' | 'relink' | 'error', details?, account? }
-async function accountDetails(discordId, puuid) {
+// `scope` limits what is asked of Riot: 'rank' reads only the rank and level, and
+// 'collection' only the owned items. The bot commands use these so /rank does not
+// wait on the (large) entitlements list and /collection not on the rank lookups.
+// A fully loaded copy in the cache serves every scope.
+async function accountDetails(discordId, puuid, opts = {}) {
+  const scope = opts.scope === 'rank' || opts.scope === 'collection' ? opts.scope : 'full';
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
-  const cacheKey = `acctdetails:v10:${discordId}:${account.puuid}`;
-  const box = await storage.kvGet(cacheKey).catch(() => null);
-  if (box && box.details && box.at && Date.now() - box.at < DETAILS_TTL) {
-    return { status: 'ok', details: box.details, cached: true, account };
+  const fullKey = `acctdetails:v10:${discordId}:${account.puuid}`;
+  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v10:${scope}:${discordId}:${account.puuid}`;
+  const [fullBox, scopedBox] = await Promise.all([
+    storage.kvGet(fullKey).catch(() => null),
+    scope === 'full' ? null : storage.kvGet(cacheKey).catch(() => null),
+  ]);
+  for (const box of [fullBox, scopedBox]) {
+    if (box && box.details && box.at && Date.now() - box.at < DETAILS_TTL) {
+      return { status: 'ok', details: box.details, cached: true, account };
+    }
   }
 
   let auth;
@@ -657,21 +668,29 @@ async function accountDetails(discordId, puuid) {
     const tokens = { ...token, entitlement };
     const shard = account.shard || 'na';
 
-    // The catalog turns raw entitlement UUIDs into skins with names and icons.
-    try {
-      await items.load();
-    } catch (e) {
-      console.warn(`[shop] item catalog refresh failed for details ${discordId}: ${(e && e.message) || e}`);
+    // The catalog turns raw entitlement UUIDs into skins with names and icons
+    // (the rank lookup does not need it).
+    if (scope !== 'rank') {
+      try {
+        await items.load();
+      } catch (e) {
+        console.warn(`[shop] item catalog refresh failed for details ${discordId}: ${(e && e.message) || e}`);
+      }
     }
 
+    const skipped = Promise.resolve({ __skipped: true });
+    const want = (part) => scope === 'full' || scope === part;
     const [mmrRes, xpRes, entRes, loadoutRes] = await Promise.allSettled([
-      riot.mmr(shard, account.puuid, tokens),
-      riot.accountXp(shard, account.puuid, tokens),
-      riot.accountEntitlements(shard, account.puuid, tokens),
-      riot.playerLoadout(shard, account.puuid, tokens),
+      want('rank') ? riot.mmr(shard, account.puuid, tokens) : skipped,
+      want('rank') ? riot.accountXp(shard, account.puuid, tokens) : skipped,
+      want('collection') ? riot.accountEntitlements(shard, account.puuid, tokens) : skipped,
+      scope === 'full' ? riot.playerLoadout(shard, account.puuid, tokens) : skipped,
     ]);
+    const ran = (r) => r.status !== 'fulfilled' || !(r.value && r.value.__skipped);
+    const okRes = (r) => r.status === 'fulfilled' && ran(r);
 
-    if (mmrRes.status === 'rejected' && mmrRes.reason && mmrRes.reason.status === 401) {
+    const expired = [mmrRes, entRes].some((r) => r.status === 'rejected' && r.reason && r.reason.status === 401);
+    if (expired) {
       const err = new Error('Riot session expired.');
       err.code = 'RELINK';
       throw err;
@@ -691,16 +710,16 @@ async function accountDetails(discordId, puuid) {
       flexes: [],
       equipped: { identityCard: null, identityTitle: null, sprays: [] },
       updatedAt: Date.now(),
-      partial: mmrRes.status !== 'fulfilled' || xpRes.status !== 'fulfilled',
+      partial: scope === 'full' && (mmrRes.status !== 'fulfilled' || xpRes.status !== 'fulfilled'),
     };
 
-    if (xpRes.status === 'fulfilled') {
+    if (okRes(xpRes)) {
       const p = (xpRes.value && xpRes.value.Progress) || {};
       const level = Number(p.Level || 0);
       if (level) details.level = { level };
     }
 
-    if (mmrRes.status === 'fulfilled') {
+    if (okRes(mmrRes)) {
       details.rank = summarizeRank(mmrRes.value);
       await items.competitiveTiers().catch(() => {});
       if (details.rank && details.rank.tier != null) {
@@ -720,7 +739,7 @@ async function accountDetails(discordId, puuid) {
       }
     }
 
-    if (entRes.status === 'fulfilled') {
+    if (okRes(entRes)) {
       details.skins = ownedSkins(entRes.value);
       details.cards = ownedAccessories(entRes.value, 'card');
       details.sprays = ownedAccessories(entRes.value, 'spray');
@@ -728,7 +747,7 @@ async function accountDetails(discordId, puuid) {
       details.titles = ownedAccessories(entRes.value, 'title');
       details.flexes = ownedAccessories(entRes.value, 'flex');
     }
-    if (loadoutRes.status === 'fulfilled') {
+    if (okRes(loadoutRes)) {
       details.equipped = equippedFromLoadout(loadoutRes.value);
       if (process.env.DETAIL_DEBUG) {
         console.log('[shop] loadout raw:', JSON.stringify(loadoutRes.value).slice(0, 2000));
@@ -739,7 +758,8 @@ async function accountDetails(discordId, puuid) {
 
     // Only cache a fully loaded result. A transient entitlements failure would
     // otherwise freeze an empty "owned skins" list for the whole TTL window.
-    if (entRes.status === 'fulfilled') {
+    const loaded = scope === 'rank' ? okRes(mmrRes) : okRes(entRes);
+    if (loaded) {
       await storage.kvSet(cacheKey, { at: Date.now(), details }, DETAILS_TTL).catch(() => {});
     }
     return { status: 'ok', details, account };

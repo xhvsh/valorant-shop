@@ -604,10 +604,29 @@ async function tierIcon(name) {
 // latest act's tier set. Turns the raw MMR tier into a rank name and badge.
 let rankTiers = null;
 let rankTiersAt = 0;
+const RANK_TIERS_KEY = 'catalog:ranktiers:v1';
+
 async function competitiveTiers() {
   if (rankTiers && Date.now() - rankTiersAt < TTL) return rankTiers;
+  // The rank names/icons are kept in the database: a request reads that copy and
+  // never waits on valorant-api once one exists.
+  const saved = await storage.kvGet(RANK_TIERS_KEY).catch(() => null);
+  if (saved && Array.isArray(saved.entries) && saved.entries.length) {
+    rankTiers = new Map(saved.entries);
+    rankTiersAt = Date.now() - TTL + 2 * 60 * 1000;
+    if (Date.now() - saved.at < TTL) {
+      rankTiersAt = saved.at;
+      return rankTiers;
+    }
+    competitiveTiersRefresh().catch(() => {});
+    return rankTiers;
+  }
+  return competitiveTiersRefresh();
+}
+
+async function competitiveTiersRefresh() {
   try {
-    const json = await fetchJson(`${API}/v1/competitivetiers`);
+    const json = await fetchJson(`${API}/v1/competitivetiers`, 2, 12000);
     const list = json.data || [];
     const latest = list[list.length - 1] || {};
     const map = new Map();
@@ -621,6 +640,7 @@ async function competitiveTiers() {
     }
     rankTiers = map;
     rankTiersAt = Date.now();
+    await storage.kvSet(RANK_TIERS_KEY, { at: rankTiersAt, entries: [...map] }, SNAP_KEEP_MS).catch(() => {});
     return map;
   } catch {
     return rankTiers || new Map();

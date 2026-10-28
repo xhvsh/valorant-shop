@@ -1986,7 +1986,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
       if (!access) {
         payload = accountNotice('unlinked', { puuid });
       } else {
-        const result = await shop.accountDetails(access.ownerId, puuid || undefined);
+        const result = await shop.accountDetails(access.ownerId, puuid || undefined, { scope: 'rank' });
         if (result.status !== 'ok') {
           payload = accountNotice(result.status, { shared: access.shared, puuid: puuid || true, what: 'rank', error: result.error });
         } else {
@@ -2009,7 +2009,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
       if (!access) {
         payload = accountNotice('unlinked', { puuid });
       } else {
-        const result = await shop.accountDetails(access.ownerId, puuid || undefined);
+        const result = await shop.accountDetails(access.ownerId, puuid || undefined, { scope: 'collection' });
         if (result.status !== 'ok') {
           payload = accountNotice(result.status, { shared: access.shared, puuid: puuid || true, what: 'collection', error: result.error });
         } else {
