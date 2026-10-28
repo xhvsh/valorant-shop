@@ -144,7 +144,11 @@ async function bundlePayload(ctx, opts = {}) {
       const files = [];
       let imageRefs;
       // The accent colour (a download of the bundle art) is fetched while the grid renders.
-      const accentPromise = ctx.embeds.bundleAccentColor(selected.art);
+      const tAccent = Date.now();
+      const accentPromise = ctx.embeds.bundleAccentColor(selected.art).then((c) => {
+        console.log(`[time] bundle accent=${Date.now() - tAccent}ms`);
+        return c;
+      });
       accentPromise.catch(() => {});
       if (selected.items && selected.items.length) {
         const media = await renderBundleMedia(selected.items);

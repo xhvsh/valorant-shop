@@ -938,9 +938,15 @@ async function renderAnimatedBundleGrid(bundleItems) {
 
 // An animated GIF when the bundle has an animated spray, else the PNG grid.
 async function renderBundleMedia(bundleItems) {
+  const t0 = Date.now();
   const gif = await renderAnimatedBundleGrid(bundleItems).catch(() => null);
-  if (gif) return { name: 'bundle-grid.gif', buf: gif };
+  const tGif = Date.now() - t0;
+  if (gif) {
+    console.log(`[time] bundle media gif=${tGif}ms size=${(gif.length / 1024) | 0}KB items=${(bundleItems || []).length}`);
+    return { name: 'bundle-grid.gif', buf: gif };
+  }
   const png = await renderBundleGrid(bundleItems);
+  console.log(`[time] bundle media animated-attempt=${tGif}ms png=${Date.now() - t0 - tGif}ms items=${(bundleItems || []).length}`);
   return png ? { name: 'bundle-grid.png', buf: png } : null;
 }
 
