@@ -407,6 +407,16 @@ async function healWallet(discordId, account, store) {
   }
 }
 
+// Gets an account ready for an imminent forced fetch: a fresh access token (and its
+// entitlement) and the item catalog. Used by the scheduler a minute before the hourly
+// bundle check, so the check itself starts from a warm instance and a valid token.
+async function warmAccount(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account || !account.auth_encrypted) return false;
+  const results = await Promise.allSettled([items.load(), tokensFor(discordId, account)]);
+  return results.every((r) => r.status === 'fulfilled');
+}
+
 // Returns { status: 'unlinked' | 'ok' | 'relink' | 'error', store?, account?, error? }
 // Omit puuid to use the user's default account. Pass `owned: false` when the
 // caller only needs the store itself (e.g. bundles) to skip the ownership lookup.
@@ -803,4 +813,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, cachedStoreFor, accountDetails, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

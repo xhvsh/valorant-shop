@@ -2698,7 +2698,9 @@ async function buildBundleAlert(bundle) {
 }
 
 async function runBundleCheck() {
+  const tFetch = Date.now();
   const bundles = await fetchSourceBundles();
+  console.log(`[time] cron bundles fetch=${Date.now() - tFetch}ms`);
   if (!bundles) return { ok: true, checked: false, newCount: 0, sent: 0, failed: 0 };
   const now = Date.now();
   const marker = await storage.kvGet(BUNDLE_SEEN_KEY).catch(() => null);
@@ -2749,15 +2751,21 @@ async function runBundleCheck() {
       console.warn(`[bundle-alert] render failed for ${bundle.id}: ${(e && e.message) || e}`);
       continue;
     }
-    for (const discordId of recipients) {
-      try {
-        await sendDirectMessage(discordId, alert.payload, alert.files);
-        sent++;
-      } catch (e) {
-        failed++;
-        console.warn(`[bundle-alert] ${discordId} failed: ${(e && e.message) || e}`);
+    // A few DMs at a time: sending them one by one made the last subscriber wait for everyone before.
+    let next = 0;
+    const worker = async () => {
+      while (next < recipients.length) {
+        const discordId = recipients[next++];
+        try {
+          await sendDirectMessage(discordId, alert.payload, alert.files);
+          sent++;
+        } catch (e) {
+          failed++;
+          console.warn(`[bundle-alert] ${discordId} failed: ${(e && e.message) || e}`);
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, recipients.length) }, worker));
   }
 
   const summary = `New bundle alert: ${names.join(', ')}. ${sent} sent, ${failed} failed, ${recipients.length} subscriber(s).`;
@@ -2773,6 +2781,12 @@ app.get('/api/cron/bundles', async (req, res, next) => {
   try {
     if (!cronAuthorized(req)) return res.status(403).json({ error: 'forbidden' });
     const t0 = Date.now();
+    // ?warm=1 (sent a minute before the check) only primes the token and catalog.
+    if (req.query.warm === '1') {
+      const warmed = await shop.warmAccount(BUNDLE_SOURCE_ID, undefined).catch(() => false);
+      console.log(`[time] cron bundles warm ${warmed ? 'ok' : 'failed'} in ${Date.now() - t0}ms`);
+      return res.json({ ok: true, warm: true, warmed });
+    }
     const job = runBundleCheck().then((out) => ({ ...out, ms: Date.now() - t0 }));
     job.catch((e) => console.error(`[cron] bundles failed: ${(e && e.stack) || e}`));
     if (waitUntil) waitUntil(job.catch(() => {}));

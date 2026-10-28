@@ -1,13 +1,32 @@
 // Calls the app's cron endpoints on schedule. Unlike a plain URL pinger it waits for
 // the answer, retries a failed call a couple of times, and logs every run (see
 // `wrangler tail` or the Worker's logs in the Cloudflare dashboard).
+//
+// Timing: Cloudflare starts a cron a few seconds to ~30s after its minute. So the
+// schedules fire at :59, and the Worker waits until the top of the hour before the
+// real call. The bundle check also gets a warm-up call at :59 (fresh token, warm
+// instance), which makes the call at :00 as quick as it can be.
 const JOBS = {
-  '0 * * * *': '/api/cron/bundles',
-  '0 0 * * *': '/api/cron/dailyshop',
+  '59 * * * *': { path: '/api/cron/bundles', warm: true },
+  '59 23 * * *': { path: '/api/cron/dailyshop', warm: false },
 };
 
 const ATTEMPTS = 3;
 const TIMEOUT_MS = 65 * 1000; // a bit over the app's own 60s function limit
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function warmUp(path, env) {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${env.APP_URL}${path}?warm=1`, {
+      headers: { 'x-scheduler-secret': env.SCHEDULER_SECRET },
+      signal: AbortSignal.timeout(20 * 1000),
+    });
+    console.log(`[cron] warm-up ${path}: HTTP ${res.status} (${Date.now() - t0}ms)`);
+  } catch (e) {
+    console.log(`[cron] warm-up ${path} failed: ${String((e && e.message) || e)} (${Date.now() - t0}ms)`);
+  }
+}
 
 async function callJob(path, env) {
   const url = `${env.APP_URL}${path}`;
@@ -29,10 +48,20 @@ async function callJob(path, env) {
       last = String((e && e.message) || e);
       console.log(`[cron] ${path} attempt ${attempt} failed: ${last} (${Date.now() - t0}ms)`);
     }
-    if (attempt < ATTEMPTS) await new Promise((r) => setTimeout(r, attempt * 5000));
+    if (attempt < ATTEMPTS) await sleep(attempt * 5000);
   }
   console.error(`[cron] ${path} gave up after ${ATTEMPTS} attempts: ${last}`);
   return false;
+}
+
+async function run(job, event, env) {
+  if (job.warm) await warmUp(job.path, env);
+  // The schedule is a minute before the real time: wait for the top of the hour.
+  const target = event.scheduledTime + 60 * 1000;
+  const wait = target - Date.now();
+  if (wait > 0 && wait <= 90 * 1000) await sleep(wait);
+  console.log(`[cron] calling ${job.path} at ${new Date().toISOString()} (target ${new Date(target).toISOString()})`);
+  return callJob(job.path, env);
 }
 
 export default {
@@ -49,11 +78,11 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const path = JOBS[event.cron];
-    if (!path) {
+    const job = JOBS[event.cron];
+    if (!job) {
       console.error(`[cron] no job for schedule "${event.cron}"`);
       return;
     }
-    ctx.waitUntil(callJob(path, env));
+    ctx.waitUntil(run(job, event, env));
   },
 };

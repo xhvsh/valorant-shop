@@ -7,10 +7,11 @@ preview_urls = false
 [vars]
 APP_URL = "https://xhv.sh/valorant-shop"
 
-# Hourly bundle check, and the daily shop alerts at 00:00 UTC. The SCHEDULER_SECRET
-# secret is set with `wrangler secret put` (see README.md in this folder).
+# Bundle check every hour and the daily shop alerts at 00:00 UTC. Each schedule fires
+# one minute early (:59); the Worker then waits for the top of the hour (see src/index.js).
+# The SCHEDULER_SECRET secret is set with `wrangler secret put` (see README.md).
 [triggers]
-crons = ["0 * * * *", "0 0 * * *"]
+crons = ["59 * * * *", "59 23 * * *"]
 
 # Keep a log of every run (Workers & Pages -> valorant-shop-cron -> Logs). These match
 # the settings shown in the Cloudflare dashboard, so a deploy does not change them.
