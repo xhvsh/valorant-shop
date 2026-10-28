@@ -1759,7 +1759,7 @@ app.post(
                 sub,
                 puuid: accountPuuid,
                 code: codeOpt && codeOpt.value ? String(codeOpt.value) : undefined,
-                username: user.global_name || user.username || null,
+                username: user.username || null,
                 ephemeral: Boolean(response.data && response.data.flags & EPHEMERAL),
               });
               console.log(`[int] followup dispatched name=${iname}`);

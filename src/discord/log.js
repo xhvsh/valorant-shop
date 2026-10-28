@@ -29,7 +29,7 @@ async function resolveName(discordId) {
     });
     if (!res.ok) return null;
     const u = await res.json();
-    const name = u.global_name || u.username || null;
+    const name = u.username || null;
     if (name) nameCache.set(id, name);
     return name;
   } catch {
@@ -37,7 +37,7 @@ async function resolveName(discordId) {
   }
 }
 
-// Replace every <@id> / <@!id> mention with the user's plain display name so
+// Replace every <@id> / <@!id> mention with the user's unique username so
 // the log reads "xhvsh did X" instead of "@xhvsh did X" (no mention pill, no
 // ping). When keepAdmin is true (failure alerts only) the admin mention is left
 // intact so it still pings.
