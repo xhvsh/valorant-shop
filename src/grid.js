@@ -1,5 +1,6 @@
 ﻿'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const { Resvg } = require('@resvg/resvg-js');
 const { GifReader } = require('omggif');
@@ -29,7 +30,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '9';
+const GRID_CACHE_VERSION = '10';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -37,9 +38,39 @@ const GIF_MAX_BYTES = 7 * 1024 * 1024;
 // Total pixels across all frames worth encoding inside one serverless call.
 const GIF_PIXEL_BUDGET = 110e6;
 
+// Small fixed icons (currencies, wallet emoji, rarity tiers) ship with the app, so
+// a render never waits on the network for them. Missing file: fall back to a download.
+const LOCAL_ICON_FILES = {
+  'cur-vp': path.join(__dirname, '..', 'assets', 'img', 'cur-vp.png'),
+  'cur-kc': path.join(__dirname, '..', 'assets', 'img', 'cur-kc.png'),
+  'emoji-vp': path.join(__dirname, '..', 'assets', 'img', 'emoji-vp.png'),
+  'emoji-kc': path.join(__dirname, '..', 'assets', 'img', 'emoji-kc.png'),
+  'emoji-rp': path.join(__dirname, '..', 'assets', 'img', 'emoji-rp.png'),
+  'tier-select': path.join(__dirname, '..', 'assets', 'img', 'tier-select.png'),
+  'tier-deluxe': path.join(__dirname, '..', 'assets', 'img', 'tier-deluxe.png'),
+  'tier-premium': path.join(__dirname, '..', 'assets', 'img', 'tier-premium.png'),
+  'tier-exclusive': path.join(__dirname, '..', 'assets', 'img', 'tier-exclusive.png'),
+  'tier-ultra': path.join(__dirname, '..', 'assets', 'img', 'tier-ultra.png'),
+};
+const localIconData = new Map();
+
+function localIcon(key) {
+  if (localIconData.has(key)) return localIconData.get(key);
+  let data = null;
+  try {
+    data = `data:image/png;base64,${fs.readFileSync(LOCAL_ICON_FILES[key]).toString('base64')}`;
+  } catch {
+    data = null;
+  }
+  localIconData.set(key, data);
+  return data;
+}
+
 const curIconData = {};
 
 async function loadCurIcon(code) {
+  const local = localIcon(`cur-${code}`);
+  if (local) return local;
   if (curIconData[code] === undefined) {
     curIconData[code] = (await fetchIconData(CURRENCY_ICON_URLS[code])) || false;
   }
@@ -55,11 +86,15 @@ function cachedIcon(url) {
       return d;
     });
     iconCache.set(url, p);
+    // Keep the per-instance cache bounded: drop the oldest entries past the cap.
+    while (iconCache.size > 300) iconCache.delete(iconCache.keys().next().value);
   }
   return iconCache.get(url);
 }
 
 async function loadEmoji(code) {
+  const local = localIcon(`emoji-${code}`);
+  if (local) return local;
   if (emojiPromises[code] === undefined) {
     emojiPromises[code] = fetchIconData(
       `https://cdn.discordapp.com/emojis/${EMOJI_IDS[code]}.png?size=64`
@@ -168,7 +203,10 @@ function tierColor(tier) {
 function loadTierIcons(items) {
   return Promise.all(
     items.map(async (it) => {
-      const url = it && it.tier ? await tierIcon(it.tier) : null;
+      if (!it || !it.tier) return null;
+      const local = localIcon(`tier-${String(it.tier).toLowerCase().replace(/\s*edition/g, '').trim()}`);
+      if (local) return local;
+      const url = await tierIcon(it.tier);
       return url ? cachedIcon(url) : null;
     })
   );
@@ -381,15 +419,17 @@ async function renderSkinGrid(store, opts = {}) {
   const items = source.slice(0, opts.limit || 4);
   if (!items.length) return null;
 
-  const icons = await Promise.all(
-    items.map((i) => {
-      const url = cardArtUrl(i);
-      return url ? fetchIconData(url) : Promise.resolve(null);
-    })
-  );
-  const [vpI, kcI] = await Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]);
+  const [icons, [vpI, kcI], tierIcons] = await Promise.all([
+    Promise.all(
+      items.map((i) => {
+        const url = cardArtUrl(i);
+        return url ? cachedIcon(url) : Promise.resolve(null);
+      })
+    ),
+    Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]),
+    loadTierIcons(items),
+  ]);
   const curIcons = { vp: vpI, kc: kcI };
-  const tierIcons = await loadTierIcons(items);
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);
@@ -635,7 +675,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
   await Promise.all(
     animIdx.map(async (i) => {
       try {
-        const r = await fetch(items[i].icon, { signal: AbortSignal.timeout(12000) });
+        const r = await fetch(items[i].icon, { signal: AbortSignal.timeout(7000) });
         if (!r.ok) return;
         const g = decodeGif(Buffer.from(await r.arrayBuffer()));
         if (g.frames.length) animated.push({ index: i, ...g });
@@ -648,16 +688,18 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
   if (!animated.length) return null;
   const animSet = new Set(animated.map((a) => a.index));
 
-  const staticIcons = await Promise.all(
-    items.map((it, i) => {
-      if (animSet.has(i)) return Promise.resolve(null);
-      const url = cardArtUrl(it);
-      return url ? fetchIconData(url) : Promise.resolve(null);
-    })
-  );
-  const [vpI, kcI] = await Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]);
+  const [staticIcons, [vpI, kcI], tierIcons] = await Promise.all([
+    Promise.all(
+      items.map((it, i) => {
+        if (animSet.has(i)) return Promise.resolve(null);
+        const url = cardArtUrl(it);
+        return url ? cachedIcon(url) : Promise.resolve(null);
+      })
+    ),
+    Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]),
+    loadTierIcons(items),
+  ]);
   const curIcons = { vp: vpI, kc: kcI };
-  const tierIcons = await loadTierIcons(items);
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);

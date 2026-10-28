@@ -336,12 +336,27 @@ let tierAttemptAt = 0;
 let tierLoading = null;
 let tierFetchedAt = 0;
 
+// Rarity tiers are tiny but sit on the same slow host, so a copy is kept in the
+// database and a request never waits for the download once one exists.
+const TIERS_KEY = 'catalog:tiers:v1';
+
 async function loadTiers() {
   if (tierNames.size && Date.now() - tierFetchedAt < TTL) return;
   if (tierLoading) return tierLoading;
   if (Date.now() - tierAttemptAt < 60000) return;
+  const saved = await storage.kvGet(TIERS_KEY).catch(() => null);
+  const haveSaved = Boolean(saved && Array.isArray(saved.names) && Array.isArray(saved.icons));
+  if (haveSaved) {
+    for (const [k, v] of saved.names) tierNames.set(k, v);
+    for (const [k, v] of saved.icons) tierIcons.set(k, v);
+    if (Date.now() - saved.at < TTL) {
+      tierFetchedAt = saved.at;
+      return;
+    }
+    tierFetchedAt = Date.now() - TTL + 2 * 60 * 1000;
+  }
   tierAttemptAt = Date.now();
-  tierLoading = (async () => {
+  const refresh = (async () => {
     try {
       const tiers = await fetchJson(`${API}/v1/contenttiers`, 1, 8000);
       for (const t of tiers.data || []) {
@@ -351,13 +366,15 @@ async function loadTiers() {
         if (name && t.displayIcon) tierIcons.set(name, t.displayIcon);
       }
       tierFetchedAt = Date.now();
+      await storage.kvSet(TIERS_KEY, { at: tierFetchedAt, names: [...tierNames], icons: [...tierIcons] }, SNAP_KEEP_MS).catch(() => {});
     } catch (err) {
       console.warn('[items] content tiers unavailable:', err.message);
     } finally {
       tierLoading = null;
     }
   })();
-  return tierLoading;
+  tierLoading = refresh;
+  return haveSaved ? undefined : refresh;
 }
 
 // ---- Shared catalog snapshot ---------------------------------------------------

@@ -414,10 +414,14 @@ async function getShop(discordId, puuid, opts = {}) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
+  const tStart = Date.now();
   const cached = opts.force ? null : cachedStore(account, await resetAtFor(discordId, account.puuid));
   if (cached) {
+    const tCached = Date.now();
     const fresh = await healWallet(discordId, account, await freshStore(cached));
+    const tFresh = Date.now();
     const store = opts.owned === false ? fresh : await withOwned(fresh, discordId, account, () => tokensFor(discordId, account));
+    console.log(`[time] getShop cached lookup=${tCached - tStart}ms catalog+wallet=${tFresh - tCached}ms owned=${Date.now() - tFresh}ms`);
     return { status: 'ok', store, account, cached: true };
   }
 

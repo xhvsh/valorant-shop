@@ -1579,6 +1579,9 @@ async function renderShopMessage(result, isAcc, opts = {}) {
   const ksItems = (ks && ks.items) || [];
   let gridName = isAcc ? 'accessory-grid.gif' : 'shop-grid.png';
   let gridBuf;
+  // The wallet image renders alongside the grid, not after it.
+  const walletPromise = renderWalletImage(result.store.wallet);
+  walletPromise.catch(() => {});
   if (isAcc) {
     // Sprays animate, so try the animated GIF grid first and fall back to PNG.
     gridBuf = await renderAnimatedSkinGrid(result.store, {
@@ -1594,7 +1597,7 @@ async function renderShopMessage(result, isAcc, opts = {}) {
     gridBuf = await renderSkinGrid(result.store, { wishlist: opts.wishlist });
   }
   const walletName = 'wallet.png';
-  const walletPng = await renderWalletImage(result.store.wallet);
+  const walletPng = await walletPromise;
   const files = [];
   if (gridBuf) files.push({ name: gridName, buf: gridBuf });
   if (walletPng) files.push({ name: walletName, buf: walletPng });

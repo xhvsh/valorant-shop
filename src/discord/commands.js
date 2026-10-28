@@ -143,6 +143,9 @@ async function bundlePayload(ctx, opts = {}) {
     if (selected) {
       const files = [];
       let imageRefs;
+      // The accent colour (a download of the bundle art) is fetched while the grid renders.
+      const accentPromise = ctx.embeds.bundleAccentColor(selected.art);
+      accentPromise.catch(() => {});
       if (selected.items && selected.items.length) {
         const media = await renderBundleMedia(selected.items);
         if (media) {
@@ -155,7 +158,7 @@ async function bundlePayload(ctx, opts = {}) {
         appUrl: ctx.linkBaseUrl,
         discordId: BUNDLE_SOURCE_ID,
         imageRefs,
-        accentColor: await ctx.embeds.bundleAccentColor(selected.art),
+        accentColor: await accentPromise,
       });
       return { ...message, files };
     }
