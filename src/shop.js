@@ -31,6 +31,7 @@ function isRevokedError(e) {
 // Renews an account session with the DPoP-bound ritoplus refresh token.
 // Throws REVOKED when the grant itself is dead, TRANSIENT after retries when
 // Riot is just having a moment.
+const RENEW_BUDGET_MS = 25 * 1000;
 async function renewTokens(auth, opts = {}) {
   if (!auth || !auth.refresh_token) {
     const err = new Error('Riot session expired.');
@@ -38,6 +39,7 @@ async function renewTokens(auth, opts = {}) {
     throw err;
   }
   const attempts = opts.retries == null ? 2 : opts.retries;
+  const budgetEnd = Date.now() + RENEW_BUDGET_MS;
   let lastErr = null;
   for (let i = 0; i <= attempts; i += 1) {
     try {
@@ -57,7 +59,9 @@ async function renewTokens(auth, opts = {}) {
         err.code = 'REVOKED';
         throw err;
       }
-      if (i < attempts) await sleep(500 * (i + 1));
+      // Stay well inside the function limit: no new attempt once the budget is spent.
+      if (i < attempts && Date.now() + 500 * (i + 1) < budgetEnd) await sleep(500 * (i + 1));
+      else break;
     }
   }
   const err = new Error(`Riot refresh failed (${(lastErr && lastErr.message) || 'unknown error'}).`);
@@ -249,13 +253,17 @@ function walletMissing(store) {
 // 5xx when the storefront and wallet calls land together), and log why it failed.
 async function fetchWallet(shard, puuid, tokens, who) {
   let last = null;
+  const budgetEnd = Date.now() + 20 * 1000;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
     try {
       return await riot.wallet(shard, puuid, tokens);
     } catch (e) {
       last = e;
+      // Only a quick failure is worth another try: not a timeout, not a 4xx, and not past the budget.
+      if (e && e.code === 'TIMEOUT') break;
       if (e && e.status && e.status < 500 && e.status !== 429 && e.status !== 408) break;
+      if (Date.now() > budgetEnd) break;
     }
   }
   const body = last && last.riotBody ? ` body=${JSON.stringify(last.riotBody).slice(0, 200)}` : '';

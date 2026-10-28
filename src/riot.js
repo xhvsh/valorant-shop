@@ -32,20 +32,31 @@ const SHARDS = ['na', 'eu', 'ap', 'kr', 'pbe'];
 // All outbound calls go through here so a hung Riot/API endpoint cannot eat a
 // whole serverless invocation (which would time out interactions and crons).
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...opts, signal: opts.signal || ctrl.signal });
-  } catch (e) {
-    if (e && e.name === 'AbortError') {
+  // The deadline covers the whole exchange, body included: a response whose
+  // headers arrive but whose body then stalls must not hang the request until
+  // the serverless function is killed.
+  const signal = opts.signal || AbortSignal.timeout(timeoutMs);
+  const timedOut = (e) => {
+    if (e && (e.name === 'AbortError' || e.name === 'TimeoutError')) {
       const err = new Error(`Request timed out (${timeoutMs}ms): ${String(url).split('?')[0]}`);
       err.code = 'TIMEOUT';
-      throw err;
+      return err;
     }
-    throw e;
-  } finally {
-    clearTimeout(t);
+    return e;
+  };
+  let res;
+  try {
+    res = await fetch(url, { ...opts, signal });
+  } catch (e) {
+    throw timedOut(e);
   }
+  for (const m of ['json', 'text', 'arrayBuffer', 'blob']) {
+    const read = res[m].bind(res);
+    res[m] = () => read().catch((e) => {
+      throw timedOut(e);
+    });
+  }
+  return res;
 }
 
 function regionToShard(region) {
@@ -610,6 +621,8 @@ async function dpopTokenRequest(key, store, form) {
 function httpsPost(url, extraHeaders, body, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
+    // `timeout` below only fires on an idle socket; this caps the whole request.
+    const hard = setTimeout(() => req.destroy(new Error('Riot token request timed out')), timeoutMs);
     const req = https.request(
       u,
       {
@@ -626,6 +639,7 @@ function httpsPost(url, extraHeaders, body, timeoutMs = 20000) {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
         res.on('end', () => {
+          clearTimeout(hard);
           const raw = Buffer.concat(chunks).toString('utf8');
           let json = {};
           try {
@@ -636,7 +650,10 @@ function httpsPost(url, extraHeaders, body, timeoutMs = 20000) {
       }
     );
     req.on('timeout', () => req.destroy(new Error('Riot token request timed out')));
-    req.on('error', reject);
+    req.on('error', (e) => {
+      clearTimeout(hard);
+      reject(e);
+    });
     req.write(body);
     req.end();
   });

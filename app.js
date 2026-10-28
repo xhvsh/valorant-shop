@@ -27,6 +27,12 @@ const dcLog = require('./src/discord/log');
 const { waitUntil } = require('@vercel/functions');
 const { renderSkinGrid, renderAnimatedSkinGrid, renderWalletImage, renderBundleGrid, renderBundleMedia, renderRankImage, renderCollectionImage } = require('./src/grid');
 
+// fetch with a hard deadline. Without one, a stalled Discord (or self) call holds
+// the request until the serverless function is killed at 60s.
+function dfetch(url, init = {}, ms = 15000) {
+  return fetch(url, { ...init, signal: init.signal || AbortSignal.timeout(ms) });
+}
+
 const PORT = Number(process.env.PORT || 3000);
 const BASE_URL = String(process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
 const APP_URL = String(process.env.APP_URL || BASE_URL).replace(/\/+$/, '');
@@ -275,7 +281,7 @@ app.get('/auth/discord/callback', async (req, res, next) => {
       throw httpError('Invalid login response. Try again.', 400);
     }
     delete req.session.discordOauthState;
-    const tokenRes = await fetch('https://discord.com/api/v10/oauth2/token', {
+    const tokenRes = await dfetch('https://discord.com/api/v10/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -288,7 +294,7 @@ app.get('/auth/discord/callback', async (req, res, next) => {
     });
     if (!tokenRes.ok) throw httpError('Discord login failed. Try again.', 400);
     const tok = await tokenRes.json();
-    const meRes = await fetch('https://discord.com/api/v10/users/@me', {
+    const meRes = await dfetch('https://discord.com/api/v10/users/@me', {
       headers: { Authorization: `Bearer ${tok.access_token}` },
     });
     if (!meRes.ok) throw httpError('Discord login failed. Try again.', 400);
@@ -1558,11 +1564,11 @@ function discordIdFrom(body) {
 }
 
 async function fireFollowUp(payload) {
-  await fetch(`${APP_URL}/api/interactions/followup`, {
+  await dfetch(`${APP_URL}/api/interactions/followup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-link-secret': LINK_SECRET },
     body: JSON.stringify(payload),
-  });
+  }, 50000);
 }
 
 // Renders the shop/accessory grid + wallet as attachments and builds the CV2
@@ -1657,7 +1663,7 @@ async function renderDailyDm(result, opts = {}) {
 async function sendDirectMessage(discordId, payload, files) {
   const botToken = process.env.DISCORD_BOT_TOKEN || '';
   if (!botToken) throw new Error('no bot token configured');
-  const channelRes = await fetch('https://discord.com/api/v10/users/@me/channels', {
+  const channelRes = await dfetch('https://discord.com/api/v10/users/@me/channels', {
     method: 'POST',
     headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient_id: discordId }),
@@ -1685,7 +1691,7 @@ async function sendDirectMessage(discordId, payload, files) {
       body: JSON.stringify(body),
     };
   }
-  const msgRes = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, init);
+  const msgRes = await dfetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, init);
   if (!msgRes.ok) {
     const err = new Error(`dm send ${msgRes.status} ${await msgRes.text().catch(() => '')}`);
     err.status = msgRes.status;
@@ -1905,13 +1911,13 @@ async function sendPrivateNotice(token, payload) {
   const body = { ...payload, flags: (payload.flags || 0) | EPHEMERAL };
   delete body.private;
   const base = `https://discord.com/api/v10/webhooks/${DISCORD_CLIENT_ID}/${token}`;
-  const fr = await fetch(`${base}?with_components=true`, {
+  const fr = await dfetch(`${base}?with_components=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!fr.ok) console.warn('[interactions] private notice failed:', fr.status, await fr.text().catch(() => ''));
-  const dr = await fetch(`${base}/messages/@original`, { method: 'DELETE' });
+  const dr = await dfetch(`${base}/messages/@original`, { method: 'DELETE' });
   if (!dr.ok && dr.status !== 404) console.warn('[interactions] placeholder delete failed:', dr.status);
 }
 
@@ -2057,7 +2063,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
     const editUrl =
       `https://discord.com/api/v10/webhooks/${DISCORD_CLIENT_ID}/${token}/messages/@original` +
       (v2 ? '?with_components=true' : '');
-    const dr = await fetch(editUrl, init);
+    const dr = await dfetch(editUrl, init);
     if (!dr.ok) console.warn('[interactions] follow-up PATCH failed:', dr.status, await dr.text().catch(() => ''));
     else console.log(`[int] followup patched ok status=${dr.status}`);
     res.json({ ok: true });
@@ -2071,7 +2077,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
       } else if (token) {
         // Bundle menu clicks edit the existing bundle message in place; never
         // delete it, just swap in the notice.
-        await fetch(`https://discord.com/api/v10/webhooks/${DISCORD_CLIENT_ID}/${token}/messages/@original?with_components=true`, {
+        await dfetch(`https://discord.com/api/v10/webhooks/${DISCORD_CLIENT_ID}/${token}/messages/@original?with_components=true`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buildNotice(crash)),

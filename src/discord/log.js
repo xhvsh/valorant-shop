@@ -25,6 +25,7 @@ async function resolveName(discordId) {
   if (!token) return null;
   try {
     const res = await fetch(`https://discord.com/api/v10/users/${id}`, {
+      signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bot ${token}` },
     });
     if (!res.ok) return null;
@@ -63,6 +64,7 @@ async function sendLog(content, opts = {}) {
   try {
     const text = await renderNames(String(content).slice(0, 1900), ping);
     const res = await fetch(`https://discord.com/api/v10/channels/${LOG_CHANNEL_ID}/messages`, {
+      signal: AbortSignal.timeout(8000),
       method: 'POST',
       headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
       // Failure alerts keep the admin mention and may ping them; normal lines
