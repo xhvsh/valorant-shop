@@ -1933,12 +1933,17 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
 
     const isAcc = cmdName === 'accessories';
     console.log(`[int] followup arrived name=${cmdName || bundleView} id=${interactionId}`);
+    // Where the time goes, per step, so a slow command can be traced from the logs.
+    const t0 = Date.now();
+    const laps = [];
+    const lap = (label) => laps.push(`${label}=${Date.now() - t0}ms`);
     const wishItems = discordId
       ? await storage
           .getWishlist(discordId)
           .then((w) => [...(w.daily || []), ...(w.accessory || [])])
           .catch(() => null)
       : null;
+    lap('wishlist');
     let payload;
     let files = [];
     if (bundleView) {
@@ -2017,6 +2022,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
       }
     } else {
       const result = await shopFor(discordId, puuid || undefined);
+      lap('getShop');
       if (result.status !== 'ok') {
         payload = accountNotice(result.status, { shared: result.shared, puuid, what: isAcc ? 'accessory shop' : 'shop', error: result.error });
       } else {
@@ -2025,6 +2031,7 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
           payload = buildNotice('The accessory shop is empty right now. Try again later.');
         } else {
           const built = await renderShopMessage(result, isAcc, { wishlist: wishItems });
+          lap('render');
           payload = built.payload;
           files = files.concat(built.files);
         }
@@ -2063,9 +2070,12 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
     const editUrl =
       `https://discord.com/api/v10/webhooks/${DISCORD_CLIENT_ID}/${token}/messages/@original` +
       (v2 ? '?with_components=true' : '');
+    lap('payload');
     const dr = await dfetch(editUrl, init);
+    lap('patch');
     if (!dr.ok) console.warn('[interactions] follow-up PATCH failed:', dr.status, await dr.text().catch(() => ''));
     else console.log(`[int] followup patched ok status=${dr.status}`);
+    console.log(`[time] followup name=${cmdName || bundleView} total=${Date.now() - t0}ms ${laps.join(' ')}`);
     res.json({ ok: true });
   } catch (err) {
     console.error(`[int] followup FAILED name=${cmdName || bundleView} id=${interactionId} err=${(err && err.stack) || err}`);

@@ -302,6 +302,7 @@ async function freshStore(store) {
 // goes stale the moment the player buys something.
 const OWNED_TTL = 3 * 60 * 1000;
 const OWNED_FAIL_TTL = 60 * 1000;
+const OWNED_DEADLINE_MS = 5000;
 const OWNABLE = new Set(['skin', 'buddy', 'spray', 'card', 'title', 'flex']);
 
 function ownedKey(item) {
@@ -338,8 +339,19 @@ async function withOwned(store, discordId, account, getTokens) {
   }
   if (!owned) {
     try {
-      const tokens = await getTokens();
-      const res = await riot.accountEntitlements(account.shard || 'na', account.puuid, tokens);
+      // The owned marks are a nicety: never let this lookup hold the shop for long.
+      const lookup = (async () => {
+        const tokens = await getTokens();
+        return riot.accountEntitlements(account.shard || 'na', account.puuid, tokens);
+      })();
+      lookup.catch(() => {});
+      let timer;
+      const res = await Promise.race([
+        lookup,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`owned lookup took longer than ${OWNED_DEADLINE_MS}ms`)), OWNED_DEADLINE_MS);
+        }),
+      ]).finally(() => clearTimeout(timer));
       const have = new Set();
       for (const e of entitlementList(res)) {
         if (!e || !e.ItemID) continue;
