@@ -2765,12 +2765,24 @@ async function runBundleCheck() {
   return { ok: true, checked: true, newCount: fresh.length, sent, failed, recipients: recipients.length, names };
 }
 
+// External schedulers give up after ~30s (cron-job.org's free plan) and mark the run
+// as failed. The check keeps running to the end, but the reply goes out at 25s at the latest.
+const CRON_REPLY_DEADLINE_MS = 25 * 1000;
+
 app.get('/api/cron/bundles', async (req, res, next) => {
   try {
     if (!cronAuthorized(req)) return res.status(403).json({ error: 'forbidden' });
     const t0 = Date.now();
-    const out = await runBundleCheck();
-    res.json({ ...out, ms: Date.now() - t0 });
+    const job = runBundleCheck().then((out) => ({ ...out, ms: Date.now() - t0 }));
+    job.catch((e) => console.error(`[cron] bundles failed: ${(e && e.stack) || e}`));
+    if (waitUntil) waitUntil(job.catch(() => {}));
+    let timer;
+    const slow = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ok: true, pending: true, ms: Date.now() - t0 }), CRON_REPLY_DEADLINE_MS);
+    });
+    const out = await Promise.race([job, slow]).finally(() => clearTimeout(timer));
+    console.log(`[time] cron bundles ${out.pending ? 'still running at ' : 'done in '}${Date.now() - t0}ms`);
+    res.json(out);
   } catch (err) {
     next(err);
   }
