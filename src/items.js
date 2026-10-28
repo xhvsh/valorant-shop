@@ -289,12 +289,15 @@ let loading = null;
 const tierNames = new Map();
 const tierIcons = new Map();
 const TTL = 12 * 60 * 60 * 1000;
+const PARTIAL_RETRY_MS = 60 * 1000;
 
-async function fetchJson(url, attempts = 3) {
+// valorant-api answers headers quickly but the multi-megabyte bodies can take a
+// while from a serverless region, so the deadline (which covers the body) is generous.
+async function fetchJson(url, attempts = 2) {
   let lastError;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 12000);
+      const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 22000);
       const json = await res.json();
       if (!res.ok || json.status !== 200) throw new Error(`HTTP ${res.status}`);
       return json;
@@ -410,7 +413,8 @@ async function load(force = false) {
     } else if (map.size) {
       catalog = map;
     }
-    catalogAt = Date.now();
+    // A catalog missing some sources is only good for a minute, then load() tries again.
+    catalogAt = ok < SOURCES.length ? Date.now() - TTL + PARTIAL_RETRY_MS : Date.now();
 
     await loadContracts().catch(() => {});
     await loadTiers();
@@ -472,6 +476,7 @@ function refreshIcons(store) {
     for (const it of box.items) {
       if (!it || !it.id) continue;
       const r = resolve(it.id);
+      if (it.type === 'unknown' && r.type !== 'unknown') Object.assign(it, r);
       if (r.icon) it.icon = r.icon;
       if (r.staticIcon) it.staticIcon = r.staticIcon;
     }

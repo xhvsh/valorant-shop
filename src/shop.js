@@ -230,6 +230,7 @@ function cachedStore(account, resetAt) {
   if (
     account &&
     account.store_cache &&
+    !hasUnknownItems(account.store_cache) &&
     account.store_updated_at &&
     Date.now() - account.store_updated_at < STORE_TTL &&
     (!resetAt || Date.now() < resetAt)
@@ -237,6 +238,15 @@ function cachedStore(account, resetAt) {
     return account.store_cache;
   }
   return null;
+}
+
+// Items the catalog could not name ("Unknown Item") mean the store was built while
+// the item catalog was missing or partial. Such a store is never cached or reused.
+function hasUnknownItems(store) {
+  for (const box of [store && store.daily, store && store.kingdomShop, store && store.nightMarket]) {
+    for (const it of (box && box.items) || []) if (it && it.type === 'unknown') return true;
+  }
+  return false;
 }
 
 // The balances are all null only when the wallet request failed (a real wallet
@@ -433,7 +443,16 @@ async function getShop(discordId, puuid, opts = {}) {
       }
       w = wRes.status === 'fulfilled' ? wRes.value : null;
     }
-    const store = buildStoreResponse(sf, w);
+    let store = buildStoreResponse(sf, w);
+    // Catalog was incomplete when the store was built: reload it once and rebuild.
+    if (hasUnknownItems(store)) {
+      try {
+        await items.load(true);
+        store = buildStoreResponse(sf, w);
+      } catch (e) {
+        console.warn(`[shop] catalog reload failed for ${discordId}: ${(e && e.message) || e}`);
+      }
+    }
     // Wallet failed this time: keep the last balances we knew rather than blanking them.
     if (!w && walletMissing(store) && !walletMissing(account.store_cache)) store.wallet = account.store_cache.wallet;
     const panel = sf && sf.SkinsPanelLayout;
@@ -442,10 +461,14 @@ async function getShop(discordId, puuid, opts = {}) {
     const resetAt = remainingMs > 0 ? Date.now() + remainingMs : nextMidnightUtc();
     try {
       await storage.kvSet(`shop_reset:${discordId}:${account.puuid}`, { at: resetAt }, 25 * 60 * 60 * 1000);
-      await storage.saveAccount(discordId, account.puuid, {
-        store_cache: store,
-        store_updated_at: new Date().toISOString(),
-      });
+      if (hasUnknownItems(store)) {
+        console.warn(`[shop] store for ${discordId} has unresolved items (catalog incomplete), not caching it`);
+      } else {
+        await storage.saveAccount(discordId, account.puuid, {
+          store_cache: store,
+          store_updated_at: new Date().toISOString(),
+        });
+      }
     } catch (e) {
       console.warn(`[shop] cache persist failed for ${discordId}: ${(e && e.message) || e}`);
     }
