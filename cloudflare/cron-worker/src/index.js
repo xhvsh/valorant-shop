@@ -2,13 +2,13 @@
 // the answer, retries a failed call a couple of times, and logs every run (see
 // `wrangler tail` or the Worker's logs in the Cloudflare dashboard).
 //
-// Timing: Cloudflare starts a cron a few seconds to ~30s after its minute. So the
-// schedules fire at :59, and the Worker waits until the top of the hour before the
-// real call. The bundle check also gets a warm-up call at :59 (fresh token, warm
-// instance), which makes the call at :00 as quick as it can be.
+// Timing: Cloudflare starts a cron up to ~a minute off its minute, and `scheduledTime`
+// is not minute-aligned. So the schedules fire at :58, the bundle check gets a warm-up
+// call first (fresh token, warm instance; a cold one takes ~8s), and the Worker then
+// waits until the top of the hour for the real call.
 const JOBS = {
-  '59 * * * *': { path: '/api/cron/bundles', warm: true },
-  '59 23 * * *': { path: '/api/cron/dailyshop', warm: false },
+  '58 * * * *': { path: '/api/cron/bundles', warm: true },
+  '58 23 * * *': { path: '/api/cron/dailyshop', warm: false },
 };
 
 const ATTEMPTS = 3;
@@ -56,10 +56,10 @@ async function callJob(path, env) {
 
 async function run(job, event, env) {
   if (job.warm) await warmUp(job.path, env);
-  // The schedule is a minute before the real time: wait for the top of the hour.
-  const target = event.scheduledTime + 60 * 1000;
+  // The schedule is two minutes before the real time: wait for the top of the hour.
+  const target = Math.floor(event.scheduledTime / 60000) * 60000 + 120 * 1000;
   const wait = target - Date.now();
-  if (wait > 0 && wait <= 90 * 1000) await sleep(wait);
+  if (wait > 0 && wait <= 150 * 1000) await sleep(wait);
   console.log(`[cron] calling ${job.path} at ${new Date().toISOString()} (target ${new Date(target).toISOString()})`);
   return callJob(job.path, env);
 }
