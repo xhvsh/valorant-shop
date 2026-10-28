@@ -933,7 +933,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .acct-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/1.2 var(--font); }
 .acct-card-name .tag { color: var(--text-3); font-weight: 400; }
 .acct-card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-.acct-card-rank { display: grid; gap: 6px; padding: 0 16px 14px; }
+.acct-card-rank { display: grid; align-content: start; gap: 6px; padding: 0 16px 14px; min-height: 40px; }
 .rank-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .rank-name { font: 600 13px/1.2 var(--font-head); letter-spacing: .08em; text-transform: uppercase; }
 .rank-rr { color: var(--text-2); font: 500 12px/1 var(--font-mono); }
@@ -1618,6 +1618,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .wl-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .wl-panel-count { color: var(--text-2); font: 500 12px/1 var(--font-mono); }
 .wl-pick .wl-pick-body .sk-line { height: 12px; }
+/* Loading cards match the loaded card height (media + name row + meta row). */
+.card.grid-sk .card-body { min-height: 72px; }
+@media (max-width: 719px) { .card.grid-sk .card-body { min-height: 66px; } }
+/* Collection panel placeholders: same stack and heights as the loaded toolbar. */
+.coll-sk-seg { height: 38px; border-radius: var(--r-md, 8px); }
+.coll-sk-tools { height: 62px; margin-top: 14px; border-radius: var(--r-md, 8px); }
+.coll-sk-filters { height: 28px; margin: 10px 0 14px; border-radius: var(--r-md, 8px); }
 .wl-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px; }
 .wl-pick {
   display: flex;

@@ -1141,21 +1141,23 @@
 
   function walletEl(a) {
     const w = walletOf(a);
-    if (!w && a.linked && S.storePending[a.puuid]) {
+    if (!w && a.linked && !S.storeError[a.puuid]) {
       return h("div", { class: "wallet" }, h("span", { class: "sk", style: "width:74px;height:28px" }), h("span", { class: "sk", style: "width:66px;height:28px" }), h("span", { class: "sk", style: "width:70px;height:28px" }));
     }
     const ww = w || {};
     return h("div", { class: "wallet" }, coinEl("vp", ww.vp), coinEl("rp", ww.rp), coinEl("kc", ww.kc));
   }
 
+  // The rank row always takes the same height (loading, loaded or unavailable), so a
+  // card does not grow or shrink when the rank arrives.
   function rankBlock(a, compact) {
     const d = S.details[a.puuid];
     if (!a.linked) return null;
-    if (!d && S.detailsPending[a.puuid]) {
+    if (!d && !S.detailsError[a.puuid]) {
       return h("div", { class: "acct-card-rank" }, h("div", { class: "sk sk-line w60" }), h("div", { class: "sk", style: "height:4px" }));
     }
     if (!d || d.relink || !d.rank) {
-      return compact ? null : h("div", { class: "acct-card-rank" }, h("span", { class: "rank-name faint", text: d && d.relink ? "Needs re-link" : "Rank unavailable" }));
+      return h("div", { class: "acct-card-rank" }, h("span", { class: "rank-name faint", text: d && d.relink ? "Needs re-link" : compact ? "No rank data" : "Rank unavailable" }));
     }
     const rank = d.rank;
     const ranked = Number(rank.tier) >= 3;
@@ -1257,6 +1259,8 @@
     if (a.shared) chips.appendChild(h("span", { class: "chip shared" }, iconEl("share"), a.sharedBy && a.sharedBy.name ? `Shared by ${a.sharedBy.name}` : "Shared with you"));
     const d = S.details[a.puuid];
     if (d && d.level && d.level.level) chips.appendChild(h("span", { class: "chip", text: `Level ${fmt(d.level.level)}` }));
+    // Keep the level chip's spot while the details load, so the header does not reflow.
+    else if (!d && a.linked && !S.detailsError[a.puuid]) chips.appendChild(h("span", { class: "chip sk", style: "width:84px", "aria-hidden": "true" }));
     chips.appendChild(
       h("button", { class: "puuid-btn", type: "button", title: "Copy account ID (PUUID)", onclick: () => copyText(a.puuid, "Account ID copied") },
         iconEl("copy"), h("span", { text: a.puuid }))
@@ -1298,7 +1302,7 @@
 
   function statsEl(a) {
     const d = S.details[a.puuid];
-    const loading = !d && S.detailsPending[a.puuid];
+    const loading = !d && !S.detailsError[a.puuid];
     const stats = h("div", { class: "stats" });
     // label on top, content in the middle, an optional footer pinned to the bottom
     const stat = (label, body, foot) =>
@@ -1307,7 +1311,7 @@
     const emblem = (icon) => (icon ? h("span", { class: "emblem md", style: "background:transparent" }, makeImg(icon, "")) : null);
 
     // Rank
-    if (loading) stats.appendChild(stat("Rank", sk()));
+    if (loading) stats.appendChild(stat("Rank", sk(), h("div", { class: "rr-bar sk" })));
     else if (d && d.rank) {
       const rank = d.rank;
       const ranked = Number(rank.tier) >= 3;
@@ -1353,7 +1357,7 @@
   // balance right-aligned so the numbers line up.
   function walletRowsEl(a) {
     const w = walletOf(a);
-    if (!w && a.linked && S.storePending[a.puuid]) {
+    if (!w && a.linked && !S.storeError[a.puuid]) {
       return h("div", { class: "wallet-rows" }, ...[0, 1, 2].map(() => h("span", { class: "sk", style: "height:18px" })));
     }
     const ww = w || {};
@@ -1470,7 +1474,7 @@
         );
         return;
       }
-      tools.appendChild(h("span", { class: "sk sk-line", style: "width:120px" }));
+      tools.appendChild(h("span", { class: "sk sk-line", style: "width:120px;height:14px" }));
       box.appendChild(skeletonCards(view === "nm" ? 6 : 4, "daily"));
       return;
     }
@@ -1716,8 +1720,12 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchDetails(a.puuid, true).catch(() => {}); renderPanel(); } }, iconEl("refresh"), "Try again")));
         return;
       }
+      // Same stack as the loaded panel (tab strip, search row, filter row), then tiles.
+      box.appendChild(h("div", { class: "sk coll-sk-seg" }));
+      box.appendChild(h("div", { class: "sk coll-sk-tools" }));
+      box.appendChild(h("div", { class: "sk coll-sk-filters" }));
       const sk = h("div", { class: "tiles" });
-      for (let i = 0; i < 12; i++) sk.appendChild(h("div", { class: "tile" }, h("div", { class: "tile-media sk", style: "border-radius:0" }), h("div", { class: "tile-name" }, h("div", { class: "sk sk-line w80" }))));
+      for (let i = 0; i < 18; i++) sk.appendChild(h("div", { class: "tile" }, h("div", { class: "tile-media sk", style: "border-radius:0" }), h("div", { class: "tile-name" }, h("div", { class: "sk sk-line w80" }))));
       box.appendChild(sk);
       return;
     }
@@ -2468,7 +2476,18 @@
     const data = await api("/api/wishlist");
     S.wishlist = { daily: data.daily || [], accessory: data.accessory || [] };
     S.wlLoaded = true;
+    try { localStorage.setItem("valo.wlCount", String(S.wishlist.daily.length + S.wishlist.accessory.length)); } catch { /* storage unavailable */ }
     renderWishlistUI();
+  }
+
+  // How many placeholder rows the wishlist shows while loading: the size it had last
+  // time (capped), so the list does not jump when the real one arrives.
+  function wlKnownCount() {
+    try {
+      const n = Number(localStorage.getItem("valo.wlCount"));
+      if (Number.isFinite(n) && n > 0) return Math.min(n, 9);
+    } catch { /* storage unavailable */ }
+    return 4;
   }
 
   function renderWishlistUI() {
@@ -2559,7 +2578,7 @@
         S.wlLoaded
           ? h("div", { class: "empty-state" }, iconEl("star"), h("h3", { text: "Nothing here yet" }),
               h("p", { text: "Search above to add items, or tap the star on anything in a shop." }))
-          : wlSkeleton(6)
+          : wlSkeleton(wlKnownCount())
       );
     }
     empty.hidden = items.length > 0;
