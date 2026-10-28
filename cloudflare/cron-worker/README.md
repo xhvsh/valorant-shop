@@ -4,10 +4,10 @@ Cloudflare Worker that replaces the cron-job.org jobs:
 
 | Schedule (UTC) | Calls |
 | --- | --- |
-| `0 * * * *` | `/api/cron/bundles` |
-| `0 0 * * *` | `/api/cron/dailyshop` |
+| `59 * * * *` | `/api/cron/bundles` (warm-up at :59, real call at :00) |
+| `59 23 * * *` | `/api/cron/dailyshop` (real call at 00:00) |
 
-It calls the app at `https://xhv.sh/valorant-shop`, waits for the reply, retries up to 3 times, and logs each run (Workers & Pages -> valorant-shop-cron -> Logs). A manual run: `curl -H "x-scheduler-secret: $SCHEDULER_SECRET" "https://valorant-shop-cron.<your-subdomain>.workers.dev/?job=bundles"`.
+Schedules fire one minute early; the Worker waits until the top of the hour, so the call lands at :00 and not at whatever second Cloudflare starts the cron. It calls the app at `https://xhv.sh/valorant-shop`, waits for the reply, retries up to 3 times, and logs each run (Workers & Pages -> valorant-shop-cron -> Logs). A manual run: `curl -H "x-scheduler-secret: $SCHEDULER_SECRET" "https://valorant-shop-cron.<your-subdomain>.workers.dev/?job=bundles"`.
 
 ## Deploy
 
