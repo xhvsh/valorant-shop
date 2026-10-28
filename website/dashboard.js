@@ -3449,7 +3449,6 @@
      ========================================================================== */
 
   let tickerTimer = null;
-  let expiredKick = 0;
   function startTicker() {
     if (tickerTimer) return;
     tickerTimer = setInterval(() => {
@@ -3466,10 +3465,7 @@
           el.textContent = `${el.dataset.prefix || ""}${fmtCountdown(left)}${el.dataset.suffix || ""}`;
         }
       });
-      if (expired && now - expiredKick > 20000) {
-        expiredKick = now;
-        setTimeout(runAutoRefresh, 4000);
-      }
+      if (expired && !refreshing && now - lastRefreshAt > staleGap()) runAutoRefresh();
     }, 1000);
   }
 
@@ -3488,32 +3484,66 @@
     return [part(store.daily), part(store.kingdomShop), part(store.nightMarket), `${w.vp}|${w.rp}|${w.kc}`].join("~");
   }
 
-  function nextExpiry() {
-    const now = Date.now();
-    let min = 0;
-    const consider = (at) => {
-      if (at && at > now && (min === 0 || at < min)) min = at;
-    };
+  // After a rotation Riot can serve the old shop for a few seconds. While anything
+  // loaded is past its end we retry quickly, backing off so a stuck panel stays cheap.
+  let staleTries = 0;
+  function staleGap() {
+    return Math.min(2500 * Math.pow(1.5, staleTries), 20000);
+  }
+
+  function endTimes() {
+    const times = [];
+    const add = (at) => { if (at) times.push(at); };
     for (const a of S.accounts) {
       const s = S.store[a.puuid];
       if (!s) continue;
-      consider(s.daily && s.daily.expiresAt);
-      consider(s.kingdomShop && s.kingdomShop.expiresAt);
-      consider(s.nightMarket && s.nightMarket.expiresAt);
+      add(s.daily && s.daily.expiresAt);
+      add(s.kingdomShop && s.kingdomShop.expiresAt);
+      add(s.nightMarket && s.nightMarket.expiresAt);
     }
-    for (const b of S.bundles || []) consider(b.leavesAt);
+    for (const b of S.bundles || []) add(b.leavesAt);
+    return times;
+  }
+
+  function hasStale() {
+    const now = Date.now();
+    return endTimes().some((at) => at <= now);
+  }
+
+  function nextExpiry() {
+    const now = Date.now();
+    let min = 0;
+    for (const at of endTimes()) if (at > now && (min === 0 || at < min)) min = at;
     return min;
+  }
+
+  // A new bundle can show up on any hour (the bot checks at :00), not only when the
+  // current one leaves, so a loaded bundles list is also re-read just after each hour.
+  function nextHourCheck() {
+    const now = Date.now();
+    const at = Math.floor(now / 3600000) * 3600000 + 6000;
+    return at > now ? at : at + 3600000;
   }
 
   function scheduleAutoRefresh() {
     if (autoTimer) clearTimeout(autoTimer);
     autoTimer = null;
-    const at = nextExpiry();
+    const now = Date.now();
     let delay;
-    if (at) delay = Math.min(Math.max(8000, at - Date.now() + 5000), 30 * 60 * 1000);
-    else if (S.accounts.some((a) => a.linked && !S.store[a.puuid])) delay = 20000;
-    else if (S.accounts.some((a) => a.linked)) delay = 5 * 60 * 1000;
-    else return;
+    if (hasStale()) {
+      delay = staleGap();
+    } else {
+      const expiry = nextExpiry();
+      let fireAt = expiry ? expiry + 1500 : 0;
+      if (S.bundles) {
+        const hourly = nextHourCheck();
+        if (!fireAt || hourly < fireAt) fireAt = hourly;
+      }
+      if (fireAt) delay = Math.min(Math.max(2000, fireAt - now), S.bundles ? 10 * 60 * 1000 : 30 * 60 * 1000);
+      else if (S.accounts.some((a) => a.linked && !S.store[a.puuid])) delay = 20000;
+      else if (S.accounts.some((a) => a.linked)) delay = 5 * 60 * 1000;
+      else return;
+    }
     autoTimer = setTimeout(runAutoRefresh, delay);
   }
 
@@ -3521,7 +3551,15 @@
     if (refreshing) return;
     refreshing = true;
     try {
-      const targets = S.accounts.filter((a) => a.linked);
+      // While waiting out a rotation, only the accounts that actually rotated are re-read.
+      const staleNow = hasStale();
+      const now = Date.now();
+      const rotated = (a) => {
+        const st = S.store[a.puuid];
+        if (!st) return true;
+        return [st.daily, st.kingdomShop, st.nightMarket].some((b) => b && b.expiresAt && b.expiresAt <= now);
+      };
+      const targets = S.accounts.filter((a) => a.linked && (!staleNow || rotated(a)));
       await Promise.allSettled(
         targets.map((a) =>
           api(`/api/shop?puuid=${encodeURIComponent(a.puuid)}`, { timeoutMs: 35000 }).then((d) => {
@@ -3543,6 +3581,7 @@
     } finally {
       refreshing = false;
       lastRefreshAt = Date.now();
+      staleTries = hasStale() ? staleTries + 1 : 0;
       scheduleAutoRefresh();
     }
   }
