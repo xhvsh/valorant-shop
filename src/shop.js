@@ -230,8 +230,38 @@ function cachedStore(account, resetAt) {
     Date.now() - account.store_updated_at < STORE_TTL &&
     (!resetAt || Date.now() < resetAt)
   ) {
+    // A wallet that failed to load is cached as all nulls. Do not keep serving
+    // that for the whole TTL: after a short grace period fetch the store again.
+    if (walletMissing(account.store_cache) && Date.now() - account.store_updated_at > WALLET_RETRY_MS) return null;
     return account.store_cache;
   }
+  return null;
+}
+
+// The balances are all null only when the wallet request failed (a real wallet
+// always lists at least VP and Radianite).
+const WALLET_RETRY_MS = 90 * 1000;
+function walletMissing(store) {
+  const w = store && store.wallet;
+  return !w || (w.vp == null && w.rp == null && w.kc == null);
+}
+
+// The wallet is optional for the shop, but a failure used to leave the balances
+// blank until the shop rotated. Retry a couple of times (Riot answers 429 or
+// 5xx when the storefront and wallet calls land together), and log why it failed.
+async function fetchWallet(shard, puuid, tokens, who) {
+  let last = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
+    try {
+      return await riot.wallet(shard, puuid, tokens);
+    } catch (e) {
+      last = e;
+      if (e && e.status && e.status < 500 && e.status !== 429 && e.status !== 408) break;
+    }
+  }
+  const body = last && last.riotBody ? ` body=${JSON.stringify(last.riotBody).slice(0, 200)}` : '';
+  console.warn(`[shop] wallet fetch failed for ${who} shard=${shard} status=${(last && last.status) || '-'} err=${(last && last.message) || last}${body}`);
   return null;
 }
 
@@ -361,7 +391,7 @@ async function getShop(discordId, puuid, opts = {}) {
     {
       const [sfRes, wRes] = await Promise.allSettled([
         riot.storefront(shard, account.puuid, tokens),
-        riot.wallet(shard, account.puuid, tokens),
+        fetchWallet(shard, account.puuid, tokens, `${discordId}/${account.puuid}`),
       ]);
       if (sfRes.status === 'fulfilled') {
         sf = sfRes.value;
@@ -371,14 +401,11 @@ async function getShop(discordId, puuid, opts = {}) {
       } else {
         throw sfRes.reason;
       }
-      if (wRes.status === 'fulfilled') {
-        w = wRes.value;
-      } else {
-        w = null;
-        console.warn(`[shop] wallet fetch failed for ${discordId}, continuing without balances: ${(wRes.reason && wRes.reason.message) || wRes.reason}`);
-      }
+      w = wRes.status === 'fulfilled' ? wRes.value : null;
     }
     const store = buildStoreResponse(sf, w);
+    // Wallet failed this time: keep the last balances we knew rather than blanking them.
+    if (!w && walletMissing(store) && !walletMissing(account.store_cache)) store.wallet = account.store_cache.wallet;
     const panel = sf && sf.SkinsPanelLayout;
     const remainingMs =
       ((panel && (panel.SingleItemOffersRemainingDurationInSeconds || panel.DurationRemainingInSeconds)) || 0) * 1000;
