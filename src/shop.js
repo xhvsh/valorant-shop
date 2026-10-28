@@ -655,15 +655,13 @@ async function accountDetails(discordId, puuid, opts = {}) {
 
   const fullKey = `acctdetails:v10:${discordId}:${account.puuid}`;
   const cacheKey = scope === 'full' ? fullKey : `acctdetails:v10:${scope}:${discordId}:${account.puuid}`;
-  const [fullBox, scopedBox] = await Promise.all([
-    storage.kvGet(fullKey).catch(() => null),
-    scope === 'full' ? null : storage.kvGet(cacheKey).catch(() => null),
-  ]);
-  for (const box of [fullBox, scopedBox]) {
-    if (box && box.details && box.at && Date.now() - box.at < DETAILS_TTL) {
-      return { status: 'ok', details: box.details, cached: true, account };
-    }
-  }
+  // The scoped copy is the small one: try it first, and only read the big full copy
+  // (hundreds of KB) when it misses.
+  const fresh = (box) => box && box.details && box.at && Date.now() - box.at < DETAILS_TTL;
+  const scopedBox = scope === 'full' ? null : await storage.kvGet(cacheKey).catch(() => null);
+  if (fresh(scopedBox)) return { status: 'ok', details: scopedBox.details, cached: true, account };
+  const fullBox = await storage.kvGet(fullKey).catch(() => null);
+  if (fresh(fullBox)) return { status: 'ok', details: fullBox.details, cached: true, account };
 
   let auth;
   try {

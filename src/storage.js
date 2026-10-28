@@ -49,6 +49,23 @@ function isConfigured() {
 }
 
 // ---- Sessions (express-session store) --------------------------------------
+// Every website request loads its session, and each page load fires several. A short
+// per-instance memo answers the repeats without a round trip, and writes that would
+// change nothing (same data, expiry still far away) are skipped.
+const SESSION_MEMO_MS = 15 * 1000;
+const SESSION_MEMO_MAX = 200;
+const SESSION_REFRESH_GAP_MS = 12 * 60 * 60 * 1000; // expiry slides at most this often
+const sessionMemo = new Map(); // sid -> { json, expiresAt, at }
+
+function sessionBody(data) {
+  return JSON.stringify(data, (k, v) => (k === 'cookie' ? undefined : v));
+}
+
+function rememberSession(sid, data, expiresAt) {
+  if (sessionMemo.size >= SESSION_MEMO_MAX) sessionMemo.delete(sessionMemo.keys().next().value);
+  sessionMemo.set(sid, { json: JSON.stringify(data), body: sessionBody(data), expiresAt, at: Date.now() });
+}
+
 async function sessionGet(sid) {
   if (!hasDb) {
     const row = mem.sessions.get(sid);
@@ -59,44 +76,63 @@ async function sessionGet(sid) {
     }
     return row.data;
   }
+  const memo = sessionMemo.get(sid);
+  if (memo && Date.now() - memo.at < SESSION_MEMO_MS && memo.expiresAt > Date.now()) return JSON.parse(memo.json);
   const { data, error } = await client.from('sessions').select('data, expires_at').eq('sid', sid).maybeSingle();
   if (error) dbFail('session get', error);
-  if (!data) return null;
-  if (new Date(data.expires_at).getTime() <= Date.now()) {
+  if (!data) {
+    sessionMemo.delete(sid);
+    return null;
+  }
+  const expiresAt = new Date(data.expires_at).getTime();
+  if (expiresAt <= Date.now()) {
+    sessionMemo.delete(sid);
     await client.from('sessions').delete().eq('sid', sid);
     return null;
   }
+  rememberSession(sid, data.data, expiresAt);
   return data.data;
 }
 
 async function sessionSet(sid, data, maxAgeMs) {
-  const expiresAt = new Date(Date.now() + (Number(maxAgeMs) || 7 * 24 * 60 * 60 * 1000)).toISOString();
+  const maxAge = Number(maxAgeMs) || 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(Date.now() + maxAge).toISOString();
   if (!hasDb) {
     mem.sessions.set(sid, { data, expires_at: expiresAt });
     return;
   }
+  const memo = sessionMemo.get(sid);
+  if (memo && memo.body === sessionBody(data) && memo.expiresAt - Date.now() > maxAge - SESSION_REFRESH_GAP_MS) return;
   const { error } = await client
     .from('sessions')
     .upsert({ sid, data, expires_at: expiresAt }, { onConflict: 'sid' });
   if (error) dbFail('session set', error);
+  rememberSession(sid, data, new Date(expiresAt).getTime());
 }
 
 // Extends expiry only. Must never upsert: a request that loaded the session
 // before logout would otherwise write it back after sessionDestroy.
 async function sessionTouch(sid, maxAgeMs) {
-  const expiresAt = new Date(Date.now() + (Number(maxAgeMs) || 7 * 24 * 60 * 60 * 1000)).toISOString();
+  const maxAge = Number(maxAgeMs) || 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(Date.now() + maxAge).toISOString();
   if (!hasDb) {
     const row = mem.sessions.get(sid);
     if (row) row.expires_at = expiresAt;
     return;
   }
+  // The session was just read, so the memo knows its expiry: a session that was
+  // extended within the last half day does not need another write.
+  const memo = sessionMemo.get(sid);
+  if (memo && memo.expiresAt - Date.now() > maxAge - SESSION_REFRESH_GAP_MS) return;
   const { error } = await client.from('sessions').update({ expires_at: expiresAt }).eq('sid', sid);
   if (error) dbFail('session touch', error);
+  if (memo) memo.expiresAt = new Date(expiresAt).getTime();
 }
 
 // Drops every website session that belongs to a Discord user (full data wipe).
 async function sessionDestroyForUser(discordId) {
   const id = String(discordId);
+  sessionMemo.clear();
   if (!hasDb) {
     for (const [sid, row] of mem.sessions.entries()) {
       if (row && row.data && String(row.data.discordId) === id) mem.sessions.delete(sid);
@@ -108,6 +144,7 @@ async function sessionDestroyForUser(discordId) {
 }
 
 async function sessionDestroy(sid) {
+  sessionMemo.delete(sid);
   if (!hasDb) {
     mem.sessions.delete(sid);
     return;
@@ -117,7 +154,21 @@ async function sessionDestroy(sid) {
 }
 
 // ---- Key-value (pending login states, misc) ---------------------------------
+// Big rows (account details, bundle media, the item catalog) are 100s of KB each and
+// get read again and again. The raw text of those is kept for a minute per instance,
+// so a repeat read costs no egress. Writes and deletes here drop the entry.
+const BIG_MIN_CHARS = 50 * 1000;
+const BIG_MEMO_MS = 60 * 1000;
+const BIG_MEMO_MAX = 6;
+const bigMemo = new Map(); // key -> { value, expiresAt, at }
+
+function rememberBig(key, value, expiresAt) {
+  if (bigMemo.size >= BIG_MEMO_MAX) bigMemo.delete(bigMemo.keys().next().value);
+  bigMemo.set(key, { value, expiresAt, at: Date.now() });
+}
+
 async function kvSet(key, value, ttlMs) {
+  bigMemo.delete(key);
   const expiresAt = new Date(Date.now() + (ttlMs || 15 * 60 * 1000)).toISOString();
   if (!hasDb) {
     mem.kv.set(key, { value, expires_at: expiresAt });
@@ -150,6 +201,14 @@ async function kvUnlock(key) {
 }
 
 async function kvGet(key) {
+  const big = bigMemo.get(key);
+  if (big && Date.now() - big.at < BIG_MEMO_MS && big.expiresAt > Date.now()) {
+    try {
+      return JSON.parse(big.value);
+    } catch {
+      bigMemo.delete(key);
+    }
+  }
   if (!hasDb) {
     const row = mem.kv.get(key);
     if (!row) return null;
@@ -166,6 +225,9 @@ async function kvGet(key) {
     await kvDel(key);
     return null;
   }
+  if (typeof data.value === 'string' && data.value.length >= BIG_MIN_CHARS) {
+    rememberBig(key, data.value, new Date(data.expires_at).getTime());
+  }
   try {
     return JSON.parse(data.value);
   } catch {
@@ -174,6 +236,7 @@ async function kvGet(key) {
 }
 
 async function kvDel(key) {
+  bigMemo.delete(key);
   if (!hasDb) {
     mem.kv.delete(key);
     return;

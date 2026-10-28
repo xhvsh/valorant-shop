@@ -549,26 +549,52 @@ function generatePkce() {
   return { verifier, challenge };
 }
 
+// The DPoP key never changes and the nonce changes rarely, but both used to be read
+// from (and the key re-written to) the database on every Riot call. They are kept per
+// instance now. The key's one-year expiry is pushed out at most once a day, and the
+// nonce is only written when Riot hands out a new one. Riot answers a stale nonce with
+// a fresh one and the call is retried, so a slightly old copy costs nothing.
+const DPOP_KEY_RENEW_MS = 24 * 60 * 60 * 1000;
+const DPOP_NONCE_MEMO_MS = 60 * 1000;
+let dpopKeyMemo = null; // { key, renewedAt }
+let dpopNonceMemo = null; // { nonce, at }
+
 async function getDpopKey(store) {
+  if (dpopKeyMemo) {
+    if (Date.now() - dpopKeyMemo.renewedAt > DPOP_KEY_RENEW_MS) {
+      dpopKeyMemo.renewedAt = Date.now();
+      await store.kvSet('dpop:key', dpopKeyMemo.key, DPOP_KEY_TTL).catch(() => {});
+    }
+    return dpopKeyMemo.key;
+  }
   const existing = await store.kvGet('dpop:key').catch(() => null);
   if (existing) {
+    dpopKeyMemo = { key: existing, renewedAt: Date.now() };
     await store.kvSet('dpop:key', existing, DPOP_KEY_TTL).catch(() => {});
     return existing;
   }
   const key = createDpopKey();
   await store.kvSet('dpop:key', key, DPOP_KEY_TTL);
+  dpopKeyMemo = { key, renewedAt: Date.now() };
   return key;
 }
 
 async function getDpopNonce(store) {
+  if (dpopNonceMemo && Date.now() - dpopNonceMemo.at < DPOP_NONCE_MEMO_MS) return dpopNonceMemo.nonce;
   const box = await store.kvGet('dpop:nonce').catch(() => null);
   const nonce = (box && box.nonce) || null;
-  if (nonce) await store.kvSet('dpop:nonce', { nonce }, DPOP_KEY_TTL).catch(() => {});
+  dpopNonceMemo = { nonce, at: Date.now() };
   return nonce;
 }
 
 async function saveDpopNonce(store, nonce) {
-  if (nonce) await store.kvSet('dpop:nonce', { nonce }, DPOP_KEY_TTL).catch(() => {});
+  if (!nonce) return;
+  if (dpopNonceMemo && dpopNonceMemo.nonce === nonce) {
+    dpopNonceMemo.at = Date.now();
+    return;
+  }
+  dpopNonceMemo = { nonce, at: Date.now() };
+  await store.kvSet('dpop:nonce', { nonce }, DPOP_KEY_TTL).catch(() => {});
 }
 
 // Riot answers a missing/stale DPoP nonce with a 400 naming the nonce plus a
