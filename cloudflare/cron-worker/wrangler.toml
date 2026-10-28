@@ -12,6 +12,15 @@ APP_URL = "https://xhv.sh/valorant-shop"
 [triggers]
 crons = ["0 * * * *", "0 0 * * *"]
 
-# Keep a log of every run (Workers & Pages -> valorant-shop-cron -> Logs).
-[observability]
+# Keep a log of every run (Workers & Pages -> valorant-shop-cron -> Logs). These match
+# the settings shown in the Cloudflare dashboard, so a deploy does not change them.
+[observability.logs]
 enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
