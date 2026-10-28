@@ -230,17 +230,15 @@ function cachedStore(account, resetAt) {
     Date.now() - account.store_updated_at < STORE_TTL &&
     (!resetAt || Date.now() < resetAt)
   ) {
-    // A wallet that failed to load is cached as all nulls. Do not keep serving
-    // that for the whole TTL: after a short grace period fetch the store again.
-    if (walletMissing(account.store_cache) && Date.now() - account.store_updated_at > WALLET_RETRY_MS) return null;
     return account.store_cache;
   }
   return null;
 }
 
 // The balances are all null only when the wallet request failed (a real wallet
-// always lists at least VP and Radianite).
-const WALLET_RETRY_MS = 90 * 1000;
+// always lists at least VP and Radianite). A cached store like that gets its
+// wallet fetched again on its own (see healWallet), never the whole shop.
+const WALLET_RETRY_MS = 3 * 60 * 1000;
 function walletMissing(store) {
   const w = store && store.wallet;
   return !w || (w.vp == null && w.rp == null && w.kc == null);
@@ -355,6 +353,30 @@ async function tokensFor(discordId, account) {
   return { ...token, entitlement: await entitlementFor(token.access_token) };
 }
 
+// A cached store whose wallet is blank: ask Riot for just the wallet and patch the
+// cache. At most one attempt per account every WALLET_RETRY_MS (kept in kv, so it
+// also holds across serverless instances), so a wallet that keeps failing costs
+// one extra call every few minutes however many accounts there are.
+async function healWallet(discordId, account, store) {
+  if (!walletMissing(store) || !account.auth_encrypted) return store;
+  const gate = `wallet_retry:${discordId}:${account.puuid}`;
+  try {
+    if (await storage.kvGet(gate)) return store;
+    await storage.kvSet(gate, { at: Date.now() }, WALLET_RETRY_MS);
+    const tokens = await tokensFor(discordId, account);
+    const w = await fetchWallet(account.shard || 'na', account.puuid, tokens, `${discordId}/${account.puuid}`);
+    if (!w) return store;
+    const { wallet } = buildStoreResponse(null, w);
+    if (walletMissing({ wallet })) return store;
+    const patched = { ...account.store_cache, wallet };
+    await storage.saveAccount(discordId, account.puuid, { store_cache: patched });
+    return { ...store, wallet };
+  } catch (e) {
+    console.warn(`[shop] wallet heal skipped for ${discordId}/${account.puuid}: ${(e && e.message) || e}`);
+    return store;
+  }
+}
+
 // Returns { status: 'unlinked' | 'ok' | 'relink' | 'error', store?, account?, error? }
 // Omit puuid to use the user's default account. Pass `owned: false` when the
 // caller only needs the store itself (e.g. bundles) to skip the ownership lookup.
@@ -364,7 +386,7 @@ async function getShop(discordId, puuid, opts = {}) {
 
   const cached = opts.force ? null : cachedStore(account, await resetAtFor(discordId, account.puuid));
   if (cached) {
-    const fresh = await freshStore(cached);
+    const fresh = await healWallet(discordId, account, await freshStore(cached));
     const store = opts.owned === false ? fresh : await withOwned(fresh, discordId, account, () => tokensFor(discordId, account));
     return { status: 'ok', store, account, cached: true };
   }
