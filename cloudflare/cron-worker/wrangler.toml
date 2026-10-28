@@ -1,0 +1,12 @@
+name = "valorant-shop-cron"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = false
+
+[vars]
+APP_URL = "https://valorant-shop.vercel.app"
+
+# Hourly bundle check, and the daily shop alerts at 00:00 UTC. The SCHEDULER_SECRET
+# secret is set with `wrangler secret put` (see README.md in this folder).
+[triggers]
+crons = ["0 * * * *", "0 0 * * *"]
