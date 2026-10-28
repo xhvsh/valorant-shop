@@ -657,7 +657,8 @@ app.patch('/api/prefs', express.json(), requireDiscord, async (req, res, next) =
 // only stored as an HMAC digest, so a DB dump does not leak usable codes.
 
 const SHARE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 symbols, no I/O/0/1
-const SHARE_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
+// Generated codes use the alphabet above, but a hand-set code may use any letter or digit.
+const SHARE_CODE_RE = /^[A-Z0-9]{8}$/;
 
 function newShareCode() {
   const bytes = crypto.randomBytes(8);
