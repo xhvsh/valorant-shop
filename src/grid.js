@@ -30,7 +30,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '10';
+const GRID_CACHE_VERSION = '11';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -314,18 +314,50 @@ async function fetchIconData(url) {
         : 'image/png';
     return `data:${mime};base64,${buf.toString('base64')}`;
   };
-  let timer;
-  const first = attempt(8000);
-  const second = new Promise((resolve, reject) => {
-    timer = setTimeout(() => attempt(6000).then(resolve, reject), 2000);
+  // Up to three tries. The next one starts when the previous failed, or after a
+  // delay if it is merely slow; the first to deliver wins.
+  const budgets = [8000, 6000, 5000];
+  return new Promise((resolve) => {
+    let started = 0;
+    let pending = 0;
+    let done = false;
+    const timers = [];
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      timers.forEach(clearTimeout);
+      resolve(value);
+    };
+    const launch = () => {
+      if (done || started >= budgets.length) return;
+      pending += 1;
+      attempt(budgets[started++]).then(finish, () => {
+        pending -= 1;
+        if (started < budgets.length) launch();
+        else if (pending === 0) finish(null);
+      });
+    };
+    launch();
+    timers.push(setTimeout(launch, 1500), setTimeout(launch, 3500));
   });
-  try {
-    return await Promise.any([first, second]);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+}
+
+// Any card whose art still failed gets one more go (a failed download is not kept
+// in the cache). Returns how many are still missing.
+async function fillMissingIcons(icons, urlOf) {
+  const retry = [];
+  icons.forEach((d, i) => {
+    if (!d && urlOf(i)) retry.push(i);
+  });
+  if (!retry.length) return 0;
+  await Promise.all(
+    retry.map(async (i) => {
+      const url = urlOf(i);
+      iconCache.delete(url);
+      icons[i] = await cachedIcon(url);
+    })
+  );
+  return icons.filter((d, i) => !d && urlOf(i)).length;
 }
 
 function walletRows(wallet) {
@@ -430,6 +462,8 @@ async function renderSkinGrid(store, opts = {}) {
     loadTierIcons(items),
   ]);
   const curIcons = { vp: vpI, kc: kcI };
+  const missingArt = await fillMissingIcons(icons, (i) => cardArtUrl(items[i]));
+  if (opts.report) opts.report.missing = missingArt;
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);
@@ -700,6 +734,8 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
     loadTierIcons(items),
   ]);
   const curIcons = { vp: vpI, kc: kcI };
+  const missingArt = await fillMissingIcons(staticIcons, (i) => (animSet.has(i) ? null : cardArtUrl(items[i])));
+  if (opts.report) opts.report.missing = missingArt;
 
   const cols = opts.cols || 2;
   const rows = Math.ceil(items.length / cols);
@@ -924,30 +960,32 @@ function bundleCols(count) {
   return count <= 4 ? 2 : 3;
 }
 
-async function renderBundleGrid(bundleItems) {
+async function renderBundleGrid(bundleItems, report) {
   const items = await bundleCardItems(bundleItems);
   if (!items.length) return null;
-  return renderSkinGrid(null, { items, limit: 20, cols: bundleCols(items.length), showType: true });
+  return renderSkinGrid(null, { items, limit: 20, cols: bundleCols(items.length), showType: true, report });
 }
 
-async function renderAnimatedBundleGrid(bundleItems) {
+async function renderAnimatedBundleGrid(bundleItems, report) {
   const items = await bundleCardItems(bundleItems);
   if (!items.length) return null;
-  return renderAnimatedSkinGrid(null, { items, limit: 20, cols: bundleCols(items.length), showType: true });
+  return renderAnimatedSkinGrid(null, { items, limit: 20, cols: bundleCols(items.length), showType: true, report });
 }
 
 // An animated GIF when the bundle has an animated spray, else the PNG grid.
 async function renderBundleMedia(bundleItems) {
   const t0 = Date.now();
-  const gif = await renderAnimatedBundleGrid(bundleItems).catch(() => null);
+  const report = { missing: 0 };
+  const gif = await renderAnimatedBundleGrid(bundleItems, report).catch(() => null);
   const tGif = Date.now() - t0;
   if (gif) {
-    console.log(`[time] bundle media gif=${tGif}ms size=${(gif.length / 1024) | 0}KB items=${(bundleItems || []).length}`);
-    return { name: 'bundle-grid.gif', buf: gif };
+    console.log(`[time] bundle media gif=${tGif}ms size=${(gif.length / 1024) | 0}KB items=${(bundleItems || []).length} missing=${report.missing}`);
+    return { name: 'bundle-grid.gif', buf: gif, incomplete: report.missing > 0 };
   }
-  const png = await renderBundleGrid(bundleItems);
-  console.log(`[time] bundle media animated-attempt=${tGif}ms png=${Date.now() - t0 - tGif}ms items=${(bundleItems || []).length}`);
-  return png ? { name: 'bundle-grid.png', buf: png } : null;
+  report.missing = 0;
+  const png = await renderBundleGrid(bundleItems, report);
+  console.log(`[time] bundle media animated-attempt=${tGif}ms png=${Date.now() - t0 - tGif}ms items=${(bundleItems || []).length} missing=${report.missing}`);
+  return png ? { name: 'bundle-grid.png', buf: png, incomplete: report.missing > 0 } : null;
 }
 
 // Card chrome shared by the rank and collection renders, matching the shop

@@ -133,7 +133,8 @@ async function savedBundleMedia(ctx, bundle) {
 }
 
 async function saveBundleMedia(ctx, bundle, media) {
-  if (!media || media.buf.length > BUNDLE_MEDIA_MAX_BYTES) return;
+  // A render with a card missing its art is shown once but never kept.
+  if (!media || media.incomplete || media.buf.length > BUNDLE_MEDIA_MAX_BYTES) return;
   await ctx.storage
     .kvSet(bundleMediaKey(bundle), { name: media.name, b64: media.buf.toString('base64') }, bundleMediaTtl(bundle))
     .catch(() => {});
@@ -169,9 +170,10 @@ async function prewarmBundles(ctx, bundles, selectedId) {
     if (!b || String(b.id) === String(selectedId) || !b.items || !b.items.length) continue;
     try {
       if (await savedBundleMedia(ctx, b)) continue;
-      const media = await renderBundleMedia(b.items);
+      let media = await renderBundleMedia(b.items);
+      if (media && media.incomplete) media = await renderBundleMedia(b.items);
       await saveBundleMedia(ctx, b, media);
-      if (media) done += 1;
+      if (media && !media.incomplete) done += 1;
     } catch (e) {
       console.warn(`[bundle] prewarm failed for ${b.id}: ${(e && e.message) || e}`);
     }
