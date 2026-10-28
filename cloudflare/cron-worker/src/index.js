@@ -36,6 +36,18 @@ async function callJob(path, env) {
 }
 
 export default {
+  // Manual run for testing: GET /?job=bundles (or dailyshop) with the x-scheduler-secret
+  // header. Anything else gets a plain status line, so the public URL reveals nothing.
+  async fetch(request, env, ctx) {
+    const job = new URL(request.url).searchParams.get('job');
+    const path = job === 'bundles' ? '/api/cron/bundles' : job === 'dailyshop' ? '/api/cron/dailyshop' : null;
+    if (path && request.headers.get('x-scheduler-secret') === env.SCHEDULER_SECRET) {
+      const ok = await callJob(path, env);
+      return new Response(ok ? 'ok\n' : 'failed\n', { status: ok ? 200 : 502 });
+    }
+    return new Response('valorant-shop-cron\n', { status: 200 });
+  },
+
   async scheduled(event, env, ctx) {
     const path = JOBS[event.cron];
     if (!path) {

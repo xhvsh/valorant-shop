@@ -7,7 +7,7 @@ Cloudflare Worker that replaces the cron-job.org jobs:
 | `0 * * * *` | `/api/cron/bundles` |
 | `0 0 * * *` | `/api/cron/dailyshop` |
 
-It waits for the reply, retries up to 3 times, and logs each run.
+It calls the app at `https://xhv.sh/valorant-shop`, waits for the reply, retries up to 3 times, and logs each run (Workers & Pages -> valorant-shop-cron -> Logs). A manual run: `curl -H "x-scheduler-secret: $SCHEDULER_SECRET" "https://valorant-shop-cron.<your-subdomain>.workers.dev/?job=bundles"`.
 
 ## Deploy
 
