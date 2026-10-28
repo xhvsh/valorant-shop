@@ -104,11 +104,28 @@ const BP_SKIN_NAMES = new Set();
 
 const BP_ACCESSORIES = require('./bp-accessories.json');
 
+// The agent / battle-pass name sets come from a slow endpoint, so they are kept in
+// the database too: a request reads the saved copy and never waits on valorant-api.
+const CONTRACTS_KEY = 'catalog:contracts:v1';
+
 async function loadContracts() {
   if (Date.now() - contractsAt < CONTRACTS_TTL) return;
   if (contractsLoading) return contractsLoading;
   if (!catalog) return; // reward uuids resolve through the catalog
-  contractsLoading = (async () => {
+  const saved = await storage.kvGet(CONTRACTS_KEY).catch(() => null);
+  const haveSaved = Boolean(saved && Array.isArray(saved.agent) && Array.isArray(saved.bp));
+  if (haveSaved) {
+    AGENT_SKIN_NAMES.clear();
+    for (const n of saved.agent) AGENT_SKIN_NAMES.add(n);
+    BP_SKIN_NAMES.clear();
+    for (const n of saved.bp) BP_SKIN_NAMES.add(n);
+    if (Date.now() - saved.at < CONTRACTS_TTL) {
+      contractsAt = saved.at;
+      return;
+    }
+    contractsAt = Date.now() - CONTRACTS_TTL + 2 * 60 * 1000;
+  }
+  const refresh = (async () => {
     try {
       const json = await fetchJson(`${API}/v1/contracts`, 1, 8000);
       // Stage into locals so a failed or partial refresh never wipes a good set.
@@ -134,6 +151,7 @@ async function loadContracts() {
       BP_SKIN_NAMES.clear();
       for (const n of bp) BP_SKIN_NAMES.add(n);
       contractsAt = Date.now();
+      await storage.kvSet(CONTRACTS_KEY, { at: contractsAt, agent: [...AGENT_SKIN_NAMES], bp: [...BP_SKIN_NAMES] }, SNAP_KEEP_MS).catch(() => {});
     } catch (err) {
       console.warn('[items] contracts unavailable:', err.message);
       contractsAt = Date.now() - CONTRACTS_TTL + 2 * 60 * 1000; // try again in 2 minutes, not every request
@@ -141,7 +159,9 @@ async function loadContracts() {
       contractsLoading = null;
     }
   })();
-  return contractsLoading;
+  contractsLoading = refresh;
+  // With a saved copy in place the refresh runs on its own; first time ever, wait for it.
+  return haveSaved ? undefined : refresh;
 }
 
 const BP_ACCESSORY_NAMES = {

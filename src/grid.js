@@ -29,7 +29,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '8';
+const GRID_CACHE_VERSION = '9';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -260,20 +260,33 @@ function cardCell(item, i, cx, cy, icon, curIcons, opts = {}) {
   return { defs, svg: s };
 }
 
+// valorant-api's media host sometimes stalls one request from a serverless region
+// while the next answers at once. So if the first try has not delivered within
+// 2s (or failed), a second try starts in parallel and whichever finishes first wins.
 async function fetchIconData(url) {
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return null;
+  const attempt = async (ms) => {
+    const r = await fetch(url, { signal: AbortSignal.timeout(ms) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
-    if (!buf.length) return null;
+    if (!buf.length) throw new Error('empty');
     const mime = /\.webp(\?|$)/i.test(url)
       ? 'image/webp'
       : /\.jpe?g(\?|$)/i.test(url)
         ? 'image/jpeg'
         : 'image/png';
     return `data:${mime};base64,${buf.toString('base64')}`;
+  };
+  let timer;
+  const first = attempt(8000);
+  const second = new Promise((resolve, reject) => {
+    timer = setTimeout(() => attempt(6000).then(resolve, reject), 2000);
+  });
+  try {
+    return await Promise.any([first, second]);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
