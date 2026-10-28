@@ -1,6 +1,8 @@
 'use strict';
 
+const zlib = require('node:zlib');
 const { fetchWithTimeout } = require('./riot');
+const storage = require('./storage');
 
 const CURRENCY = {
   vp: '85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741',
@@ -108,7 +110,7 @@ async function loadContracts() {
   if (!catalog) return; // reward uuids resolve through the catalog
   contractsLoading = (async () => {
     try {
-      const json = await fetchJson(`${API}/v1/contracts`);
+      const json = await fetchJson(`${API}/v1/contracts`, 1, 8000);
       // Stage into locals so a failed or partial refresh never wipes a good set.
       const agent = new Set(AGENT_SKIN_NAMES);
       const bp = new Set(BP_SKIN_NAMES);
@@ -134,6 +136,7 @@ async function loadContracts() {
       contractsAt = Date.now();
     } catch (err) {
       console.warn('[items] contracts unavailable:', err.message);
+      contractsAt = Date.now() - CONTRACTS_TTL + 2 * 60 * 1000; // try again in 2 minutes, not every request
     } finally {
       contractsLoading = null;
     }
@@ -293,11 +296,11 @@ const PARTIAL_RETRY_MS = 60 * 1000;
 
 // valorant-api answers headers quickly but the multi-megabyte bodies can take a
 // while from a serverless region, so the deadline (which covers the body) is generous.
-async function fetchJson(url, attempts = 2) {
+async function fetchJson(url, attempts = 2, timeoutMs = 22000) {
   let lastError;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 22000);
+      const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, timeoutMs);
       const json = await res.json();
       if (!res.ok || json.status !== 200) throw new Error(`HTTP ${res.status}`);
       return json;
@@ -320,7 +323,7 @@ async function loadTiers() {
   tierAttemptAt = Date.now();
   tierLoading = (async () => {
     try {
-      const tiers = await fetchJson(`${API}/v1/contenttiers`);
+      const tiers = await fetchJson(`${API}/v1/contenttiers`, 1, 8000);
       for (const t of tiers.data || []) {
         if (!t || !t.uuid) continue;
         const name = (t.displayName || '').replace(/\s+Edition$/i, '') || null;
@@ -337,6 +340,35 @@ async function loadTiers() {
   return tierLoading;
 }
 
+// ---- Shared catalog snapshot ---------------------------------------------------
+// Every cold serverless instance used to download ~5 MB from valorant-api, which
+// throttles or stalls under that load. The built catalog is kept gzipped in the
+// database instead: instances read it from there, and only one refreshes it.
+const SNAP_KEY = 'catalog:snapshot:v1';
+const SNAP_LOCK = 'catalog:refresh_lock';
+const SNAP_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function readSnapshot() {
+  try {
+    const box = await storage.kvGet(SNAP_KEY);
+    if (!box || !box.gz || !box.at) return null;
+    const entries = JSON.parse(zlib.gunzipSync(Buffer.from(box.gz, 'base64')).toString('utf8'));
+    return entries.length ? { at: box.at, map: new Map(entries) } : null;
+  } catch (e) {
+    console.warn('[items] catalog snapshot unreadable:', (e && e.message) || e);
+    return null;
+  }
+}
+
+async function writeSnapshot(map) {
+  try {
+    const gz = zlib.gzipSync(JSON.stringify([...map])).toString('base64');
+    await storage.kvSet(SNAP_KEY, { at: Date.now(), gz }, SNAP_KEEP_MS);
+  } catch (e) {
+    console.warn('[items] catalog snapshot not saved:', (e && e.message) || e);
+  }
+}
+
 async function load(force = false) {
   if (!force && catalog && Date.now() - catalogAt < TTL) {
     await loadContracts().catch(() => {});
@@ -346,6 +378,26 @@ async function load(force = false) {
   if (loading) return loading;
 
   loading = (async () => {
+    const snap = await readSnapshot();
+    if (snap && !force && Date.now() - snap.at < TTL) {
+      catalog = snap.map;
+      catalogAt = snap.at;
+      await loadContracts().catch(() => {});
+      await loadTiers();
+      return catalog;
+    }
+    // Stale (or no) snapshot: one instance refreshes, the others keep using the stale copy.
+    let held = true;
+    if (snap) {
+      held = await storage.kvLock(SNAP_LOCK, 90 * 1000).catch(() => true);
+      if (!held) {
+        catalog = snap.map;
+        catalogAt = Date.now() - TTL + PARTIAL_RETRY_MS;
+        return catalog;
+      }
+    }
+    if (snap && !catalog) catalog = snap.map;
+    try {
     const [results, weapons, themes] = await Promise.all([
       Promise.allSettled(
         SOURCES.map(async (src) => {
@@ -402,6 +454,7 @@ async function load(force = false) {
         }
       });
 
+    if (ok === SOURCES.length && map.size) await writeSnapshot(map);
     if (ok === 0 && !catalog) throw new Error('item catalog unavailable');
     if (ok === 0) {
       console.warn('[items] catalog refresh failed entirely, keeping stale copy');
@@ -420,6 +473,9 @@ async function load(force = false) {
     await loadTiers();
 
     return catalog;
+    } finally {
+      if (snap && held) await storage.kvUnlock(SNAP_LOCK).catch(() => {});
+    }
   })();
 
   try {
