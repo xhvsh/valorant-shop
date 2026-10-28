@@ -30,7 +30,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '11';
+const GRID_CACHE_VERSION = '12';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;
@@ -302,17 +302,25 @@ function cardCell(item, i, cx, cy, icon, curIcons, opts = {}) {
 // while the next answers at once. So if the first try has not delivered within
 // 2s (or failed), a second try starts in parallel and whichever finishes first wins.
 async function fetchIconData(url) {
+  const buf = await fetchBytes(url);
+  if (!buf) return null;
+  const mime = /\.webp(\?|$)/i.test(url)
+    ? 'image/webp'
+    : /\.jpe?g(\?|$)/i.test(url)
+      ? 'image/jpeg'
+      : 'image/png';
+  return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+// The raw bytes behind an image URL (a Buffer, or null), with the hedged retries
+// described above. Used for icons and for the animated GIFs.
+async function fetchBytes(url) {
   const attempt = async (ms) => {
     const r = await fetch(url, { signal: AbortSignal.timeout(ms) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
     if (!buf.length) throw new Error('empty');
-    const mime = /\.webp(\?|$)/i.test(url)
-      ? 'image/webp'
-      : /\.jpe?g(\?|$)/i.test(url)
-        ? 'image/jpeg'
-        : 'image/png';
-    return `data:${mime};base64,${buf.toString('base64')}`;
+    return buf;
   };
   // Up to three tries. The next one starts when the previous failed, or after a
   // delay if it is merely slow; the first to deliver wins.
@@ -696,6 +704,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
   const source = opts.items || (store && store.daily && store.daily.items) || [];
   const items = source.slice(0, opts.limit || 4);
   if (!items.length) return null;
+  const tAnim = Date.now();
 
   const animIdx = [];
   items.forEach((it, i) => {
@@ -703,29 +712,26 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
   });
   if (!animIdx.length) return null;
 
-  // Decode each animated item's GIF. Items whose GIF fails to decode are simply
-  // rendered statically instead of aborting the whole message.
-  const animated = [];
-  await Promise.all(
-    animIdx.map(async (i) => {
-      try {
-        const r = await fetch(items[i].icon, { signal: AbortSignal.timeout(7000) });
-        if (!r.ok) return;
-        const g = decodeGif(Buffer.from(await r.arrayBuffer()));
-        if (g.frames.length) animated.push({ index: i, ...g });
-      } catch {
-        /* fall back to the static icon for this cell */
-      }
-    })
-  );
-  animated.sort((a, b) => a.index - b.index);
-  if (!animated.length) return null;
-  const animSet = new Set(animated.map((a) => a.index));
-
-  const [staticIcons, [vpI, kcI], tierIcons] = await Promise.all([
+  // Every download starts at once: the GIFs, the static art of the other cards and
+  // the small icons. An animated item whose GIF fails to download or decode is
+  // simply rendered statically instead of aborting the whole message.
+  const isAnim = new Set(animIdx);
+  const [animatedRaw, staticIcons, [vpI, kcI], tierIcons] = await Promise.all([
+    Promise.all(
+      animIdx.map(async (i) => {
+        try {
+          const buf = await fetchBytes(items[i].icon);
+          if (!buf) return null;
+          const g = decodeGif(buf);
+          return g.frames.length ? { index: i, ...g } : null;
+        } catch {
+          return null;
+        }
+      })
+    ),
     Promise.all(
       items.map((it, i) => {
-        if (animSet.has(i)) return Promise.resolve(null);
+        if (isAnim.has(i)) return Promise.resolve(null);
         const url = cardArtUrl(it);
         return url ? cachedIcon(url) : Promise.resolve(null);
       })
@@ -733,6 +739,19 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
     Promise.all([loadCurIcon('vp'), loadCurIcon('kc')]),
     loadTierIcons(items),
   ]);
+  const animated = animatedRaw.filter(Boolean).sort((a, b) => a.index - b.index);
+  if (!animated.length) return null;
+  const animSet = new Set(animated.map((a) => a.index));
+  // Cells whose GIF failed need their static art after all.
+  await Promise.all(
+    animIdx
+      .filter((i) => !animSet.has(i))
+      .map(async (i) => {
+        const url = cardArtUrl(items[i]);
+        staticIcons[i] = url ? await cachedIcon(url) : null;
+      })
+  );
+  const tDownloaded = Date.now() - tAnim;
   const curIcons = { vp: vpI, kc: kcI };
   const missingArt = await fillMissingIcons(staticIcons, (i) => (animSet.has(i) ? null : cardArtUrl(items[i])));
   if (opts.report) opts.report.missing = missingArt;
@@ -860,6 +879,7 @@ async function renderAnimatedSkinGrid(store, opts = {}) {
     tick = Math.round(tick * 1.5);
     out = encode(tick);
   }
+  console.log(`[time] animated grid downloads=${tDownloaded}ms encode=${Date.now() - tAnim - tDownloaded}ms frames=${animated.length} size=${(out.length / 1024) | 0}KB`);
   return out.length > GIF_MAX_BYTES ? null : out;
 }
 
