@@ -346,33 +346,71 @@ async function accountByPuuid(puuid, devKey) {
 }
 
 let versionCache = { value: null, at: 0 };
+let versionLoading = null;
+let versionForce = false;
 const VERSION_TTL = 60 * 60 * 1000;
+const VERSION_KEY = 'riot:clientversion';
+const VERSION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Asks valorant-api for the current client version. Nothing waits on this once a version
+// is known: the last good one is kept in memory and in the database (storage is required
+// here, not at the top, so riot.js stays usable on its own).
+function refreshClientVersion() {
+  if (versionLoading) return versionLoading;
+  versionLoading = (async () => {
+    try {
+      const res = await fetchWithTimeout('https://valorant-api.com/v1/version', { headers: { Accept: 'application/json' } }, 8000);
+      const json = await res.json();
+      const d = json && json.data;
+      let value = d && (d.riotClientVersion || d.riotClientBuild);
+      if (!value && d && d.branch && d.buildVersion && d.version) {
+        const build = String(d.version).split('.')[3];
+        value = `${d.branch}-shipping-${d.buildVersion}-${build || '0'}`;
+      }
+      if (!value) throw new Error('unexpected version payload');
+      versionCache = { value, at: Date.now() };
+      require('./storage').kvSet(VERSION_KEY, versionCache, VERSION_KEEP_MS).catch(() => {});
+      return value;
+    } catch (err) {
+      // Keep serving the version we have; try again in a couple of minutes, not on every call.
+      if (versionCache.value) versionCache.at = Date.now() - VERSION_TTL + 2 * 60 * 1000;
+      throw err;
+    } finally {
+      versionLoading = null;
+    }
+  })();
+  return versionLoading;
+}
+
+// Riot rejected the version: the next call asks valorant-api again and waits for it.
 function resetClientVersion() {
-  versionCache = { value: null, at: 0 };
+  versionForce = true;
 }
 
 async function clientVersion() {
   const now = Date.now();
-  if (versionCache.value && now - versionCache.at < VERSION_TTL) {
+  if (!versionForce && versionCache.value && now - versionCache.at < VERSION_TTL) return versionCache.value;
+  if (versionForce) {
+    versionForce = false;
+    try {
+      return await refreshClientVersion();
+    } catch (err) {
+      if (versionCache.value) return versionCache.value;
+      throw err;
+    }
+  }
+  // A new instance starts from the copy in the database, so a slow valorant-api cannot
+  // hold up a request that only needs the version.
+  if (!versionCache.value) {
+    const saved = await require('./storage').kvGet(VERSION_KEY).catch(() => null);
+    if (saved && saved.value) versionCache = { value: saved.value, at: saved.at || 0 };
+    if (versionCache.value && now - versionCache.at < VERSION_TTL) return versionCache.value;
+  }
+  if (versionCache.value) {
+    refreshClientVersion().catch(() => {});
     return versionCache.value;
   }
-  try {
-    const res = await fetchWithTimeout('https://valorant-api.com/v1/version', { headers: { Accept: 'application/json' } }, 10000);
-    const json = await res.json();
-    const d = json && json.data;
-    let value = d && (d.riotClientVersion || d.riotClientBuild);
-    if (!value && d && d.branch && d.buildVersion && d.version) {
-      const build = String(d.version).split('.')[3];
-      value = `${d.branch}-shipping-${d.buildVersion}-${build || '0'}`;
-    }
-    if (!value) throw new Error('unexpected version payload');
-    versionCache = { value, at: now };
-    return value;
-  } catch (err) {
-    if (versionCache.value) return versionCache.value;
-    throw err;
-  }
+  return refreshClientVersion();
 }
 
 async function pdFetch(url, tokens, { method = 'GET', body } = {}) {
