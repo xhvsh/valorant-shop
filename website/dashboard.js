@@ -2038,13 +2038,46 @@
   const battlepass = { pass: null, error: null, pending: null };
   const bpProgress = {};
 
+  // The pass changes about once an act, so the browser keeps its own copy until the act ends
+  // (a day at most) and the page opens instantly. Progress is kept for ten minutes, as on the
+  // server. Storage can be blocked or full: everything here is optional.
+  const BP_PASS_KEY = "bp:pass:v1";
+  const BP_PASS_KEEP_MS = 24 * 60 * 60 * 1000;
+  const BP_PROGRESS_KEEP_MS = 10 * 60 * 1000;
+
+  function bpStored(key, keepMs) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key) || "null");
+      return v && v.at && Date.now() - v.at < keepMs ? v : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function bpStore(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ at: Date.now(), ...value }));
+    } catch {
+      /* private mode or full: the page just asks the server next time */
+    }
+  }
+
   function loadBattlepass(force) {
     if (!force && (battlepass.pass || battlepass.pending)) return battlepass.pending || Promise.resolve(battlepass.pass);
+    if (!force) {
+      const saved = bpStored(BP_PASS_KEY, BP_PASS_KEEP_MS);
+      if (saved && saved.pass && saved.pass.act && Date.parse(saved.pass.act.end) > Date.now() && saved.pass.chapters && saved.pass.chapters.length) {
+        battlepass.pass = saved.pass;
+        if (S.route.name === "battlepass") render();
+        return Promise.resolve(battlepass.pass);
+      }
+    }
     battlepass.error = null;
     battlepass.pending = api("/api/battlepass", { timeoutMs: 30000 })
       .then((res) => {
         battlepass.pass = (res && res.pass) || null;
         if (!battlepass.pass) battlepass.error = "The battle pass is not available right now.";
+        else if (battlepass.pass.chapters && battlepass.pass.chapters.length) bpStore(BP_PASS_KEY, { pass: battlepass.pass });
       })
       .catch((err) => {
         battlepass.error = err.message || "Could not load the battle pass.";
@@ -2064,10 +2097,19 @@
     }
     if (box.data || box.pending) return box.pending || Promise.resolve();
     box.error = null;
+    if (!force) {
+      const saved = bpStored(`bp:progress:v1:${puuid}`, BP_PROGRESS_KEEP_MS);
+      if (saved && saved.progress) {
+        box.data = saved.progress;
+        if (S.route.name === "battlepass") renderBattlepassRows();
+        return Promise.resolve();
+      }
+    }
     box.pending = api(`/api/accounts/${encodeURIComponent(puuid)}/battlepass`, { timeoutMs: 35000 })
       .then((res) => {
         if (res && res.status === "relink") box.error = "Riot asked to sign in again. Re-link this account.";
         else box.data = (res && res.progress) || null;
+        if (box.data) bpStore(`bp:progress:v1:${puuid}`, { progress: box.data });
         if (!box.data && !box.error) box.error = "No battle pass data for this account.";
       })
       .catch((err) => {
@@ -2296,7 +2338,7 @@
     const worker = async () => {
       while (i < todo.length) await fetchBpProgress(todo[i++].puuid).catch(() => {});
     };
-    Promise.all([worker(), worker()]).catch(() => {});
+    Promise.all([worker(), worker(), worker()]).catch(() => {});
   }
 
   /* ---------- alerts ---------- */

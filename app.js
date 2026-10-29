@@ -590,6 +590,8 @@ app.get('/api/battlepass', requireDiscord, async (req, res, next) => {
   try {
     rateLimit(`${req.session.discordId}:battlepass-pass`, 30, 60000);
     const pass = await items.battlepassTrack();
+    // The pass changes about once an act: the browser may keep it for a while.
+    if (pass && pass.chapters.length) res.set('Cache-Control', 'private, max-age=3600');
     res.json({ ok: true, pass });
   } catch (err) {
     next(err);

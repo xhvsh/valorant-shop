@@ -866,7 +866,10 @@ const BP_KEY = 'catalog:battlepass:v2';
 let bpPass = null;
 let bpFailedAt = 0;
 
-const bpCurrent = (p) => p && p.act && Date.now() - p.at < TTL && Date.parse(p.act.end) > Date.now();
+// A pass changes about once an act, so what was saved stays good until the act ends (a week at
+// most, to pick up late fixes). The act can begin before its pass is listed: a copy without
+// the pass is only trusted for a few minutes.
+const bpCurrent = (p) => Boolean(p && p.act && Date.parse(p.act.end) > Date.now() && Date.now() - p.at < (p.contract ? 7 * 24 * 60 * 60 * 1000 : 10 * 60 * 1000));
 
 async function battlepassRefresh() {
   if (Date.now() - bpFailedAt < 2 * 60 * 1000) return null;
@@ -918,10 +921,35 @@ async function battlepass() {
 
 const BP_KINDS = { EquippableSkinLevel: 'skin', EquippableCharmLevel: 'buddy', Spray: 'spray', PlayerCard: 'card', Title: 'title', Currency: 'currency' };
 
-// The pass as the page shows it: every reward resolved to a name and icon.
+// The pass as the page shows it: every reward resolved to a name and icon. Building it needs
+// the item catalog and the currency list, so the finished result is kept (in memory and in the
+// database) until the act ends and a request does none of that work.
+const TRACK_KEY = 'catalog:battlepass:track:v1';
+let trackMemo = null;
+const trackLive = (t) => Boolean(t && t.act && t.chapters && t.chapters.length && Date.parse(t.act.end) > Date.now());
+
 async function battlepassTrack() {
+  if (trackLive(trackMemo)) return trackMemo;
+  const saved = await storage.kvGet(TRACK_KEY).catch(() => null);
+  if (trackLive(saved)) {
+    trackMemo = saved;
+    return saved;
+  }
   const pass = await battlepass();
   if (!pass) return null;
+  const track = await buildBattlepassTrack(pass);
+  // Only a complete track is kept: one built while the catalog or a reward was missing would
+  // show "Unknown Item" until the act ends.
+  const rewards = track.chapters.flatMap((c) => [...c.levels.map((l) => l.reward), ...c.free]);
+  if (trackLive(track) && rewards.every((r) => r && r.name !== 'Unknown Item' && (r.icon || r.kind === 'title'))) {
+    trackMemo = track;
+    const ttl = Math.min(30 * 24 * 60 * 60 * 1000, Date.parse(track.act.end) - Date.now());
+    await storage.kvSet(TRACK_KEY, track, ttl).catch(() => {});
+  }
+  return track;
+}
+
+async function buildBattlepassTrack(pass) {
   const [cur] = await Promise.all([currencies(), load().catch(() => {})]);
   const currency = new Map([...cur].map(([id, c]) => [String(id).toLowerCase(), c]));
   const show = (r) => {

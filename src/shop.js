@@ -934,16 +934,21 @@ async function accountBattlepass(discordId, puuid) {
     const entitlement = await entitlementFor(token.access_token);
     const tokens = { ...token, entitlement };
     const shard = account.shard || 'na';
+    const premiumKey = `battlepass:premium:${discordId}:${account.puuid}:${meta.contractId}`;
+    const premiumKnown = Boolean(await storage.kvGet(premiumKey).catch(() => null));
     const [contracts, owned] = await Promise.all([
       riot.contracts(shard, account.puuid, tokens),
-      riot.accountEntitlements(shard, account.puuid, tokens).catch(() => null),
+      premiumKnown ? null : riot.accountEntitlements(shard, account.puuid, tokens).catch(() => null),
     ]);
     const mine = ((contracts && contracts.Contracts) || []).find((c) => String(c.ContractDefinitionID).toLowerCase() === meta.contractId);
     const tier = mine ? Number(mine.ProgressionLevelReached) || 0 : 0;
     const towards = mine ? Number(mine.ProgressionTowardsNextLevel) || 0 : 0;
     let premium = null; // unknown when the ownership list did not come back
-    if (owned && meta.premiumMarker) {
+    if (premiumKnown) premium = true;
+    else if (owned && meta.premiumMarker) {
       premium = (owned.EntitlementsByTypes || []).some((t) => (t.Entitlements || []).some((e) => String(e.ItemID).toLowerCase() === meta.premiumMarker));
+      // A bought pass stays bought for the whole act, so that is not asked again.
+      if (premium) await storage.kvSet(premiumKey, true, 120 * 24 * 60 * 60 * 1000).catch(() => {});
     }
     const progress = {
       tier,
