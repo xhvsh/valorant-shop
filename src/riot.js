@@ -13,10 +13,6 @@ const PD_URLS = {
   mmr: (shard, puuid) => `https://pd.${shard}.a.pvp.net/mmr/v1/players/${puuid}`,
   accountXp: (shard, puuid) => `https://pd.${shard}.a.pvp.net/account-xp/v1/players/${puuid}`,
   entitlements: (shard, puuid) => `https://pd.${shard}.a.pvp.net/store/v1/entitlements/${puuid}`,
-  // Unofficial personalization endpoint: the player's currently equipped
-  // loadout (identity card/title + spray wheel + primary gun skin).
-  loadout: (shard, puuid) => `https://pd.${shard}.a.pvp.net/personalization/v2/players/${puuid}/playerloadout`,
-  loadoutLegacy: (shard, puuid) => `https://pd.${shard}.a.pvp.net/personalization/v2/players/${puuid}/loadout`,
 };
 
 const CLIENT_PLATFORM = Buffer.from(
@@ -458,14 +454,31 @@ async function accountEntitlements(shard, puuid, tokens) {
 
 // Currently equipped loadout (identity / spray wheel / primary gun). Shape is
 // undocumented and can change; callers must treat this as optional data.
+// Riot has moved this endpoint between versions before, so a few known paths are tried
+// in turn (a 404 or 405 means "not here") and the one that works is remembered.
+let loadoutPathIndex = 0;
 async function playerLoadout(shard, puuid, tokens) {
-  try {
-    return await pdFetch(PD_URLS.loadout(shard, puuid), tokens);
-  } catch (err) {
-    // The path has moved before; try the older one once before giving up.
-    if (err.status === 404 || err.status === 405) return pdFetch(PD_URLS.loadoutLegacy(shard, puuid), tokens);
-    throw err;
+  const base = `https://pd.${shard}.a.pvp.net/personalization`;
+  const paths = [
+    `${base}/v3/players/${puuid}/playerloadout`,
+    `${base}/v2/players/${puuid}/playerloadout`,
+    `${base}/v2/players/${puuid}/loadout`,
+  ];
+  const tried = [];
+  for (let n = 0; n < paths.length; n += 1) {
+    const i = (loadoutPathIndex + n) % paths.length;
+    try {
+      const json = await pdFetch(paths[i], tokens);
+      loadoutPathIndex = i;
+      return json;
+    } catch (err) {
+      tried.push(`${paths[i].replace(base, '').replace(puuid, ':puuid')}=${err.status}`);
+      if (err.status !== 404 && err.status !== 405) throw err;
+    }
   }
+  const err = new Error(`loadout not found (${tried.join(', ')})`);
+  err.status = 404;
+  throw err;
 }
 
 // Marks the night market offers as "seen" in-game. The storefront sometimes
