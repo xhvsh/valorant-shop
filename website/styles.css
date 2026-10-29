@@ -1504,7 +1504,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   z-index: 1;
   left: 0;
   right: 0;
-  top: 56%;
+  top: 66%;
   display: grid;
 }
 .lo-card-name b {
