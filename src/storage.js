@@ -159,12 +159,14 @@ async function sessionDestroy(sid) {
 // so a repeat read costs no egress. Writes and deletes here drop the entry.
 const BIG_MIN_CHARS = 50 * 1000;
 const BIG_MEMO_MS = 60 * 1000;
-const BIG_MEMO_MAX = 6;
-const bigMemo = new Map(); // key -> { value, expiresAt, at }
+const IMMUTABLE_MEMO_MS = 6 * 60 * 60 * 1000; // rendered bundle images never change once saved
+const BIG_MEMO_MAX = 12;
+const bigMemo = new Map(); // key -> { value, expiresAt, at, ttl }
 
 function rememberBig(key, value, expiresAt) {
   if (bigMemo.size >= BIG_MEMO_MAX) bigMemo.delete(bigMemo.keys().next().value);
-  bigMemo.set(key, { value, expiresAt, at: Date.now() });
+  const ttl = key.startsWith('bundle:media:') ? IMMUTABLE_MEMO_MS : BIG_MEMO_MS;
+  bigMemo.set(key, { value, expiresAt, at: Date.now(), ttl });
 }
 
 async function kvSet(key, value, ttlMs) {
@@ -202,7 +204,7 @@ async function kvUnlock(key) {
 
 async function kvGet(key) {
   const big = bigMemo.get(key);
-  if (big && Date.now() - big.at < BIG_MEMO_MS && big.expiresAt > Date.now()) {
+  if (big && Date.now() - big.at < big.ttl && big.expiresAt > Date.now()) {
     try {
       return JSON.parse(big.value);
     } catch {
@@ -233,6 +235,20 @@ async function kvGet(key) {
   } catch {
     return null;
   }
+}
+
+// True when the key exists and has not expired. Reads only the expiry, never the value,
+// so checking for a big row costs almost nothing.
+async function kvExists(key) {
+  const big = bigMemo.get(key);
+  if (big && Date.now() - big.at < big.ttl && big.expiresAt > Date.now()) return true;
+  if (!hasDb) {
+    const row = mem.kv.get(key);
+    return Boolean(row && new Date(row.expires_at).getTime() > Date.now());
+  }
+  const { data, error } = await client.from('kv').select('expires_at').eq('key', key).maybeSingle();
+  if (error) dbFail('kv exists', error);
+  return Boolean(data && new Date(data.expires_at).getTime() > Date.now());
 }
 
 async function kvDel(key) {
@@ -558,6 +574,7 @@ module.exports = {
   kvLock,
   kvUnlock,
   kvGet,
+  kvExists,
   kvDel,
   kvList,
   getAccount,

@@ -123,8 +123,9 @@ function bundleMediaKey(bundle) {
 }
 
 function bundleMediaTtl(bundle) {
+  // A bundle runs for days and its render never changes: keep it until the bundle leaves.
   const left = bundle.leavesAt ? bundle.leavesAt - Date.now() : 0;
-  return Math.min(Math.max(left, 60 * 60 * 1000), 24 * 60 * 60 * 1000);
+  return Math.min(Math.max(left, 60 * 60 * 1000), 30 * 24 * 60 * 60 * 1000);
 }
 
 async function savedBundleMedia(ctx, bundle) {
@@ -169,7 +170,7 @@ async function prewarmBundles(ctx, bundles, selectedId) {
   for (const b of bundles || []) {
     if (!b || String(b.id) === String(selectedId) || !b.items || !b.items.length) continue;
     try {
-      if (await savedBundleMedia(ctx, b)) continue;
+      if (await ctx.storage.kvExists(bundleMediaKey(b)).catch(() => false)) continue;
       let media = await renderBundleMedia(b.items);
       if (media && media.incomplete) media = await renderBundleMedia(b.items);
       await saveBundleMedia(ctx, b, media);
