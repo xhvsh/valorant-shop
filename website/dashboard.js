@@ -1802,19 +1802,7 @@
     const countEl = h("span", { class: "coll-count" });
     box.appendChild(h("div", { class: "coll-tools" }, h("label", { class: "search" }, iconEl("search"), search), countEl));
 
-    // Equipped items (from the loadout) are marked and listed first.
-    const eq = d.equipped || {};
-    const nameKey = (n) => String(n || "").toLowerCase();
-    const equippedSets = {
-      skins: new Set((eq.skins || []).map((x) => nameKey(x.name))),
-      buddies: new Set((eq.buddies || []).map((x) => nameKey(x.name))),
-      sprays: new Set((eq.sprays || []).map((x) => nameKey(x.name))),
-      flexes: new Set((eq.flexes || []).map((x) => nameKey(x.name))),
-      cards: new Set(eq.identityCard ? [nameKey(eq.identityCard.name)] : []),
-      titles: new Set(eq.identityTitle ? [nameKey(eq.identityTitle.name)] : []),
-    };
-    const isEquipped = (it) => equippedSets[st.section].has(nameKey(it.name));
-    const list = [...lists[st.section]].sort((x, y) => Number(isEquipped(y)) - Number(isEquipped(x)));
+    const list = lists[st.section];
     let filterBox = null;
     if (st.section === "skins" && list.length) {
       filterBox = h("div");
@@ -1862,8 +1850,7 @@
       // Titles are text only: the title itself fills the tile, no caption.
       const isTitle = st.section === "titles";
       const media = isTitle ? h("div", { class: "title-text", text: titleName(it.name) }) : imgOrFallback(src, it.name);
-      const equipped = isEquipped(it);
-      const tile = h("div", { class: `tile${equipped ? " is-equipped" : ""}`, title: it.name || "" }, h("div", { class: "tile-media" }, media, equipped ? h("span", { class: "eq-badge", text: "Equipped" }) : null), isTitle ? null : h("div", { class: "tile-name", text: it.name || "Unknown" }));
+      const tile = h("div", { class: "tile", title: it.name || "" }, h("div", { class: "tile-media" }, media), isTitle ? null : h("div", { class: "tile-name", text: it.name || "Unknown" }));
       if (st.section === "skins" && it.id) previewTrigger(tile, { ...it, type: "skin" });
       if (st.section === "cards" && it.art) previewTrigger(tile, { ...it, type: "card" });
       tiles.appendChild(tile);

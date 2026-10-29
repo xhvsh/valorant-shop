@@ -635,43 +635,17 @@ function ownedAccessories(res, type) {
 // spray wheel, primary gun skin) from the unofficial loadout endpoint. Shapes
 // are undocumented; every field is mapped defensively and failures are optional.
 function equippedFromLoadout(loadout) {
-  if (!loadout || typeof loadout !== 'object') return { identityCard: null, identityTitle: null, sprays: [], flexes: [], skins: [], buddies: [] };
+  if (!loadout || typeof loadout !== 'object') return { identityCard: null, identityTitle: null, sprays: [] };
   const id = loadout.Identity || {};
-  const out = { identityCard: null, identityTitle: null, sprays: [], flexes: [], skins: [], buddies: [] };
+  const out = { identityCard: null, identityTitle: null, sprays: [] };
   const seen = new Set();
-  // Sprays and flexes: older responses list sprays under `Sprays`; the newer ones put
-  // sprays and flexes in `ActiveExpressions` as { TypeID, AssetID }. Read both and keep
-  // whatever resolves to a spray or flex.
-  const expressionIds = [
-    ...(loadout.Sprays || []).map((s) => s && s.SprayID),
-    ...(loadout.ActiveExpressions || []).map((e) => e && e.AssetID),
-  ];
-  for (const rawId of expressionIds) {
-    const r = rawId ? items.resolve(rawId) : null;
-    if (!r || (r.type !== 'spray' && r.type !== 'flex')) continue;
-    const key = `${r.type}:${items.normalizeName(r.name)}`;
-    if (!items.normalizeName(r.name) || seen.has(key)) continue;
+  for (const s of loadout.Sprays || []) {
+    const r = s && s.SprayID ? items.resolve(s.SprayID) : null;
+    if (!r || r.type !== 'spray') continue;
+    const key = items.normalizeName(r.name);
+    if (!key || seen.has(key)) continue;
     seen.add(key);
-    if (r.type === 'spray') out.sprays.push({ id: r.id, name: r.name, icon: r.icon, staticIcon: r.staticIcon || null });
-    else out.flexes.push({ id: r.id, name: r.name });
-  }
-  // Equipped gun skins and buddies (one per weapon). The skin and buddy ids are level
-  // ids, which the catalog resolves to the same names the collection lists.
-  for (const g of loadout.Guns || []) {
-    const skin = g && (g.SkinID || g.SkinLevelID) ? items.resolve(g.SkinID || g.SkinLevelID) : null;
-    if (skin && skin.type === 'skin' && !seen.has(`skin:${skin.name}`)) {
-      seen.add(`skin:${skin.name}`);
-      out.skins.push({ id: skin.id, name: skin.name });
-    }
-    const charm = g && (g.CharmLevelID || g.CharmID) ? items.resolve(g.CharmLevelID || g.CharmID) : null;
-    if (charm && charm.type === 'buddy' && !seen.has(`buddy:${charm.name}`)) {
-      seen.add(`buddy:${charm.name}`);
-      out.buddies.push({ id: charm.id, name: charm.name });
-    }
-  }
-  if (!out.sprays.length && !out.flexes.length) {
-    // The response shape has changed before: say which fields it has (names only).
-    console.log(`[shop] loadout has no sprays/flexes; fields: ${Object.keys(loadout).join(',')}`);
+    out.sprays.push({ id: r.id, name: r.name, icon: r.icon, staticIcon: r.staticIcon || null });
   }
   // Riot's field names end in "ID"; older notes had them without it.
   const cardId = id.PlayerCardID || id.PlayerCard;
@@ -699,8 +673,8 @@ async function accountDetails(discordId, puuid, opts = {}) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
-  const fullKey = `acctdetails:v13:${discordId}:${account.puuid}`;
-  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v13:${scope}:${discordId}:${account.puuid}`;
+  const fullKey = `acctdetails:v12:${discordId}:${account.puuid}`;
+  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v12:${scope}:${discordId}:${account.puuid}`;
   // The scoped copy is the small one: try it first, and only read the big full copy
   // (hundreds of KB) when it misses.
   const fresh = (box) => box && box.details && box.at && Date.now() - box.at < DETAILS_TTL;
@@ -762,7 +736,7 @@ async function accountDetails(discordId, puuid, opts = {}) {
       buddies: [],
       titles: [],
       flexes: [],
-      equipped: { identityCard: null, identityTitle: null, sprays: [], flexes: [], skins: [], buddies: [] },
+      equipped: { identityCard: null, identityTitle: null, sprays: [] },
       updatedAt: Date.now(),
       partial: scope === 'full' && (mmrRes.status !== 'fulfilled' || xpRes.status !== 'fulfilled'),
     };
