@@ -2082,11 +2082,10 @@
 
   // One pass shown the way the game shows it: a page of tiers (one chapter) with the
   // premium rewards in a row and the chapter's free rewards after them, and the chapters as
-  // a line of diamonds below. Locks and progress bars are for the account picked in the
-  // cards above; every account's avatar sits on the tier it is working on.
+  // a line of diamonds below. The pass is the same for every account: each one is an avatar
+  // on that line where it is, and on the tile of the tier it is working on.
   let bpPage = 0;
   let bpPicked = false;
-  let bpFocus = null;
 
   const bpTotal = (pass) => pass.chapters.reduce((n, ch) => n + ch.levels.length, 0);
   const bpLinked = () => ordered().filter((a) => a.linked);
@@ -2108,6 +2107,17 @@
     return i < 0 ? 0 : i;
   }
 
+  // Where an account is on the chapter line, 0 to 1. Each chapter owns an equal stretch
+  // with its diamond in the middle, so an account half way through a chapter is on it.
+  function bpLineAt(pass, p) {
+    const total = bpTotal(pass);
+    if (p.tier >= total) return 1;
+    const i = bpPageOf(pass, p);
+    const ch = pass.chapters[i];
+    const f = Math.max(0, Math.min(1, (bpPos(p) - (ch.levels[0].tier - 1)) / ch.levels.length));
+    return (i + f) / pass.chapters.length;
+  }
+
   // The last page is the Epilogue, not a numbered chapter.
   const bpChapterName = (ch, i) => (ch.epilogue ? "Epilogue" : `Chapter ${i + 1}`);
 
@@ -2126,102 +2136,87 @@
 
   function bpTileEl(r, o) {
     const art = bpArtEl(r);
-    if (o.locked) art.appendChild(h("span", { class: "bp-lock", "aria-label": "Locked" }, iconEl("lock")));
     if (o.here.length) {
       art.appendChild(h("span", { class: "bp-here" }, ...o.here.slice(0, 3).map((a) => emblemEl(a, "xs")),
         o.here.length > 3 ? h("span", { class: "bp-here-more", text: `+${o.here.length - 3}` }) : null));
     }
     const tip = [r ? `${r.name}${r.amount > 1 ? ` x${fmt(r.amount)}` : ""} (${BP_KINDS[r.kind] || r.kind})` : o.label];
     if (o.here.length) tip.push(`Working on it: ${o.here.map(acctName).join(", ")}`);
-    return h("div", { class: `bp-tile${o.free ? " is-free" : ""}${o.locked ? " is-locked" : ""}${o.current ? " is-current" : ""}`, title: tip.join("\n") },
-      h("span", { class: "bp-bar" }, h("i", { style: `width:${(o.fill * 100).toFixed(1)}%` })),
+    return h("div", { class: `bp-tile${o.free ? " is-free" : ""}`, style: `grid-column:${o.col}`, title: tip.join("\n") },
       art,
       h("span", { class: "bp-foot" }, h("b", { text: o.label }), h("span", { text: r ? r.name : "" })));
   }
 
-  function bpViewEl(pass, accts, focus, onPage) {
+  function bpViewEl(pass, accts, onPage) {
     const total = bpTotal(pass);
     const ch = pass.chapters[bpPage];
-    const n = ch.levels.length;
-    const k = ch.free.length;
     const first = ch.levels[0].tier;
-    const last = ch.levels[n - 1].tier;
-    const p = focus && bpData(focus);
+    const last = ch.levels[ch.levels.length - 1].tier;
     const loaded = accts.filter(bpData);
     const hereOn = (tier) => loaded.filter((a) => bpWorking(bpData(a), total) === tier);
 
     // As in the game: the premium tiles in a row, then a diamond, then the chapter's free
-    // rewards, which come with finishing the chapter.
-    const stage = h("div", { class: "bp-stage-in", style: `--n:${n};--k:${k};grid-template-columns:repeat(${n}, minmax(0, 1fr))${k ? ` 10px repeat(${k}, minmax(0, 1fr))` : ""}` },
-      h("span", { class: "bp-col-label", style: `grid-column:1 / span ${n}`, text: "Premium rewards" }),
-      k ? h("span", { class: "bp-col-label is-free", style: `grid-column:${n + 2} / span ${k}`, text: "Free rewards" }) : null);
-    for (const l of ch.levels) {
-      const fill = !p ? 0 : p.tier >= l.tier ? 1 : p.tier + 1 === l.tier && p.nextXp ? Math.min(1, p.towards / p.nextXp) : 0;
-      stage.appendChild(bpTileEl(l.reward, {
-        label: `Tier ${l.tier}`,
-        fill,
-        locked: Boolean(p) && (p.tier < l.tier || p.premium === false),
-        current: Boolean(p) && bpWorking(p, total) === l.tier,
-        here: hereOn(l.tier),
-      }));
-    }
-    if (k) {
-      stage.appendChild(h("span", { class: "bp-sep", "aria-hidden": "true" }));
-      const done = p ? Math.max(0, Math.min(1, (bpPos(p) - (first - 1)) / n)) : 0;
-      for (const r of ch.free) stage.appendChild(bpTileEl(r, { label: "Free", fill: done, locked: Boolean(p) && p.tier < last, current: false, here: [], free: true }));
-    }
+    // rewards. The grid has room for the most tiles and free rewards any chapter has, so
+    // tiles keep their size and place from page to page.
+    const cols = Math.max(...pass.chapters.map((c) => c.levels.length));
+    const freeCols = Math.max(...pass.chapters.map((c) => c.free.length));
+    const stage = h("div", { class: "bp-stage-in", style: `--n:${cols};--k:${freeCols};grid-template-columns:repeat(${cols}, minmax(0, 1fr))${freeCols ? ` 10px repeat(${freeCols}, minmax(0, 1fr))` : ""}` },
+      h("span", { class: "bp-col-label", style: `grid-column:1 / span ${cols}`, text: "Premium rewards" }),
+      ch.free.length ? h("span", { class: "bp-col-label is-free", style: `grid-column:${cols + 2} / span ${freeCols}`, text: "Free rewards" }) : null,
+      ch.free.length ? h("span", { class: "bp-sep", style: `grid-column:${cols + 1}`, "aria-hidden": "true" }) : null);
+    ch.levels.forEach((l, i) => stage.appendChild(bpTileEl(l.reward, { label: `Tier ${l.tier}`, col: i + 1, here: hereOn(l.tier) })));
+    ch.free.forEach((r, i) => stage.appendChild(bpTileEl(r, { label: "Free", col: cols + 2 + i, here: [], free: true })));
 
-    // The chapters as diamonds on a line, the open one large with its number. The line
-    // fills up to where the picked account is; a dot marks chapters someone is working on.
+    // The chapters as diamonds on a line, the open one large with its number. Every
+    // account is an avatar above the line where it is; avatars that would overlap go up a
+    // row. Clicking one opens its page.
     const count = pass.chapters.length;
-    let reach = 0;
-    if (p) {
-      const at = p.tier >= total ? count - 1 : bpPageOf(pass, p);
-      const c = pass.chapters[at];
-      reach = p.tier >= total ? 1 : (at + Math.max(0, Math.min(1, (bpPos(p) - (c.levels[0].tier - 1)) / c.levels.length))) / Math.max(1, count - 1);
+    const marks = loaded.map((a) => ({ a, p: bpData(a), at: bpLineAt(pass, bpData(a)) })).sort((x, y) => x.at - y.at);
+    const lastAt = [-1, -1, -1];
+    let levels = 1;
+    const track = h("div", { class: "bp-track", style: `--cnt:${count}` });
+    for (const m of marks) {
+      let lv = 0;
+      while (lv < lastAt.length - 1 && lastAt[lv] >= 0 && m.at - lastAt[lv] < 0.035) lv++;
+      lastAt[lv] = m.at;
+      levels = Math.max(levels, lv + 1);
+      track.appendChild(h("button", { class: "bp-mark", type: "button", style: `left:${(m.at * 100).toFixed(2)}%;--lv:${lv}`,
+        title: `${acctName(m.a)}: tier ${m.p.tier} of ${m.p.totalTiers}`, "aria-label": `${acctName(m.a)}, tier ${m.p.tier}`, onclick: () => onPage(bpPageOf(pass, m.p)) },
+      emblemEl(m.a, "xs")));
     }
-    const track = h("div", { class: "bp-track", style: `--cnt:${count};--reach:${Math.min(1, reach).toFixed(4)}` });
+    track.style.setProperty("--levels", String(levels));
     pass.chapters.forEach((c, i) => {
-      const a = c.levels[0].tier;
-      const b = c.levels[c.levels.length - 1].tier;
-      const who = loaded.filter((x) => {
-        const w = bpWorking(bpData(x), total);
-        return w >= a && w <= b;
-      });
       const on = i === bpPage;
       track.appendChild(h("button", {
-        class: `bp-dot${on ? " is-on" : ""}${p && p.tier >= b ? " is-done" : ""}${c.epilogue ? " is-epilogue" : ""}${who.length ? " has-acct" : ""}`,
+        class: `bp-dot${on ? " is-on" : ""}${c.epilogue ? " is-epilogue" : ""}`,
         type: "button",
         "aria-label": bpChapterName(c, i),
         "aria-current": on ? "page" : null,
-        title: `${bpChapterName(c, i)}: tiers ${a} to ${b}${who.length ? `\n${who.map(acctName).join(", ")}` : ""}`,
+        title: `${bpChapterName(c, i)}: tiers ${c.levels[0].tier} to ${c.levels[c.levels.length - 1].tier}`,
         onclick: () => onPage(i),
       }, h("span", { class: "bp-dot-mark" }, c.epilogue ? iconEl("star") : on ? h("span", { text: String(i + 1) }) : null)));
     });
     const arrow = (delta) => h("button", { class: "bp-arrow", type: "button", "aria-label": delta < 0 ? "Previous chapter" : "Next chapter", disabled: bpPage + delta < 0 || bpPage + delta >= count, onclick: () => onPage(bpPage + delta) },
       iconEl(delta < 0 ? "chevron-left" : "chevron-right"));
 
-    const head = h("div", { class: "bp-view-head" },
-      h("div", { class: "bp-view-title" }, h("b", { text: bpChapterName(ch, bpPage) }), h("span", { text: `Tiers ${first} to ${last}` })),
-      focus ? h("span", { class: "bp-view-as" }, "Progress of", emblemEl(focus, "xs"), h("b", {}, ...nameNodes(acctName(focus)))) : null);
+    const head = h("div", { class: "bp-view-title" }, h("b", { text: bpChapterName(ch, bpPage) }), h("span", { text: `Tiers ${first} to ${last}` }));
     return h("section", { class: "bp-view" }, head, h("div", { class: "bp-stage" }, stage), h("div", { class: "bp-nav" }, arrow(-1), track, arrow(1)));
   }
 
-  // One card per account: its tier, the xp toward the next one, and the whole pass as a bar
-  // with a notch per chapter. Picking a card shows the pass as that account sees it.
-  function bpAcctEl(a, pass, focused, onFocus) {
+  // One card per account: its tier, the whole pass as a bar with a notch per chapter, and
+  // the xp toward the next tier under it. Clicking a card opens the page it is on.
+  function bpAcctEl(a, pass, onPage) {
     const box = bpProgress[a.puuid] || {};
     const p = box.data;
     const total = p ? p.totalTiers : bpTotal(pass);
     const sub = !p ? box.error || "Loading progress" : p.tier >= total ? "Pass complete" : p.nextXp ? `${fmt(p.towards)} / ${fmt(p.nextXp)} XP to tier ${p.tier + 1}` : "Not started";
-    return h("button", { class: `bp-acct${focused ? " is-focus" : ""}${p ? "" : " is-wait"}${box.error ? " is-error" : ""}`, type: "button", "aria-pressed": focused ? "true" : "false", disabled: !p, onclick: () => onFocus(a, p) },
+    return h("button", { class: `bp-acct${box.error ? " is-error" : ""}`, type: "button", disabled: !p, onclick: () => onPage(bpPageOf(pass, p)) },
       emblemEl(a, "md"),
-      h("span", { class: "bp-acct-main" },
-        h("span", { class: "bp-acct-name" }, h("b", {}, ...nameNodes(acctName(a))),
-          p && p.premium != null ? h("span", { class: `chip${p.premium ? " main" : ""}`, text: p.premium ? "Premium" : "Free" }) : null),
-        h("span", { class: "bp-acct-sub", text: sub })),
+      h("span", { class: "bp-acct-name" }, h("b", {}, ...nameNodes(acctName(a))),
+        p && p.premium != null ? h("span", { class: `chip${p.premium ? " main" : ""}`, text: p.premium ? "Premium" : "Free" }) : null),
       h("span", { class: "bp-acct-tier" }, h("small", { text: "Tier" }), h("span", {}, h("b", { text: p ? String(p.tier) : "-" }), h("i", { text: `/${total}` }))),
-      h("span", { class: `bp-acct-bar${p ? "" : " sk"}`, style: `--chs:${pass.chapters.length}` }, h("i", { style: `width:${p ? ((bpPos(p) / total) * 100).toFixed(2) : 0}%` })));
+      h("span", { class: `bp-acct-bar${p ? "" : " sk"}`, style: `--chs:${pass.chapters.length}` }, h("i", { style: `width:${p ? ((bpPos(p) / total) * 100).toFixed(2) : 0}%` })),
+      h("span", { class: "bp-acct-sub", text: sub }));
   }
 
   function renderBattlepassRows() {
@@ -2229,17 +2224,16 @@
     const pass = battlepass.pass;
     if (!body || !pass) return;
     const accts = bpLinked();
-    // The pass shows the picked account, else the main one while it loads, else the first
-    // with progress. The page opens where that account is working.
-    const usable = (a) => !(bpProgress[a.puuid] || {}).error;
-    let focus = accts.find((a) => a.puuid === bpFocus && usable(a));
-    if (!focus) {
-      focus = accts.find((a) => a.is_default && usable(a)) || accts.find(bpData) || accts.find(usable) || null;
-      bpFocus = focus ? focus.puuid : null;
-    }
-    if (!bpPicked && focus && bpData(focus)) {
-      bpPage = bpPageOf(pass, bpData(focus));
-      bpPicked = true;
+    // The page opens where the main account is working (or, if it has no progress, the
+    // first account that does).
+    if (!bpPicked) {
+      const main = accts.find((a) => a.is_default);
+      const mainBox = main ? bpProgress[main.puuid] || {} : null;
+      const from = mainBox && mainBox.data ? mainBox.data : !mainBox || mainBox.error ? accts.map(bpData).find(Boolean) : null;
+      if (from) {
+        bpPage = bpPageOf(pass, from);
+        bpPicked = true;
+      }
     }
     const scroll = window.scrollY;
     const onPage = (i) => {
@@ -2247,13 +2241,9 @@
       bpPicked = true;
       renderBattlepassRows();
     };
-    const onFocus = (a, p) => {
-      bpFocus = a.puuid;
-      onPage(bpPageOf(pass, p));
-    };
     body.replaceChildren(
-      h("div", { class: "bp-accts" }, ...accts.map((a) => bpAcctEl(a, pass, focus === a, onFocus))),
-      bpViewEl(pass, accts, focus, onPage));
+      h("div", { class: "bp-accts" }, ...accts.map((a) => bpAcctEl(a, pass, onPage))),
+      bpViewEl(pass, accts, onPage));
     window.scrollTo({ top: scroll, behavior: "instant" });
   }
 
@@ -2262,7 +2252,7 @@
     const view = $("view");
     const pass = battlepass.pass;
     const head = h("div", { class: "page-head" }, h("div", null, h("h1", { text: "Battle pass" }),
-      h("p", { text: pass ? `${pass.act.name}. Pick an account to see the pass with its progress and locks.` : "Where each account stands on the current act's battle pass." })));
+      h("p", { text: pass ? `${pass.act.name}. Click an account to open the chapter it is on.` : "Where each account stands on the current act's battle pass." })));
     view.appendChild(head);
     if (!pass) {
       if (battlepass.error && !battlepass.pending) {

@@ -1337,9 +1337,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
-/* battle pass page: a card per account (tier, xp, the whole pass as a bar), then the pass
-   as the game shows it, one chapter at a time, with the picked account's locks and
-   progress, and the chapters as a line of diamonds below. */
+/* battle pass page: a card per account (tier, the whole pass as a bar, xp), then the pass
+   as the game shows it, one chapter at a time, and the chapters as a line of diamonds with
+   every account's avatar on it. */
 .bp-ends { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 20px; color: var(--text-2); font-size: 14px; }
 .bp-ends .i { font-size: 16px; color: var(--text-3); }
 .bp-count { color: var(--text); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -1347,29 +1347,25 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-sk { height: 420px; }
 .bp-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
-/* Account cards: avatar, name with Premium or Free, xp to the next tier, the tier on the
-   right, and the whole pass as a bar along the bottom with a notch between chapters. */
+/* Account cards: avatar, name with Premium or Free, the tier on the right, then the whole
+   pass as a bar with a notch between chapters, and the xp to the next tier under it. */
 .bp-accts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 10px; }
-.bp-acct { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
+.bp-acct { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s var(--ease); }
 .bp-acct:hover:not(:disabled) { border-color: var(--line-2); }
 .bp-acct:disabled { cursor: default; }
-.bp-acct.is-focus { border-color: var(--red-line); background: linear-gradient(180deg, var(--red-soft), transparent 75%), var(--surface); }
 .bp-acct .emblem.md { width: 42px; height: 42px; }
-.bp-acct-main { display: grid; gap: 4px; min-width: 0; }
 .bp-acct-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bp-acct-name b { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .bp-acct-name .chip { flex: none; height: 18px; padding: 0 6px; font-size: 10px; }
-.bp-acct-sub { overflow: hidden; color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.bp-acct.is-error .bp-acct-sub { color: var(--amber); white-space: normal; }
 .bp-acct-tier { display: grid; justify-items: end; gap: 3px; white-space: nowrap; }
 .bp-acct-tier small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .bp-acct-tier b { font: 600 24px/1 var(--font-head); font-variant-numeric: tabular-nums; }
 .bp-acct-tier i { margin-left: 2px; color: var(--text-3); font-size: 12px; font-style: normal; }
 .bp-acct-bar { position: relative; grid-column: 1 / -1; height: 5px; overflow: hidden; border-radius: 1px; background: var(--surface-3); }
-.bp-acct-bar i { position: absolute; inset: 0 auto 0 0; background: var(--text-2); transition: width .4s var(--ease); }
-.bp-acct.is-focus .bp-acct-bar i { background: var(--red); }
+.bp-acct-bar i { position: absolute; inset: 0 auto 0 0; background: var(--red); transition: width .4s var(--ease); }
 .bp-acct-bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / var(--chs, 11) - 2px), var(--surface) 0 calc(100% / var(--chs, 11))); }
-
+.bp-acct-sub { grid-column: 1 / -1; margin-top: -4px; overflow: hidden; color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.bp-acct.is-error .bp-acct-sub { color: var(--amber); white-space: normal; }
 /* On a phone the cards scroll sideways in one row, so the pass stays near the top. */
 @media (max-width: 640px) {
   .bp-accts { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 86%; margin: 0 calc(var(--pad) * -1); padding: 0 var(--pad) 4px; overflow-x: auto; scroll-padding: 0 var(--pad); scroll-snap-type: x mandatory; scrollbar-width: none; }
@@ -1378,39 +1374,25 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 
 /* The pass. A faint blue wash like the game's menu. */
 .bp-view { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 20px clamp(14px, 2.4vw, 28px) 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: radial-gradient(120% 100% at 50% 0%, rgba(90, 140, 210, .09), transparent 70%), var(--bg-2); }
-.bp-view-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
 .bp-view-title { display: grid; gap: 5px; }
 .bp-view-title b { font: 600 26px/1 var(--font-head); letter-spacing: .04em; text-transform: uppercase; }
 .bp-view-title span { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
-.bp-view-as { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--text-3); font-size: 12px; }
-.bp-view-as .emblem { border-radius: 50%; }
-.bp-view-as b { overflow: hidden; color: var(--text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Tiles keep a usable size: on a narrow screen the row scrolls sideways instead. */
+/* Every page has the same grid (room for the most tiles and free rewards any chapter has),
+   so tiles never change size or move. On a narrow screen the row scrolls sideways. */
 .bp-stage { overflow-x: auto; margin: 0 -4px; padding: 0 4px 4px; scrollbar-width: thin; }
-.bp-stage-in { display: grid; gap: 8px 12px; min-width: calc((var(--n, 5) + var(--k, 0)) * 106px + 22px); }
+.bp-stage-in { display: grid; grid-template-rows: auto auto; gap: 8px 12px; min-width: calc((var(--n, 5) + var(--k, 0)) * 106px + 22px); }
 .bp-col-label { grid-row: 1; color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .bp-col-label.is-free { color: var(--green); }
 .bp-sep { grid-row: 2; align-self: center; justify-self: center; width: 8px; height: 8px; transform: rotate(45deg); background: var(--text-3); }
-.bp-tile { grid-row: 2; display: grid; grid-template-rows: auto auto auto; min-width: 0; }
-/* Above each tile, the picked account's progress through that tier, as in the game. */
-.bp-bar { display: block; height: 3px; margin-bottom: 6px; overflow: hidden; background: var(--line-2); }
-.bp-bar i { display: block; height: 100%; background: var(--text); }
-.bp-tile.is-free .bp-bar i { background: var(--green); }
-.bp-art { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; padding: 15%; border: 1px solid var(--line-2); background: radial-gradient(90% 90% at 50% 40%, rgba(255, 255, 255, .06), transparent 70%), var(--surface); transition: border-color .15s var(--ease); }
-.bp-art img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .5)); transition: transform .2s var(--ease), opacity .2s var(--ease); }
+.bp-tile { grid-row: 2; display: grid; grid-template-rows: auto auto; min-width: 0; }
+.bp-art { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; padding: 15%; border: 1px solid var(--line-2); background: radial-gradient(90% 90% at 50% 40%, rgba(255, 255, 255, .06), transparent 70%), var(--surface); }
+.bp-art img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .5)); }
 .bp-art.is-card { padding: 0; }
 .bp-art.is-card img { object-fit: cover; filter: none; }
 .bp-art-text { color: var(--text); font: 600 15px/1.25 var(--font-head); letter-spacing: .05em; text-align: center; text-transform: uppercase; overflow-wrap: anywhere; }
-.bp-tile:hover .bp-art { border-color: var(--text-3); }
-.bp-tile:hover .bp-art img { transform: scale(1.05); }
-.bp-tile.is-locked .bp-art img, .bp-tile.is-locked .bp-art-text { opacity: .6; }
-.bp-tile.is-current .bp-art { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
 .bp-tile.is-free .bp-art { border-color: rgba(70, 211, 154, .3); background: radial-gradient(90% 90% at 50% 40%, rgba(70, 211, 154, .09), transparent 70%), var(--surface); }
-.bp-tile.is-free:hover .bp-art { border-color: rgba(70, 211, 154, .6); }
 .bp-amount { position: absolute; top: 6px; right: 7px; color: var(--text); font: 600 14px/1 var(--font-head); letter-spacing: .02em; text-shadow: 0 1px 4px rgba(0, 0, 0, .9); }
-.bp-lock { position: absolute; left: 6px; bottom: 6px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(8, 9, 12, .75); color: var(--text-2); }
-.bp-lock .i { font-size: 13px; }
 /* Accounts working on this tier, as overlapping avatars in the corner. */
 .bp-here { position: absolute; top: 6px; left: 6px; display: flex; align-items: center; }
 .bp-here .emblem { width: 24px; height: 24px; margin-right: -7px; border: 2px solid var(--bg-2); border-radius: 50%; background: var(--surface-3); box-shadow: 0 2px 6px rgba(0, 0, 0, .5); }
@@ -1418,36 +1400,34 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-foot { display: grid; gap: 2px; min-width: 0; padding: 6px 6px 7px; background: var(--surface-3); text-align: center; }
 .bp-foot b { color: var(--text); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .bp-foot span { overflow: hidden; color: var(--text-3); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.bp-tile.is-current .bp-foot { background: var(--text); }
-.bp-tile.is-current .bp-foot b { color: var(--bg); }
-.bp-tile.is-current .bp-foot span { color: #4a4d57; }
 .bp-tile.is-free .bp-foot b { color: var(--green); }
 
-/* Chapters: a diamond each on one line, spread evenly. The line is white up to where the
-   picked account is; finished chapters are hollow, the open one is big and numbered, the
-   Epilogue is a circle with a star, and a red dot marks chapters an account is on. */
-.bp-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: clamp(6px, 2cqw, 18px); }
-.bp-arrow { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
+/* Chapters: a diamond each, spread evenly on one line that runs the whole width (each
+   chapter owns an equal stretch with its diamond in the middle). The open chapter is big
+   and numbered, the Epilogue is a circle with a star. Above the line, every account is an
+   avatar on a stem at the point it has reached; close ones are lifted a row. */
+.bp-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: clamp(8px, 2cqw, 18px); }
+.bp-arrow { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 5px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface); color: var(--text); cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
 .bp-arrow:hover:not(:disabled) { border-color: var(--text-3); background: var(--surface-2); }
 .bp-arrow:disabled { opacity: .35; cursor: default; }
 .bp-arrow .i { font-size: 16px; }
-.bp-track { position: relative; display: flex; height: 52px; }
-.bp-track::before, .bp-track::after { content: ""; position: absolute; top: 50%; left: calc(50% / var(--cnt)); height: 2px; margin-top: -1px; }
-.bp-track::before { right: calc(50% / var(--cnt)); background: var(--line-2); }
-.bp-track::after { width: calc((100% - 100% / var(--cnt)) * var(--reach, 0)); background: var(--text-2); }
-.bp-dot { position: relative; z-index: 1; display: grid; flex: 1 1 0; place-items: center; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
-.bp-dot-mark { display: grid; place-items: center; width: 11px; height: 11px; border: 2px solid var(--text-3); background: var(--text-3); transform: rotate(45deg); transition: border-color .15s var(--ease), background-color .15s var(--ease); }
-.bp-dot.is-done .bp-dot-mark { border-color: var(--text); background: var(--bg-2); }
+.bp-track { --levels: 1; position: relative; display: flex; padding-top: calc(var(--levels) * 26px + 4px); }
+.bp-track::before { content: ""; position: absolute; left: 0; right: 0; bottom: 21px; height: 2px; background: var(--line-2); }
+.bp-dot { position: relative; z-index: 1; display: grid; flex: 1 1 0; place-items: center; min-width: 0; height: 44px; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.bp-dot-mark { display: grid; place-items: center; width: 11px; height: 11px; border: 2px solid var(--text-3); background: var(--bg-2); transform: rotate(45deg); transition: border-color .15s var(--ease); }
 .bp-dot:hover .bp-dot-mark { border-color: var(--text); }
-.bp-dot.is-on .bp-dot-mark { width: 28px; height: 28px; border-color: var(--text); background: var(--bg-2); box-shadow: 0 0 0 4px var(--bg-2); }
+.bp-dot.is-on .bp-dot-mark { width: 28px; height: 28px; border-color: var(--text); box-shadow: 0 0 0 4px var(--bg-2); }
 .bp-dot-mark > span { transform: rotate(-45deg); font: 600 13px/1 var(--font-head); }
-.bp-dot.is-epilogue .bp-dot-mark { width: 22px; height: 22px; border-radius: 50%; transform: none; background: var(--surface-3); }
+.bp-dot.is-epilogue .bp-dot-mark { width: 22px; height: 22px; border-radius: 50%; transform: none; }
 .bp-dot.is-epilogue.is-on .bp-dot-mark { width: 32px; height: 32px; background: var(--text); color: var(--bg); }
 .bp-dot.is-epilogue .i { font-size: 11px; }
 .bp-dot.is-epilogue.is-on .i { font-size: 14px; }
-.bp-dot.has-acct::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--red); }
+.bp-mark { position: absolute; bottom: calc(48px + var(--lv, 0) * 26px); z-index: 0; display: grid; place-items: center; width: 22px; height: 22px; margin-left: -11px; padding: 0; border: 2px solid var(--text-2); border-radius: 50%; background: var(--surface-3); cursor: pointer; transition: border-color .15s var(--ease); }
+.bp-mark::after { content: ""; position: absolute; left: 50%; top: 100%; z-index: -1; width: 2px; height: calc(26px + var(--lv, 0) * 26px); margin-left: -1px; background: var(--text-3); }
+.bp-mark:hover { z-index: 3; border-color: var(--text); }
+.bp-mark .emblem { width: 100%; height: 100%; overflow: hidden; border-radius: 50%; font-size: 8px; }
 @container (max-width: 520px) {
-  .bp-arrow { width: 28px; height: 28px; }
+  .bp-arrow { width: 28px; height: 28px; margin-bottom: 8px; }
   .bp-dot-mark { width: 9px; height: 9px; }
   .bp-dot.is-on .bp-dot-mark { width: 24px; height: 24px; }
   .bp-dot.is-epilogue .bp-dot-mark { width: 18px; height: 18px; }
