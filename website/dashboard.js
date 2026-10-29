@@ -2002,7 +2002,7 @@
       }
       const sk = loadoutColumnsEl(null);
       sk.appendChild(h("div", { class: "lo-col lo-side" },
-        h("h3", { class: "lo-h", text: "Player card" }), h("div", { class: "lo-card sk" }),
+        h("h3", { class: "lo-h", text: "Player card" }), h("div", { class: "lo-card-wrap" }, h("div", { class: "lo-card sk" })),
         h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }), h("div", { class: "lo-wheel sk" })));
       box.appendChild(h("div", { class: "lo-wrap" }, sk));
       return;
@@ -2015,10 +2015,13 @@
     const screen = loadoutColumnsEl(byWeapon);
 
     // Last column: player card and the expressions wheel. As in the game, the player's
-    // name and title sit on the card itself. The account level is shown elsewhere.
+    // name and title sit over the card. They are beside the card in a wrapper, not inside it,
+    // because the card clips and fades its art and the name row sticks out past its edges.
+    // The account level is shown elsewhere.
     const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
-    const card = h("div", { class: "lo-card", title: lo.card ? lo.card.name || "" : "" },
-      cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" }),
+    const card = h("div", { class: "lo-card-wrap" },
+      h("div", { class: "lo-card", title: lo.card ? lo.card.name || "" : "" },
+        cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" })),
       h("div", { class: "lo-card-name" }, h("b", { text: String(a.name || acctName(a)).replace(/#.*$/, "") }),
         lo.title ? h("span", {}, h("i", { text: titleName(lo.title.name) })) : null));
     const side = h("div", { class: "lo-col lo-side" },
