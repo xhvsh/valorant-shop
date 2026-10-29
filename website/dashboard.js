@@ -2160,31 +2160,37 @@
     // tiles keep their size and place from page to page.
     const cols = Math.max(...pass.chapters.map((c) => c.levels.length));
     const freeCols = Math.max(...pass.chapters.map((c) => c.free.length));
-    const stage = h("div", { class: "bp-stage-in", style: `--n:${cols};--k:${freeCols};grid-template-columns:repeat(${cols}, minmax(0, 1fr))${freeCols ? ` 10px repeat(${freeCols}, minmax(0, 1fr))` : ""}` },
+    // Columns are as wide as they would be on the fullest page and the used ones are centred,
+    // so a chapter with fewer free rewards (or none) sits in the middle of the box.
+    const used = ch.free.length;
+    const stage = h("div", { class: "bp-stage-in", style: `--s:${cols + freeCols};grid-template-columns:repeat(${cols}, var(--t))${used ? ` 10px repeat(${used}, var(--t))` : ""}` },
       h("span", { class: "bp-col-label", style: `grid-column:1 / span ${cols}`, text: "Premium rewards" }),
-      ch.free.length ? h("span", { class: "bp-col-label is-free", style: `grid-column:${cols + 2} / span ${freeCols}`, text: "Free rewards" }) : null,
-      ch.free.length ? h("span", { class: "bp-sep", style: `grid-column:${cols + 1}`, "aria-hidden": "true" }) : null);
+      used ? h("span", { class: "bp-col-label is-free", style: `grid-column:${cols + 2} / span ${used}`, text: "Free rewards" }) : null,
+      used ? h("span", { class: "bp-sep", style: `grid-column:${cols + 1}`, "aria-hidden": "true" }) : null);
     ch.levels.forEach((l, i) => stage.appendChild(bpTileEl(l.reward, { label: `Tier ${l.tier}`, col: i + 1, here: hereOn(l.tier) })));
     ch.free.forEach((r, i) => stage.appendChild(bpTileEl(r, { label: "Free", col: cols + 2 + i, here: [], free: true })));
 
     // The chapters as diamonds on a line, the open one large with its number. Every
-    // account is an avatar above the line where it is; avatars that would overlap go up a
-    // row. Clicking one opens its page.
+    // account is a small avatar above the line where it is; accounts close together share
+    // one spot as a row of overlapping avatars (the first few, then +N) with a short stem.
+    // Clicking an avatar opens its page.
     const count = pass.chapters.length;
     const marks = loaded.map((a) => ({ a, p: bpData(a), at: bpLineAt(pass, bpData(a)) })).sort((x, y) => x.at - y.at);
-    const lastAt = [-1, -1, -1];
-    let levels = 1;
     const track = h("div", { class: "bp-track", style: `--cnt:${count}` });
+    const groups = [];
     for (const m of marks) {
-      let lv = 0;
-      while (lv < lastAt.length - 1 && lastAt[lv] >= 0 && m.at - lastAt[lv] < 0.035) lv++;
-      lastAt[lv] = m.at;
-      levels = Math.max(levels, lv + 1);
-      track.appendChild(h("button", { class: "bp-mark", type: "button", style: `left:${(m.at * 100).toFixed(2)}%;--lv:${lv}`,
-        title: `${acctName(m.a)}: tier ${m.p.tier} of ${m.p.totalTiers}`, "aria-label": `${acctName(m.a)}, tier ${m.p.tier}`, onclick: () => onPage(bpPageOf(pass, m.p)) },
-      emblemEl(m.a, "xs")));
+      const g = groups[groups.length - 1];
+      if (g && m.at - g.from < 0.05) g.items.push(m);
+      else groups.push({ from: m.at, items: [m] });
     }
-    track.style.setProperty("--levels", String(levels));
+    for (const g of groups) {
+      const at = g.items.reduce((n, m) => n + m.at, 0) / g.items.length;
+      track.appendChild(h("div", { class: "bp-mark-group", style: `left:${(at * 100).toFixed(2)}%` },
+        ...g.items.slice(0, 4).map((m) => h("button", { class: "bp-mark", type: "button",
+          title: `${acctName(m.a)}: tier ${m.p.tier} of ${m.p.totalTiers}`, "aria-label": `${acctName(m.a)}, tier ${m.p.tier}`, onclick: () => onPage(bpPageOf(pass, m.p)) },
+        emblemEl(m.a, "xs"))),
+        g.items.length > 4 ? h("span", { class: "bp-mark-more", title: g.items.slice(4).map((m) => acctName(m.a)).join(", "), text: `+${g.items.length - 4}` }) : null));
+    }
     pass.chapters.forEach((c, i) => {
       const on = i === bpPage;
       track.appendChild(h("button", {
