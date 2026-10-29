@@ -526,6 +526,21 @@ async function playerLoadout(shard, puuid, tokens) {
   throw err;
 }
 
+// Owned items of one type, including each copy's InstanceID (gun buddies are equipped
+// by instance). `typeId` is one of the item type UUIDs.
+async function accountEntitlementsOfType(shard, puuid, tokens, typeId) {
+  return pdFetch(`${PD_URLS.entitlements(shard, puuid)}/${typeId}`, tokens);
+}
+
+// Writes the whole loadout back. Riot expects the full object as read, with only the
+// changed fields edited; it uses the same path version that the last read worked on.
+async function setPlayerLoadout(shard, puuid, tokens, body) {
+  const base = `https://pd.${shard}.a.pvp.net/personalization`;
+  const versions = ['v3/players/%/playerloadout', 'v2/players/%/playerloadout', 'v2/players/%/loadout'];
+  const path = versions[loadoutPathIndex].replace('%', puuid);
+  return pdFetch(`${base}/${path}`, tokens, { method: 'PUT', body });
+}
+
 // Marks the night market offers as "seen" in-game. The storefront sometimes
 // omits BonusStore until this has been called. Body/shape undocumented -
 // failures are harmless and surfaced to callers for diagnostics.
@@ -820,6 +835,8 @@ module.exports = {
   contracts,
   accountEntitlements,
   playerLoadout,
+  accountEntitlementsOfType,
+  setPlayerLoadout,
   revealNightMarket,
   clientVersion,
   CLIENT_PLATFORM,

@@ -1,0 +1,101 @@
+/* Public loadout share page. Builds on the dashboard's tokens and buttons in styles.css. */
+body.ls { padding-bottom: 84px; }
+.ls-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px var(--pad);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.ls-top h1 { margin: 0; font: 600 20px/1 var(--font-head); letter-spacing: .04em; text-transform: uppercase; }
+.ls-timer { font: 500 13px/1 var(--font-mono); color: var(--text-2); }
+.ls-timer.is-low { color: var(--amber); }
+.ls-main { max-width: 1180px; margin: 0 auto; padding: var(--pad); display: grid; gap: 22px; }
+.ls-note {
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+}
+.ls-note b { color: var(--text); }
+.ls-end { text-align: center; padding: 48px 16px; }
+.ls-end h2 { margin: 0 0 8px; font: 600 22px/1.1 var(--font-head); text-transform: uppercase; letter-spacing: .04em; }
+.ls-sec h2 { margin: 0 0 10px; font: 600 14px/1 var(--font-head); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+
+.ls-guns { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.ls-gun {
+  position: relative;
+  display: grid;
+  grid-template-rows: 64px auto;
+  gap: 4px;
+  padding: 8px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+}
+.ls-gun:hover { background: var(--surface-2); }
+.ls-gun.is-sel { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-soft); }
+.ls-gun.is-changed::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.ls-gun-art { display: grid; place-items: center; overflow: hidden; }
+.ls-gun-art img { max-height: 64px; width: auto; object-fit: contain; }
+.ls-gun-name { font: 600 12px/1.2 var(--font); }
+.ls-gun-skin { display: block; color: var(--text-3); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-gun-buddy { position: absolute; right: 6px; bottom: 30px; width: 26px; height: 26px; }
+.ls-gun-buddy img { width: 100%; height: 100%; object-fit: contain; }
+
+.ls-edit { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); padding: 14px; display: grid; gap: 14px; }
+.ls-edit h3 { margin: 0; font: 600 16px/1 var(--font-head); letter-spacing: .04em; text-transform: uppercase; }
+.ls-tabs { display: flex; gap: 6px; }
+.ls-search { max-width: 320px; }
+.ls-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.ls-tile {
+  display: grid;
+  grid-template-rows: 56px auto;
+  gap: 4px;
+  padding: 6px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+}
+.ls-tile:hover { background: var(--surface-3); }
+.ls-tile.is-sel { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-soft); }
+.ls-tile .art { display: grid; place-items: center; overflow: hidden; }
+.ls-tile .art img { max-height: 56px; width: auto; object-fit: contain; }
+.ls-tile .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-tile .tag { color: var(--text-3); font-size: 11px; }
+.ls-tile.cardish { grid-template-rows: 78px auto; }
+.ls-tile.cardish .art img { max-height: 78px; }
+.ls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ls-row .lbl { color: var(--text-3); font-size: 12px; margin-right: 4px; }
+.ls-sw { width: 34px; height: 34px; padding: 3px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2); }
+.ls-sw img { width: 100%; height: 100%; object-fit: contain; }
+.ls-sw.is-sel { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-soft); }
+.ls-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.ls-slots label { display: grid; gap: 4px; color: var(--text-3); font-size: 12px; }
+.ls select { height: 36px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2); color: var(--text); }
+.ls-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--pad);
+  border-top: 1px solid var(--line-2);
+  background: var(--bg-2);
+}
+.ls-bar-msg { flex: 1; color: var(--text-2); font-size: 13px; }
+.ls-bar-msg.is-error { color: var(--red-2); }
+.ls-bar-msg.is-ok { color: var(--green); }

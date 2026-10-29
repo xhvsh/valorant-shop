@@ -18,6 +18,7 @@ const riot = require('./src/riot');
 const items = require('./src/items');
 const storage = require('./src/storage');
 const shop = require('./src/shop');
+const loadshare = require('./src/loadshare');
 const PackageStore = require('./src/session');
 const { verifyRequest } = require('./src/discord/verify');
 const { buildNotice, EPHEMERAL, buildShopMessage, buildAccessoryMessage, buildNightMarketMessage, buildBundleMessage, bundleAccentColor, buildRankMessage, buildCollectionMessage, collectionColumns, bundleComponents, dailyFooter, alertFooter } = require('./src/discord/embeds');
@@ -205,6 +206,13 @@ function renderIndexHtml(mountPath) {
 app.get(['/', '/index.html', '/wishlist', '/bundles', '/battlepass', '/settings', '/a/:puuid', '/a/:puuid/:tab'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store, must-revalidate');
   res.type('html').send(renderIndexHtml(res.locals.mountPath || ''));
+});
+// Loadout share page. Its asset links are relative, so it works at / and under the mount.
+app.get('/loadout-share', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.sendFile(path.join(__dirname, 'website', 'loadshare.html'));
 });
 // Disclaimer page. Its asset links are relative, so it works at / and under the mount.
 app.get('/legal', (req, res) => {
@@ -580,6 +588,83 @@ app.get('/api/accounts/:puuid/loadout', requireDiscord, async (req, res, next) =
       return res.json({ ok: false, status: 'error', error: result.error || 'Could not load the loadout.' });
     }
     res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), loadout: result.loadout });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Loadout share links ------------------------------------------------------------
+// Owner side (Discord session): make, inspect and revoke the one live link of an account
+// the user owns. A link opens a page where anyone holding it can change the loadout once.
+async function ownedAccountOr404(discordId, puuid) {
+  const access = await accountAccessFor(discordId, String(puuid || ''));
+  if (!access || access.shared) throw httpError('Unknown account.', 404);
+}
+
+app.get('/api/accounts/:puuid/loadshare', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    await ownedAccountOr404(discordId, req.params.puuid);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, ...(await loadshare.linkStatus(discordId, req.params.puuid)) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/accounts/:puuid/loadshare', express.json(), requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    rateLimit(`${discordId}:loadshare`, 10, 60000);
+    await ownedAccountOr404(discordId, req.params.puuid);
+    const link = await loadshare.createLink(discordId, req.params.puuid, { cosmetics: Boolean(req.body && req.body.cosmetics) });
+    res.setHeader('Cache-Control', 'no-store');
+    // The token is shown once, here. Only its hash is stored.
+    res.json({ ok: true, url: `${publicOrigin(req)}${req.mountPath || ''}/loadout-share#${link.token}`, expiresAt: link.expiresAt, cosmetics: link.cosmetics });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete('/api/accounts/:puuid/loadshare', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    await ownedAccountOr404(discordId, req.params.puuid);
+    await loadshare.revokeLink(discordId, req.params.puuid);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Visitor side (no account). The link travels in a header from the page, never in a URL
+// the server sees, and every response is uncacheable and unindexed.
+function shareHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+}
+function shareIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim() || 'unknown';
+}
+
+app.get('/api/loadshare/view', async (req, res, next) => {
+  try {
+    shareHeaders(res);
+    rateLimit(`${shareIp(req)}:loadshare-view`, 30, 60000);
+    const out = await loadshare.viewLink(req.get('x-share-token'));
+    res.json({ ok: true, ...out });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/loadshare/save', express.json({ limit: '200kb' }), async (req, res, next) => {
+  try {
+    shareHeaders(res);
+    rateLimit(`${shareIp(req)}:loadshare-save`, 10, 60000);
+    const out = await loadshare.saveLink(req.get('x-share-token'), req.body || {});
+    res.json({ ok: true, ...out });
   } catch (err) {
     next(err);
   }

@@ -906,6 +906,35 @@ async function accountLoadout(discordId, puuid) {
   }
 }
 
+// Fresh Riot tokens for an account, for features that act for the owner (loadout share
+// links). Returns { status: 'unlinked' | 'relink' | 'error' | 'ok', account, shard?, tokens? }.
+async function accountTokens(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  let auth;
+  try {
+    auth = storage.decrypt(account.auth_encrypted);
+  } catch {
+    return { status: 'relink', account };
+  }
+  try {
+    const token = await ensureAccessToken(discordId, account.puuid, auth);
+    const entitlement = await entitlementFor(token.access_token);
+    return { status: 'ok', account, shard: account.shard || 'na', tokens: { ...token, entitlement } };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
+// Forget the cached loadout and collection after the loadout was changed.
+async function dropLoadoutCaches(discordId, puuid) {
+  await Promise.all([
+    storage.kvDel(`loadout:v2:${discordId}:${puuid}`),
+    storage.kvDel(`acctdetails:v12:${discordId}:${puuid}`),
+  ]).catch(() => {});
+}
+
 // ---- Battle pass progress -----------------------------------------------------
 // Where an account is on the current act's battle pass. The tier comes straight from
 // the contracts call; the premium track counts as bought when the account owns the
@@ -1000,4 +1029,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountBattlepass, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountTokens, dropLoadoutCaches, accountBattlepass, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

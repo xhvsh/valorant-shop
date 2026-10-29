@@ -1988,6 +1988,82 @@
     return wheel;
   }
 
+  // The owner's side of a loadout link: make one (shown once), see whether one is live,
+  // revoke it. The link itself is never stored in readable form, so it cannot be shown again.
+  const shareUi = Object.create(null);
+
+  function rerenderLoadoutTab(puuid) {
+    if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "loadout") renderPanel();
+  }
+
+  function loadShareEl(a) {
+    const st = shareUi[a.puuid] || (shareUi[a.puuid] = { cosmetics: false });
+    const enc = encodeURIComponent(a.puuid);
+    if (!st.loaded && !st.loading) {
+      st.loading = true;
+      api(`/api/accounts/${enc}/loadshare`)
+        .then((r) => { st.status = r; })
+        .catch(() => {})
+        .finally(() => { st.loading = false; st.loaded = true; rerenderLoadoutTab(a.puuid); });
+    }
+    const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const live = st.url ? { expiresAt: st.expiresAt } : st.status && st.status.active ? st.status : null;
+
+    async function create() {
+      st.busy = true;
+      rerenderLoadoutTab(a.puuid);
+      try {
+        const r = await api(`/api/accounts/${enc}/loadshare`, { method: "POST", json: { cosmetics: st.cosmetics } });
+        st.url = r.url;
+        st.expiresAt = r.expiresAt;
+        st.status = { active: true, expiresAt: r.expiresAt, cosmetics: r.cosmetics };
+      } catch (err) {
+        toast(err.message, "error");
+      }
+      st.busy = false;
+      rerenderLoadoutTab(a.puuid);
+    }
+    async function revoke() {
+      st.busy = true;
+      rerenderLoadoutTab(a.puuid);
+      try {
+        await api(`/api/accounts/${enc}/loadshare`, { method: "DELETE" });
+        st.url = null;
+        st.status = { active: false };
+      } catch (err) {
+        toast(err.message, "error");
+      }
+      st.busy = false;
+      rerenderLoadoutTab(a.puuid);
+    }
+
+    const kids = [
+      h("h3", { text: "Share this loadout" }),
+      h("p", { class: "muted", text: "Anyone with the link can change this account's skins and gun buddies, with no sign-in. They can only equip what this account owns. The link works for one save and ends after 30 minutes." }),
+      h("p", { class: "lo-share-warn", text: "Only share it with people you trust. They will see which skins and buddies this account owns." }),
+    ];
+    if (!live) {
+      kids.push(
+        h("label", { class: "lo-share-opt" },
+          h("input", { type: "checkbox", checked: st.cosmetics, onchange: (e) => { st.cosmetics = e.target.checked; } }),
+          h("span", { text: "Also let them change the player card, title, sprays and flexes" })),
+        h("div", { class: "lo-share-row" }, h("button", { class: "btn sm", type: "button", disabled: st.busy, onclick: create }, "Create link")));
+      if (st.status && st.status.used) kids.push(h("p", { class: "faint", text: "The last link was used." }));
+    } else {
+      if (st.url) {
+        const field = h("input", { class: "input", type: "text", readonly: true, value: st.url, "aria-label": "Share link" });
+        kids.push(h("div", { class: "lo-share-row" }, field,
+          h("button", { class: "btn sm", type: "button", onclick: () => copyText(st.url, "Link copied") }, iconEl("copy"), "Copy")));
+      } else {
+        kids.push(h("p", { class: "muted", text: "A link is active. It cannot be shown again; create a new one to replace it." }));
+      }
+      kids.push(h("div", { class: "lo-share-row" },
+        h("span", { class: "faint", text: `Works once, until ${time(live.expiresAt)}${st.status && st.status.cosmetics ? " · cosmetics allowed" : ""}` }),
+        h("button", { class: "btn btn-danger sm", type: "button", disabled: st.busy, onclick: revoke }, "Revoke")));
+    }
+    return h("div", { class: "lo-share" }, ...kids);
+  }
+
   function renderLoadoutPanel(box, a) {
     const head = h("div", { class: "panel-head" }, h("h2", { text: "Loadout" }));
     box.appendChild(head);
@@ -2009,6 +2085,7 @@
     }
 
     head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
+    if (!a.shared) box.appendChild(loadShareEl(a));
 
     const byWeapon = new Map();
     for (const g of lo.guns || []) if (g.weapon) byWeapon.set(g.weapon, g);

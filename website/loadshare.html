@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Shared loadout</title>
+  <link rel="icon" href="valorant-v.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css?v=276" />
+  <link rel="stylesheet" href="loadshare.css?v=1" />
+</head>
+<body class="ls">
+  <header class="ls-top">
+    <h1>Shared loadout</h1>
+    <span class="ls-timer" id="timer" hidden></span>
+  </header>
+  <main class="ls-main" id="app">
+    <p class="muted" id="status">Loading the loadout...</p>
+  </main>
+  <footer class="ls-bar" id="bar" hidden>
+    <span class="ls-bar-msg" id="barMsg"></span>
+    <button class="btn btn-ghost" id="resetBtn" type="button">Reset</button>
+    <button class="btn" id="saveBtn" type="button" disabled>Save</button>
+  </footer>
+  <script src="loadshare.js?v=1"></script>
+</body>
+</html>
