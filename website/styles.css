@@ -1385,6 +1385,8 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-col-label { grid-row: 1; color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .bp-col-label.is-free { color: var(--green); }
 .bp-sep { grid-row: 2; align-self: center; justify-self: center; width: 8px; height: 8px; transform: rotate(45deg); background: var(--text-3); }
+.bp-tile.is-previewable { cursor: pointer; }
+.bp-tile.is-previewable:hover .bp-art { border-color: var(--text-3); }
 .bp-tile { grid-row: 2; display: grid; grid-template-rows: auto auto; min-width: 0; }
 .bp-art { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; padding: 15%; border: 1px solid var(--line-2); background: radial-gradient(90% 90% at 50% 40%, rgba(255, 255, 255, .06), transparent 70%), var(--surface); }
 .bp-art img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .5)); }
@@ -1412,7 +1414,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-arrow:disabled { opacity: .35; cursor: default; }
 .bp-arrow .i { font-size: 16px; }
 .bp-track { position: relative; display: flex; padding-top: 32px; }
-.bp-track::before { content: ""; position: absolute; left: 0; right: 0; bottom: 21px; height: 2px; background: var(--line-2); }
+.bp-track::before { content: ""; position: absolute; left: calc(50% / var(--cnt, 11)); right: calc(50% / var(--cnt, 11)); bottom: 21px; height: 2px; background: var(--line-2); }
 .bp-dot { position: relative; z-index: 1; display: grid; flex: 1 1 0; place-items: center; min-width: 0; height: 44px; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
 .bp-dot-mark { display: grid; place-items: center; width: 11px; height: 11px; border: 2px solid var(--text-3); background: var(--bg-2); transform: rotate(45deg); transition: border-color .15s var(--ease); }
 .bp-dot:hover .bp-dot-mark { border-color: var(--text); }
@@ -1424,7 +1426,8 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-dot.is-epilogue.is-on .i { font-size: 14px; }
 .bp-mark-group { position: absolute; bottom: 45px; z-index: 2; display: flex; align-items: center; transform: translateX(-50%); }
 .bp-mark-group::after { content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 4px; margin-left: -1px; background: var(--text-3); }
-.bp-mark { position: relative; display: grid; place-items: center; width: 20px; height: 20px; margin-right: -6px; padding: 0; border: 2px solid var(--bg-2); border-radius: 50%; background: var(--surface-3); box-shadow: 0 0 0 1px var(--text-3); cursor: pointer; transition: box-shadow .15s var(--ease), transform .15s var(--ease); }
+.bp-mark + .bp-mark { margin-left: -6px; }
+.bp-mark { position: relative; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 2px solid var(--bg-2); border-radius: 50%; background: var(--surface-3); box-shadow: 0 0 0 1px var(--text-3); cursor: pointer; transition: box-shadow .15s var(--ease), transform .15s var(--ease); }
 .bp-mark:hover { z-index: 3; transform: translateY(-2px); box-shadow: 0 0 0 1px var(--text); }
 .bp-mark .emblem { width: 100%; height: 100%; overflow: hidden; border-radius: 50%; font-size: 7px; }
 .bp-mark-more { margin-left: 9px; color: var(--text-2); font-size: 10px; font-weight: 600; }

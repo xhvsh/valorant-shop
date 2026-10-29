@@ -931,12 +931,23 @@ async function battlepassTrack() {
     // each gun buddy, and shows them that way.
     if (kind === 'currency') {
       const c = currency.get(r.id);
-      const name = c ? c.name : 'Currency';
-      return { kind, name, icon: c ? c.icon : null, amount: /radianite/i.test(name) ? 10 : r.amount };
+      const radianite = c && /radianite/i.test(c.name);
+      return { kind, name: radianite ? '10 Radianite Points' : c ? c.name : 'Currency', icon: c ? c.icon : null, amount: radianite ? 10 : r.amount };
     }
     const found = resolve(r.id);
     const icon = found.type === 'card' && found.art ? found.art.small || found.icon : found.icon;
-    return { kind, name: found.name, icon: icon || null, amount: kind === 'buddy' ? 2 : r.amount };
+    // id, type, tier, weapon and art are what the item preview needs (skins and player cards).
+    return {
+      kind,
+      id: found.id,
+      type: found.type,
+      name: found.name,
+      icon: icon || null,
+      tier: found.tier || null,
+      weapon: found.weapon || null,
+      art: found.art || null,
+      amount: kind === 'buddy' ? 2 : r.amount,
+    };
   };
   const track = {
     act: pass.act,

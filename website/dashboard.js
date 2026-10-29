@@ -2107,15 +2107,12 @@
     return i < 0 ? 0 : i;
   }
 
-  // Where an account is on the chapter line, 0 to 1. Each chapter owns an equal stretch
-  // with its diamond in the middle, so an account half way through a chapter is on it.
+  // Where an account is on the chapter line, 0 to 1: the middle of the diamond of the
+  // chapter it is working on (the last one once it has finished the pass). Accounts in the
+  // same chapter share that spot.
   function bpLineAt(pass, p) {
-    const total = bpTotal(pass);
-    if (p.tier >= total) return 1;
-    const i = bpPageOf(pass, p);
-    const ch = pass.chapters[i];
-    const f = Math.max(0, Math.min(1, (bpPos(p) - (ch.levels[0].tier - 1)) / ch.levels.length));
-    return (i + f) / pass.chapters.length;
+    const i = p.tier >= bpTotal(pass) ? pass.chapters.length - 1 : bpPageOf(pass, p);
+    return (i + 0.5) / pass.chapters.length;
   }
 
   // The last page is the Epilogue, not a numbered chapter.
@@ -2142,9 +2139,12 @@
     }
     const tip = [r ? `${r.name}${r.amount > 1 ? ` x${fmt(r.amount)}` : ""} (${BP_KINDS[r.kind] || r.kind})` : o.label];
     if (o.here.length) tip.push(`Working on it: ${o.here.map(acctName).join(", ")}`);
-    return h("div", { class: `bp-tile${o.free ? " is-free" : ""}`, style: `grid-column:${o.col}`, title: tip.join("\n") },
+    const tile = h("div", { class: `bp-tile${o.free ? " is-free" : ""}`, style: `grid-column:${o.col}`, title: tip.join("\n") },
       art,
       h("span", { class: "bp-foot" }, h("b", { text: o.label }), h("span", { text: r ? r.name : "" })));
+    // Skins and player cards open the same preview as everywhere else.
+    if (r && canPreview(r)) previewTrigger(tile, r);
+    return tile;
   }
 
   function bpViewEl(pass, accts, onPage) {
@@ -2202,7 +2202,8 @@
         onclick: () => onPage(i),
       }, h("span", { class: "bp-dot-mark" }, c.epilogue ? iconEl("star") : on ? h("span", { text: String(i + 1) }) : null)));
     });
-    const arrow = (delta) => h("button", { class: "bp-arrow", type: "button", "aria-label": delta < 0 ? "Previous chapter" : "Next chapter", disabled: bpPage + delta < 0 || bpPage + delta >= count, onclick: () => onPage(bpPage + delta) },
+    // The arrows loop: next from the Epilogue is chapter 1, previous from chapter 1 the Epilogue.
+    const arrow = (delta) => h("button", { class: "bp-arrow", type: "button", "aria-label": delta < 0 ? "Previous chapter" : "Next chapter", onclick: () => onPage((bpPage + delta + count) % count) },
       iconEl(delta < 0 ? "chevron-left" : "chevron-right"));
 
     const head = h("div", { class: "bp-view-title" }, h("b", { text: bpChapterName(ch, bpPage) }), h("span", { text: `Tiers ${first} to ${last}` }));
