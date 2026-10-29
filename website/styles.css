@@ -1375,7 +1375,14 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-edge .emblem { width: 20px; height: 20px; border-radius: 50%; }
 .bp-edge:hover { color: var(--text); border-color: var(--text-3); }
 .bp-stage { overflow-x: auto; padding-bottom: 4px; }
-.bp-stage-in { display: grid; gap: 10px; min-width: calc(var(--n, 5) * 104px); }
+.bp-stage-in { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 16px; min-width: calc(var(--n, 5) * 104px); }
+.bp-stage-in.has-free { grid-template-columns: minmax(0, 1fr) 148px; min-width: calc(var(--n, 5) * 104px + 164px); }
+.bp-stage-in > .bp-rail { grid-column: 1; grid-row: 1; }
+.bp-stage-in > .bp-col { grid-column: 1; grid-row: 2; }
+.bp-stage-in > .bp-col.is-free { grid-column: 2; }
+.bp-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bp-col-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.bp-col .bp-tiles, .bp-free-tiles { flex: 1; }
 .bp-rail { --levels: 1; position: relative; height: calc(8px + var(--levels) * 30px); }
 .bp-rail::before { content: ""; position: absolute; left: 0; right: 0; bottom: 3px; height: 2px; background: var(--line-2); }
 .bp-node { position: absolute; bottom: 0; width: 8px; height: 8px; margin-left: -4px; border: 2px solid var(--line-2); border-radius: 50%; background: var(--bg); }
@@ -1383,7 +1390,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-rail .bp-pin::after { top: 100%; height: calc(var(--lv, 0) * 30px + 4px); }
 .bp-tiles { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 10px; }
 .bp-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 6px; min-width: 0; padding: 12px 8px 12px; border: 1px solid var(--line); border-bottom: 2px solid var(--line-2); border-radius: var(--r-lg); background: radial-gradient(110% 80% at 50% 105%, rgba(255, 255, 255, .05), transparent 70%), var(--surface); }
-.bp-tier { justify-self: start; color: var(--text-3); font: 600 12px/1 var(--font-mono); }
+.bp-tier { justify-self: stretch; padding-top: 2px; border-top: 2px solid var(--line-2); color: var(--text-2); font: 600 11px/1.4 var(--font); letter-spacing: .08em; text-align: center; text-transform: uppercase; }
 .bp-reward { position: relative; display: inline-grid; flex: none; place-items: center; width: 100%; height: 96px; }
 .bp-reward img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .5)); }
 .bp-reward.sm { width: 34px; height: 34px; }
@@ -1391,9 +1398,10 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-reward-kind { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .bp-name { max-width: 100%; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .bp-kind { color: var(--text-3); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
-.bp-free { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 10px 14px; border: 1px dashed var(--line-2); border-radius: var(--r-lg); }
-.bp-free-label { color: var(--green); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.bp-free-item { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px; }
+.bp-free-tiles { display: grid; grid-template-rows: repeat(var(--k, 1), minmax(0, 1fr)); gap: 10px; }
+.bp-col.is-free .bp-col-label { color: var(--green); }
+.bp-tile.is-free { grid-template-rows: minmax(0, 1fr) auto auto; align-content: stretch; padding: 8px 8px 10px; border-bottom-color: rgba(70, 211, 154, .45); }
+.bp-tile.is-free .bp-reward { height: 100%; min-height: 48px; }
 
 /* The accounts, one compact card each. */
 .bp-accts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }

@@ -2121,6 +2121,9 @@
     return pin;
   }
 
+  // The last page is the Epilogue, not a numbered chapter.
+  const bpChapterName = (ch, i) => (ch.epilogue ? "Epilogue" : `Chapter ${i + 1}`);
+
   // The whole pass on one line, split into its pages. Pins that would overlap are lifted
   // onto a second or third level.
   function bpOverviewEl(pass, accts, onPage) {
@@ -2142,7 +2145,7 @@
     const segs = h("div", { class: "bp-segs" });
     pass.chapters.forEach((ch, i) => {
       segs.appendChild(h("button", { class: `bp-seg${i === bpPage ? " is-on" : ""}`, type: "button", title: `Tiers ${ch.levels[0].tier} to ${ch.levels[ch.levels.length - 1].tier}`, onclick: () => onPage(i) },
-        h("span", { text: String(i + 1) })));
+        ch.epilogue ? iconEl("star") : h("span", { text: String(i + 1) })));
     });
     wrap.appendChild(segs);
     return wrap;
@@ -2180,17 +2183,26 @@
     rail.style.setProperty("--levels", String(rail.querySelector(".bp-pin") ? levels : 0));
     inner.appendChild(rail);
 
+    // As in the game: the premium tiles in a row, the chapter's free rewards in their own
+    // column to the right.
+    const kindLabel = (r) => (r.kind === "buddy" ? "Gun buddy" : r.kind === "other" ? "Flex" : r.kind);
     const tiles = h("div", { class: "bp-tiles" });
     for (const l of ch.levels) {
       tiles.appendChild(h("div", { class: "bp-tile" },
-        h("span", { class: "bp-tier", text: String(l.tier) }),
+        h("span", { class: "bp-tier", text: `Tier ${l.tier}` }),
         bpRewardEl(l.reward),
         h("span", { class: "bp-name", text: l.reward ? l.reward.name : "" }),
-        l.reward ? h("span", { class: "bp-kind", text: l.reward.kind === "buddy" ? "Gun buddy" : l.reward.kind === "other" ? "Flex" : l.reward.kind }) : null));
+        l.reward ? h("span", { class: "bp-kind", text: kindLabel(l.reward) }) : null));
     }
-    inner.appendChild(tiles);
+    inner.appendChild(h("div", { class: "bp-col" }, h("span", { class: "bp-col-label", text: "Premium Rewards" }), tiles));
     if (ch.free.length) {
-      inner.appendChild(h("div", { class: "bp-free" }, h("span", { class: "bp-free-label", text: "Free" }), ...ch.free.map((r) => h("span", { class: "bp-free-item", title: r.name }, bpRewardEl(r, "sm"), h("span", { text: r.name })))));
+      inner.classList.add("has-free");
+      const free = h("div", { class: "bp-free-tiles", style: `--k:${ch.free.length}` });
+      for (const r of ch.free) {
+        free.appendChild(h("div", { class: "bp-tile is-free", title: r.name }, bpRewardEl(r),
+          h("span", { class: "bp-name", text: r.name }), h("span", { class: "bp-kind", text: kindLabel(r) })));
+      }
+      inner.appendChild(h("div", { class: "bp-col is-free" }, h("span", { class: "bp-col-label", text: "Free Rewards" }), free));
     }
     stage.appendChild(inner);
 
@@ -2206,7 +2218,7 @@
 
     const nav = (delta) => h("button", { class: "icon-btn", type: "button", "aria-label": delta < 0 ? "Previous page" : "Next page", disabled: bpPage + delta < 0 || bpPage + delta >= pass.chapters.length, onclick: () => onPage(bpPage + delta) }, iconEl(delta < 0 ? "chevron-left" : "chevron-right"));
     const head = h("div", { class: "bp-page-head" }, nav(-1),
-      h("div", { class: "bp-page-title" }, h("b", { text: `Chapter ${bpPage + 1}` }), h("span", { text: `Tiers ${first} to ${ch.levels[n - 1].tier}` })),
+      h("div", { class: "bp-page-title" }, h("b", { text: bpChapterName(ch, bpPage) }), h("span", { text: `Tiers ${first} to ${ch.levels[n - 1].tier}` })),
       nav(1));
     return h("div", { class: "bp-page" }, head, h("div", { class: "bp-edges" }, edge(behind, "left"), edge(ahead, "right")), stage);
   }

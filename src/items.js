@@ -862,7 +862,7 @@ async function currencies() {
 // contract whose relationUuid is the act). Kept in the database like the rank tiers, so a
 // request reads that copy and valorant-api is only asked when it is older than TTL or the
 // act it describes has ended.
-const BP_KEY = 'catalog:battlepass:v1';
+const BP_KEY = 'catalog:battlepass:v2';
 let bpPass = null;
 let bpFailedAt = 0;
 
@@ -889,6 +889,7 @@ async function battlepassRefresh() {
             id: contract.uuid,
             premiumVP: contract.content.premiumVPCost || null,
             chapters: (contract.content.chapters || []).map((ch) => ({
+              epilogue: Boolean(ch.isEpilogue),
               levels: (ch.levels || []).map((l) => ({ xp: l.xp || 0, reward: l.reward ? reward(l.reward) : null })),
               free: (ch.freeRewards || []).map(reward),
             })),
@@ -926,13 +927,16 @@ async function battlepassTrack() {
   const show = (r) => {
     if (!r) return null;
     const kind = BP_KINDS[r.type] || 'other';
+    // The catalog lists every reward once, but the game hands out 10 Radianite Points and 2 of
+    // each gun buddy, and shows them that way.
     if (kind === 'currency') {
       const c = currency.get(r.id);
-      return { kind, name: c ? c.name : 'Currency', icon: c ? c.icon : null, amount: r.amount };
+      const name = c ? c.name : 'Currency';
+      return { kind, name, icon: c ? c.icon : null, amount: /radianite/i.test(name) ? 10 : r.amount };
     }
     const found = resolve(r.id);
     const icon = found.type === 'card' && found.art ? found.art.small || found.icon : found.icon;
-    return { kind, name: found.name, icon: icon || null, amount: r.amount };
+    return { kind, name: found.name, icon: icon || null, amount: kind === 'buddy' ? 2 : r.amount };
   };
   const track = {
     act: pass.act,
@@ -947,7 +951,7 @@ async function battlepassTrack() {
   let tier = 0;
   for (const ch of (pass.contract && pass.contract.chapters) || []) {
     const levels = ch.levels.map((l) => ({ tier: ++tier, xp: l.xp, reward: show(l.reward) }));
-    track.chapters.push({ levels, free: ch.free.map(show) });
+    track.chapters.push({ epilogue: ch.epilogue, levels, free: ch.free.map(show) });
   }
   return track;
 }
