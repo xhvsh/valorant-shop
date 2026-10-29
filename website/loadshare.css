@@ -14,7 +14,9 @@ body.ls { padding-bottom: 84px; }
 .ls-timer { font: 500 13px/1 var(--font-mono); color: var(--text-2); }
 .ls-timer.is-low { color: var(--amber); }
 .ls-main { max-width: 2000px; margin: 0 auto; padding: var(--pad); display: grid; gap: 18px; }
-.ls-wrap { width: 100%; }
+/* The loadout keeps its 1633:920 shape, so its width is capped to the height left under the
+   header and above the save bar: it fills the screen on a PC without scrolling. */
+.ls-wrap { width: min(100%, max(640px, calc((100dvh - 275px) * 1.775))); margin: 0 auto; }
 .ls-note {
   padding: 12px 14px;
   border: 1px solid var(--line-2);
