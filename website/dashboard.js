@@ -1884,11 +1884,13 @@
 
   // puuid -> { data, error, pending }. Fetched when the tab opens, kept for the session.
   const loadouts = Object.create(null);
-  const LOADOUT_CATEGORIES = [
-    ["Sidearm", "Sidearms"], ["SMG", "SMGs"], ["Shotgun", "Shotguns"], ["Rifle", "Rifles"],
-    ["Sniper", "Sniper rifles"], ["Heavy", "Heavy weapons"], ["Melee", "Melee"],
+  // The in-game loadout screen: five columns, weapons grouped as the game groups them.
+  const LOADOUT_COLUMNS = [
+    [["Sidearms", ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"]]],
+    [["SMGs", ["Stinger", "Spectre"]], ["Shotguns", ["Bucky", "Judge"]], ["Melee", ["Melee"]]],
+    [["Rifles", ["Bulldog", "Guardian", "Warden", "Phantom", "Vandal"]]],
+    [["Sniper rifles", ["Marshal", "Outlaw", "Operator"]], ["Machine guns", ["Ares", "Odin"]]],
   ];
-  const LOADOUT_WEAPON_ORDER = ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff", "Stinger", "Spectre", "Bucky", "Judge", "Bulldog", "Guardian", "Phantom", "Vandal", "Marshal", "Outlaw", "Operator", "Ares", "Odin", "Melee"];
 
   function fetchLoadout(puuid, force) {
     const box = loadouts[puuid] || (loadouts[puuid] = {});
@@ -1913,26 +1915,43 @@
       });
   }
 
-  function loadoutGunEl(g) {
-    const skin = g.skin || {};
-    const media = h("div", { class: "lo-gun-media" }, imgOrFallback(skin.render || skin.icon, skin.name));
-    const meta = h("div", { class: "lo-meta" });
-    if (skin.tierIcon) meta.appendChild(makeImg(skin.tierIcon, skin.tier || "", (img) => img.remove()));
-    if (skin.level && skin.levels > 1) meta.appendChild(h("span", { class: "chip", text: `Level ${skin.level}/${skin.levels}` }));
-    if (skin.variant) {
-      meta.appendChild(
-        h("span", { class: "chip" }, skin.swatch ? h("span", { class: "lo-swatch" }, makeImg(skin.swatch, "")) : null, `Variant ${skin.variant}`)
-      );
+  function loadoutGunEl(weapon, g) {
+    const skin = (g && g.skin) || {};
+    const random = Boolean(g && skin.random);
+    const tip = g ? (random ? `${weapon}: random favorite skin` : `${weapon}: ${skin.name || ""}`) : weapon;
+    const info = [];
+    if (g && !random) {
+      if (skin.level && skin.levels > 1) info.push(`Lv ${skin.level}/${skin.levels}`);
+      if (skin.variant) info.push(`Variant ${skin.variant}`);
     }
-    const buddy = g.buddy
-      ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null, h("span", { text: g.buddy.name || "Buddy" }))
-      : null;
-    return h("div", { class: "lo-gun" }, media,
-      h("div", { class: "lo-gun-info" },
-        h("span", { class: "lo-weapon", text: g.weapon || "" }),
-        h("b", { class: "lo-skin", text: skin.name || "Unknown" }),
-        meta.childNodes.length ? meta : null,
-        buddy));
+    const art = g ? skin.render || skin.icon : null;
+    const el = h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip },
+      h("div", { class: "lo-gun-art" }, art ? imgOrFallback(art, skin.name) : null),
+      h("div", { class: "lo-gun-foot" },
+        h("div", { class: "lo-gun-names" },
+          h("span", { class: "lo-weapon", text: weapon }),
+          g && !random ? h("span", { class: "lo-skin", text: skin.name || "" }) : random ? h("span", { class: "lo-skin", text: "Random favorite" }) : null,
+          info.length ? h("span", { class: "lo-info", text: info.join(" · ") }) : null)),
+      g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null,
+      g && skin.tierIcon && !random ? h("div", { class: "lo-tier" }, makeImg(skin.tierIcon, skin.tier || "", (img) => img.remove())) : null);
+    return el;
+  }
+
+  // Spray wheel: flex on top, sprays left, right and bottom, as in the game.
+  function loadoutWheelEl(lo) {
+    const sprays = lo.sprays || [];
+    const flex = (lo.flexes || [])[0] || null;
+    const slots = [
+      ["top", flex],
+      ["left", sprays[0] || null],
+      ["right", sprays[1] || null],
+      ["bottom", sprays[2] || null],
+    ];
+    const wheel = h("div", { class: "lo-wheel" }, h("span", { class: "lo-wheel-dot" }));
+    for (const [pos, x] of slots) {
+      wheel.appendChild(h("div", { class: `lo-slot ${pos}`, title: x ? x.name || "" : "" }, x ? imgOrFallback(x.icon || x.staticIcon, x.name) : null));
+    }
+    return wheel;
   }
 
   function renderLoadoutPanel(box, a) {
@@ -1947,58 +1966,50 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Try again")));
         return;
       }
-      box.appendChild(h("div", { class: "sk", style: "height:200px;border-radius:var(--r-lg)" }));
-      const sk = h("div", { class: "lo-guns", style: "margin-top:16px" });
-      for (let i = 0; i < 8; i++) sk.appendChild(h("div", { class: "lo-gun sk", style: "height:150px" }));
+      const sk = h("div", { class: "lo-screen" });
+      for (let c = 0; c < 5; c++) {
+        const col = h("div", { class: "lo-col" });
+        for (let i = 0; i < (c === 4 ? 2 : 4); i++) col.appendChild(h("div", { class: "lo-gun sk", style: c === 4 ? "aspect-ratio:1/1.6" : "" }));
+        sk.appendChild(col);
+      }
       box.appendChild(sk);
       return;
     }
 
     head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
 
-    // Identity: player card, title, level.
-    const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
-    const idCol = h("div", { class: "lo-id-text" },
-      h("span", { class: "lo-label", text: "Player card" }),
-      h("b", { text: lo.card ? lo.card.name : "None equipped" }),
-      h("span", { class: "lo-label", style: "margin-top:12px", text: "Title" }),
-      h("b", { text: lo.title ? titleName(lo.title.name) : "None equipped" }));
-    if (lo.level != null && !lo.levelHidden) idCol.append(h("span", { class: "lo-label", style: "margin-top:12px", text: "Account level" }), h("b", { text: String(lo.level) }));
-    else if (lo.levelHidden) idCol.append(h("span", { class: "lo-label", style: "margin-top:12px", text: "Account level" }), h("b", { text: "Hidden" }));
-    if (lo.incognito) idCol.append(h("span", { class: "chip", style: "margin-top:12px;align-self:flex-start", text: "Incognito" }));
-    box.appendChild(h("div", { class: "lo-id" }, cardArt ? h("div", { class: "lo-card" }, imgOrFallback(cardArt, lo.card && lo.card.name)) : null, idCol));
+    const byWeapon = new Map();
+    for (const g of lo.guns || []) if (g.weapon) byWeapon.set(g.weapon, g);
+    const known = new Set(LOADOUT_COLUMNS.flatMap((col) => col.flatMap(([, list]) => list)));
 
-    // Sprays and flexes.
-    const extras = [...(lo.sprays || []).map((x) => ({ ...x, kind: "Spray" })), ...(lo.flexes || []).map((x) => ({ ...x, kind: "Flex" }))];
-    if (extras.length) {
-      box.appendChild(h("h3", { class: "lo-h", text: "Sprays and flexes" }));
-      const tiles = h("div", { class: "tiles square" });
-      for (const x of extras) {
-        tiles.appendChild(h("div", { class: "tile", title: x.name || "" }, h("div", { class: "tile-media" }, imgOrFallback(x.icon || x.staticIcon, x.name)), h("div", { class: "tile-name", text: x.name || x.kind })));
+    const screen = h("div", { class: "lo-screen" });
+    LOADOUT_COLUMNS.forEach((groups, i) => {
+      const col = h("div", { class: "lo-col" });
+      groups.forEach(([label, weapons]) => {
+        col.appendChild(h("h3", { class: "lo-h", text: label }));
+        for (const w of weapons) col.appendChild(loadoutGunEl(w, byWeapon.get(w)));
+      });
+      // Anything the game added that is not listed above goes at the end of the rifles.
+      if (i === 2) {
+        for (const [w, g] of byWeapon) if (!known.has(w)) col.appendChild(loadoutGunEl(w, g));
       }
-      box.appendChild(tiles);
-    }
+      screen.appendChild(col);
+    });
 
-    // Weapons, grouped by category.
-    const guns = lo.guns || [];
-    if (!guns.length) {
-      box.appendChild(h("div", { class: "inline-msg", text: "Riot did not report any equipped weapons." }));
-      return;
-    }
-    const order = (g) => {
-      const i = LOADOUT_WEAPON_ORDER.indexOf(g.weapon);
-      return i === -1 ? 999 : i;
-    };
-    const groups = new Map(LOADOUT_CATEGORIES.map(([key, label]) => [key, { label, guns: [] }]));
-    const other = { label: "Other", guns: [] };
-    for (const g of guns) (groups.get(g.category) || other).guns.push(g);
-    for (const grp of [...groups.values(), other]) {
-      if (!grp.guns.length) continue;
-      box.appendChild(h("h3", { class: "lo-h", text: grp.label }));
-      const grid = h("div", { class: "lo-guns" });
-      for (const g of grp.guns.sort((x, y) => order(x) - order(y))) grid.appendChild(loadoutGunEl(g));
-      box.appendChild(grid);
-    }
+    // Last column: player card and the expressions wheel.
+    const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
+    const card = h("div", { class: "lo-card" },
+      cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" }),
+      lo.level != null && !lo.levelHidden ? h("span", { class: "lo-level", text: String(lo.level) }) : null);
+    const side = h("div", { class: "lo-col lo-side" },
+      h("h3", { class: "lo-h", text: "Player card" }),
+      card,
+      h("div", { class: "lo-card-name" }, h("b", { text: lo.card ? lo.card.name : "" }), lo.title ? h("span", { text: titleName(lo.title.name) }) : null,
+        lo.incognito ? h("span", { class: "chip", text: "Incognito" }) : null),
+      h("h3", { class: "lo-h", text: "Expressions" }),
+      loadoutWheelEl(lo));
+    screen.appendChild(side);
+    box.appendChild(screen);
   }
 
   /* ---------- alerts ---------- */

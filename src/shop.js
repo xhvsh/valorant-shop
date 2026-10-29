@@ -846,6 +846,7 @@ async function buildLoadout(raw) {
         variant: chromaIdx > 0 ? chromaIdx + 1 : null,
         level: levelIdx >= 0 ? levelIdx + 1 : null,
         levels: levels.length || null,
+        random: /random favorite/i.test(skin.name || ''),
       },
       buddy: charm && charm.type === 'buddy' ? { id: charm.id, name: charm.name, icon: charm.icon } : null,
     });

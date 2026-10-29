@@ -1337,29 +1337,46 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
-/* loadout page */
-.lo-id { display: flex; gap: 20px; align-items: center; margin-bottom: 8px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
-.lo-card { flex: none; width: 120px; border-radius: var(--r); overflow: hidden; background: var(--bg-2); }
-.lo-card img { display: block; width: 100%; height: auto; }
-.lo-id-text { display: flex; flex-direction: column; min-width: 0; }
-.lo-id-text b { font: 600 16px/1.3 var(--font-head); letter-spacing: .04em; overflow-wrap: anywhere; }
-.lo-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.lo-h { margin: 22px 0 10px; color: var(--text-2); font: 600 13px/1 var(--font-head); letter-spacing: .1em; text-transform: uppercase; }
-.lo-guns { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
-.lo-gun { display: grid; grid-template-rows: auto 1fr; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
-.lo-gun-media { display: flex; align-items: center; justify-content: center; height: 96px; padding: 10px; background: var(--bg-2); }
-.lo-gun-media img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.lo-gun-info { display: flex; flex-direction: column; gap: 4px; padding: 9px 11px 11px; min-width: 0; }
-.lo-weapon { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.lo-skin { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.lo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
-.lo-meta > img { width: 18px; height: 18px; object-fit: contain; }
-.lo-swatch { display: inline-flex; width: 12px; height: 12px; margin-right: 5px; border-radius: 50%; overflow: hidden; }
-.lo-swatch img { width: 100%; height: 100%; object-fit: cover; }
-.lo-buddy { display: flex; align-items: center; gap: 7px; margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text-2); font-size: 12px; min-width: 0; }
-.lo-buddy img { width: 24px; height: 24px; flex: none; object-fit: contain; }
-.lo-buddy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 719px) { .lo-card { width: 88px; } }
+/* loadout page: laid out like the in-game loadout screen */
+.lo-screen { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px; align-items: start; }
+.lo-col { display: grid; gap: 10px; min-width: 0; }
+.lo-h { margin: 10px 0 2px; text-align: center; font: 600 22px/1 var(--font-head); letter-spacing: .02em; text-transform: uppercase; }
+.lo-col > .lo-h:first-child { margin-top: 0; }
+.lo-col .lo-h:not(:first-child) { margin-top: 18px; }
+.lo-gun { position: relative; display: block; aspect-ratio: 5 / 2; min-width: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 2px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
+.lo-gun-art { position: absolute; inset: 6px 8px 22px; display: flex; align-items: center; justify-content: center; }
+.lo-gun-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lo-gun.is-random .lo-gun-art img { opacity: .32; filter: grayscale(1) brightness(.7); }
+.lo-gun.is-empty .lo-gun-art { opacity: .2; }
+.lo-gun-foot { position: absolute; left: 9px; right: 44px; bottom: 6px; min-width: 0; }
+.lo-gun-names { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+.lo-weapon { color: var(--text-2); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.lo-skin { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 10.5px; }
+.lo-info { color: var(--text-3); font-size: 10.5px; }
+.lo-buddy { position: absolute; right: 7px; bottom: 5px; width: 34px; height: 34px; }
+.lo-buddy img { width: 100%; height: 100%; object-fit: contain; }
+.lo-tier { position: absolute; right: 7px; top: 6px; width: 16px; height: 16px; }
+.lo-tier img { width: 100%; height: 100%; object-fit: contain; }
+.lo-card { position: relative; overflow: hidden; border-radius: 2px; background: var(--bg-2); aspect-ratio: 452 / 998; }
+.lo-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lo-card-none { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 12px; }
+.lo-level { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 10px; background: rgba(15, 17, 21, .85); color: #fff; font: 600 12px/1.4 var(--font-mono); }
+.lo-card-name { display: grid; gap: 3px; justify-items: center; text-align: center; }
+.lo-card-name b { font: 600 14px/1.2 var(--font-head); letter-spacing: .04em; }
+.lo-card-name span:not(.chip) { color: var(--text-2); font-size: 12.5px; }
+.lo-wheel { position: relative; width: min(100%, 250px); aspect-ratio: 1; margin: 6px auto 0; border: 2px solid var(--line-2); border-radius: 50%; }
+.lo-wheel::before, .lo-wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-2); }
+.lo-wheel::before { transform: rotate(45deg); }
+.lo-wheel::after { transform: rotate(-45deg); }
+.lo-wheel-dot { position: absolute; left: 50%; top: 50%; z-index: 1; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 1px solid var(--line-2); border-radius: 50%; background: var(--bg-2); }
+.lo-slot { position: absolute; z-index: 2; display: grid; place-items: center; width: 24%; aspect-ratio: 1; }
+.lo-slot img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lo-slot.top { left: 38%; top: 6%; }
+.lo-slot.bottom { left: 38%; bottom: 6%; }
+.lo-slot.left { left: 6%; top: 38%; }
+.lo-slot.right { right: 6%; top: 38%; }
+@media (max-width: 1180px) { .lo-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lo-side { grid-column: 1 / -1; grid-row: 1; max-width: 300px; margin: 0 auto 10px; } }
+@media (max-width: 640px) { .lo-screen { grid-template-columns: 1fr; } }
 .coll-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
