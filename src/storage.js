@@ -464,7 +464,7 @@ async function getStats() {
 // Shape: { accounts: { [puuid]: { shop, accessory, wishlist_shop, wishlist_accessory } },
 //          nm: bool, bundle: bool }.
 // Everything defaults to off; the user opts in explicitly.
-const PREFS_TTL = 365 * 24 * 60 * 60 * 1000;
+const PREFS_TTL = KV_NO_EXPIRY; // alert settings never expire
 
 // Per-account alert toggles. `wishlist` was the original combined flag; it is
 // split into per-scope flags and migrated on read so old prefs keep working.
@@ -505,7 +505,7 @@ async function setPrefs(discordId, prefs) {
 // Shape: { daily: WishItem[], accessory: WishItem[] }. WishItem is a catalog
 // snapshot: { id, name, type, icon, art?, kind, addedAt }. Everything defaults
 // to empty; the user opts in explicitly.
-const WISHLIST_TTL = 365 * 24 * 60 * 60 * 1000;
+const WISHLIST_TTL = KV_NO_EXPIRY; // the wishlist never expires
 
 function wishlistItem(row) {
   if (!row || !row.id) return null;
@@ -545,7 +545,7 @@ async function setWishlist(discordId, wishlist) {
 // Riot tokens - shared shops are served from the owner's own stored session.
 // Codes are persisted only as an HMAC digest, so a database dump does not leak
 // usable codes, and stay valid until the owner revokes them.
-const SHARE_TTL = 3650 * 24 * 60 * 60 * 1000; // ~10 years (i.e. until revoked)
+const SHARE_TTL = KV_NO_EXPIRY; // share links last until revoked
 
 function hashShareCode(code) {
   return crypto.createHmac('sha256', keyBuffer()).update(`valshops:share:${String(code)}`).digest('hex');

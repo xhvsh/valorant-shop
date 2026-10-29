@@ -785,7 +785,7 @@ async function createShareFor(discordId, ownerName, puuid) {
   const code = newShareCode();
   const digest = storage.hashShareCode(code);
   const name = acct.label || acct.name || puuid;
-  await storage.kvSet(`share:puuid:${puuid}`, { owner_id: discordId }, 3650 * 24 * 60 * 60 * 1000);
+  await storage.kvSet(`share:puuid:${puuid}`, { owner_id: discordId }, storage.KV_NO_EXPIRY);
   await storage.putShare(digest, {
     code,
     owner_id: discordId,
@@ -1927,11 +1927,12 @@ async function sendPrivateNotice(token, payload) {
 }
 
 app.post('/api/interactions/followup', express.json(), async (req, res, next) => {
+  // Read before the try, so the catch below can name the command and answer the user.
+  const { interactionId, token, discordId, name: cmdName, bundleView, bundleId, puuid, sub, code, username, ephemeral } = req.body || {};
   try {
     if (req.headers['x-link-secret'] !== LINK_SECRET) {
       return res.status(403).json({ error: 'forbidden' });
     }
-    const { interactionId, token, discordId, name: cmdName, bundleView, bundleId, puuid, sub, code, username, ephemeral } = req.body || {};
     if (!interactionId || !token || (!discordId && !bundleView)) {
       return res.status(400).json({ error: 'bad payload' });
     }

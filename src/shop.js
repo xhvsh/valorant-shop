@@ -78,6 +78,33 @@ const REFRESH_WAIT_MS = 12 * 1000;
 const REFRESH_POLL_MS = 400;
 const refreshLocks = new Map();
 
+// The old refresh token is spent the moment Riot answers, so losing the new one means
+// the account silently needs re-linking. A failed save is retried a few times, and the
+// admin is pinged if it still fails.
+async function persistAuth(discordId, puuid, auth) {
+  const delays = [0, 300, 1000];
+  let lastErr = null;
+  for (const wait of delays) {
+    if (wait) await sleep(wait);
+    try {
+      await storage.saveAccount(discordId, puuid, { auth_encrypted: storage.encrypt(auth) });
+      return true;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  const msg = (lastErr && lastErr.message) || String(lastErr);
+  console.error(`[shop] token persist failed for ${discordId} after ${delays.length} tries: ${msg}`);
+  try {
+    require('./discord/log')
+      .sendLog(`${require('./discord/log').adminMention()} could not save renewed Riot tokens for ${require('./discord/log').userMention(discordId)} (${String(msg).slice(0, 120)}). The account may need re-linking.`, { ping: true })
+      .catch(() => {});
+  } catch {
+    /* logging is best effort */
+  }
+  return false;
+}
+
 async function storedAuth(discordId, puuid) {
   const acct = await storage.getAccount(discordId, puuid || undefined);
   if (!acct || !acct.auth_encrypted) return null;
@@ -115,19 +142,13 @@ async function refreshAcrossInstances(discordId, puuid, auth) {
         const base = stored && stored.refresh_token ? stored : auth;
         const next = await renewTokens(base, { discordId });
         // Persist before releasing, so waiters find the new tokens.
-        try {
-          await storage.saveAccount(discordId, puuid, {
-            auth_encrypted: storage.encrypt({
-              ...base,
-              access_token: next.access_token,
-              id_token: next.id_token,
-              expires_at: next.expires_at,
-              refresh_token: next.refresh_token,
-            }),
-          });
-        } catch (e) {
-          console.warn(`[shop] token persist failed for ${discordId}: ${(e && e.message) || e}`);
-        }
+        await persistAuth(discordId, puuid, {
+          ...base,
+          access_token: next.access_token,
+          id_token: next.id_token,
+          expires_at: next.expires_at,
+          refresh_token: next.refresh_token,
+        });
         return next;
       } finally {
         await storage.kvUnlock(lockKey).catch(() => {});
@@ -177,11 +198,7 @@ async function ensureAccessToken(discordId, puuid, auth) {
   auth.expires_at = fresh.expires_at;
   auth.refresh_token = fresh.refresh_token;
   if (fresh.cookies) auth.cookies = fresh.cookies;
-  try {
-    await storage.saveAccount(discordId, puuid, { auth_encrypted: storage.encrypt(auth) });
-  } catch (e) {
-    console.warn(`[shop] token persist failed for ${discordId}: ${(e && e.message) || e}`);
-  }
+  await persistAuth(discordId, puuid, auth);
   return { access_token: fresh.access_token };
 }
 

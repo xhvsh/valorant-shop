@@ -496,7 +496,6 @@ const DPOP_PRM = 'alias:change game:play riot:interact chat:text chat:voice frie
 const DPOP_UA =
   'RiotGamesApi/26.3.0.0 rso-auth (Android;15.00;AP4A.250105.002;) ritoplus/5.3.0';
 const DPOP_REDIRECT_URI = 'http://localhost/redirect';
-const DPOP_KEY_TTL = 365 * 24 * 60 * 60 * 1000;
 
 function base64url(input) {
   return Buffer.from(input).toString('base64url').replace(/=+$/, '');
@@ -551,40 +550,55 @@ function generatePkce() {
 
 // The DPoP key never changes and the nonce changes rarely, but both used to be read
 // from (and the key re-written to) the database on every Riot call. They are kept per
-// instance now. The key's one-year expiry is pushed out at most once a day, and the
-// nonce is only written when Riot hands out a new one. Riot answers a stale nonce with
-// a fresh one and the call is retried, so a slightly old copy costs nothing.
-const DPOP_KEY_RENEW_MS = 24 * 60 * 60 * 1000;
+// instance now. The nonce is only written when Riot hands out a new one. Riot answers
+// a stale nonce with a fresh one and the call is retried, so a slightly old copy costs
+// nothing.
+const DPOP_NONCE_TTL = 365 * 24 * 60 * 60 * 1000;
 const DPOP_NONCE_MEMO_MS = 60 * 1000;
-let dpopKeyMemo = null; // { key, renewedAt }
+let dpopKeyMemo = null; // the key object
 let dpopNonceMemo = null; // { nonce, at }
 
+// The signing key is stored encrypted (iv:tag:data) like the account tokens, and it
+// never expires: every refresh token is bound to it. A row holding a plain JWK is the
+// old format; it is used as is and re-saved encrypted (same key, so tokens stay valid).
+// Read and decrypt failures throw on purpose: falling back to a new key would orphan
+// every linked account.
+async function readStoredDpopKey(store) {
+  const raw = await store.kvGet('dpop:key');
+  if (!raw) return null;
+  if (typeof raw === 'string') return { key: store.decrypt(raw), legacy: false };
+  if (raw && typeof raw === 'object' && raw.d) return { key: raw, legacy: true };
+  throw new Error('DPoP key row is unreadable.');
+}
+
 async function getDpopKey(store) {
-  if (dpopKeyMemo) {
-    if (Date.now() - dpopKeyMemo.renewedAt > DPOP_KEY_RENEW_MS) {
-      dpopKeyMemo.renewedAt = Date.now();
-      await store.kvSet('dpop:key', dpopKeyMemo.key, DPOP_KEY_TTL).catch(() => {});
+  if (dpopKeyMemo) return dpopKeyMemo;
+  const stored = await readStoredDpopKey(store);
+  if (stored) {
+    if (stored.legacy) {
+      try {
+        const sealed = store.encrypt(stored.key);
+        const back = store.decrypt(sealed);
+        if (back.d === stored.key.d && back.x === stored.key.x && back.y === stored.key.y) {
+          await store.kvSet('dpop:key', sealed, store.KV_NO_EXPIRY);
+        }
+      } catch (e) {
+        console.warn(`[dpop] could not re-save the key encrypted: ${(e && e.message) || e}`);
+      }
     }
-    return dpopKeyMemo.key;
-  }
-  // A failed read must throw: treating it as "no key yet" would create a new key over
-  // the stored one, and every refresh token is bound to the old key.
-  const existing = await store.kvGet('dpop:key');
-  if (existing) {
-    dpopKeyMemo = { key: existing, renewedAt: Date.now() };
-    await store.kvSet('dpop:key', existing, DPOP_KEY_TTL).catch(() => {});
-    return existing;
+    dpopKeyMemo = stored.key;
+    return stored.key;
   }
   // Create only if the row is truly absent (insert, never upsert). If another instance
   // won the race, use the key it stored.
   const key = createDpopKey();
-  if (!(await store.kvInsert('dpop:key', key, DPOP_KEY_TTL))) {
-    const stored = await store.kvGet('dpop:key');
-    if (!stored) throw new Error('DPoP key could not be loaded.');
-    dpopKeyMemo = { key: stored, renewedAt: Date.now() };
-    return stored;
+  if (!(await store.kvInsert('dpop:key', store.encrypt(key), store.KV_NO_EXPIRY))) {
+    const winner = await readStoredDpopKey(store);
+    if (!winner) throw new Error('DPoP key could not be loaded.');
+    dpopKeyMemo = winner.key;
+    return winner.key;
   }
-  dpopKeyMemo = { key, renewedAt: Date.now() };
+  dpopKeyMemo = key;
   return key;
 }
 
@@ -603,7 +617,7 @@ async function saveDpopNonce(store, nonce) {
     return;
   }
   dpopNonceMemo = { nonce, at: Date.now() };
-  await store.kvSet('dpop:nonce', { nonce }, DPOP_KEY_TTL).catch(() => {});
+  await store.kvSet('dpop:nonce', { nonce }, DPOP_NONCE_TTL).catch(() => {});
 }
 
 // Riot answers a missing/stale DPoP nonce with a 400 naming the nonce plus a

@@ -7,8 +7,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "lint": "node --check app.js && node --check src/grid.js && node --check src/image-color.js && node --check server.js && node --check src/riot.js && node --check src/items.js && node --check src/parse.js && node --check src/storage.js && node --check src/session.js && node --check src/shop.js && node --check src/discord/verify.js && node --check src/discord/embeds.js && node --check src/discord/commands.js && node --check src/discord/log.js && node --check website/dashboard.js && node --check scripts/register-commands.js && node --check scripts/test-inventory.js && node --check scripts/test-inventory-probe.js && node --check scripts/test-loadout-paths.js && node --check scripts/check-commands.js && node --check src/discord/embeds.js",
-    "check:commands": "node scripts/check-commands.js"
+    "lint": "eslint . && npm run lint:syntax",
+    "check:commands": "node scripts/check-commands.js",
+    "lint:syntax": "node --check app.js && node --check src/grid.js && node --check src/image-color.js && node --check server.js && node --check src/riot.js && node --check src/items.js && node --check src/parse.js && node --check src/storage.js && node --check src/session.js && node --check src/shop.js && node --check src/discord/verify.js && node --check src/discord/embeds.js && node --check src/discord/commands.js && node --check src/discord/log.js && node --check website/dashboard.js && node --check scripts/register-commands.js && node --check scripts/test-inventory.js && node --check scripts/test-inventory-probe.js && node --check scripts/test-loadout-paths.js && node --check scripts/check-commands.js && node --check src/discord/embeds.js",
+    "test:smoke": "node scripts/smoke-test.js"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
@@ -24,5 +26,10 @@
     "node": ">=20"
   },
   "keywords": [],
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "cookie-signature": "^1.2.2",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0"
+  }
 }
