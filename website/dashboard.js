@@ -1915,12 +1915,22 @@
       });
   }
 
+  // Every skin image is cropped to the same width, so by itself a Classic would look as
+  // long as an Operator. These are the weapons' in-game lengths relative to the longest
+  // (read off the game's loadout screen), used to size each image inside its tile.
+  const LOADOUT_GUN_LENGTH = {
+    Classic: 0.37, Shorty: 0.65, Frenzy: 0.3, Ghost: 0.64, Bandit: 0.42, Sheriff: 0.53,
+    Stinger: 0.7, Spectre: 0.75, Bucky: 0.99, Judge: 0.88, Melee: 0.69,
+    Bulldog: 0.95, Guardian: 0.97, Warden: 0.97, Phantom: 1, Vandal: 0.96,
+    Marshal: 0.99, Outlaw: 0.99, Operator: 1, Ares: 0.95, Odin: 0.82,
+  };
+
   function loadoutGunEl(weapon, g) {
     const skin = (g && g.skin) || {};
     const random = Boolean(g && skin.random);
     const tip = g ? (random ? `${weapon}: random favorite skin` : `${weapon}: ${skin.name || ""}`) : weapon;
     const art = g ? skin.render || skin.icon : null;
-    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip },
+    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip, style: `--gw:${LOADOUT_GUN_LENGTH[weapon] || 0.8}` },
       h("div", { class: "lo-gun-art" }, art ? imgOrFallback(art, skin.name) : null),
       h("span", { class: "lo-weapon", text: weapon }),
       g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null);
