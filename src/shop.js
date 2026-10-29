@@ -805,7 +805,7 @@ const LOADOUT_TTL = 5 * 60 * 1000;
 const lowerId = (v) => String(v || '').toLowerCase();
 
 async function buildLoadout(raw) {
-  const out = { card: null, title: null, level: null, levelHidden: false, incognito: false, guns: [], sprays: [], flexes: [] };
+  const out = { card: null, title: null, level: null, levelHidden: false, incognito: false, guns: [], sprays: [], flexes: [], expressions: [] };
   const identity = (raw && raw.Identity) || {};
   const cardId = identity.PlayerCardID || identity.PlayerCard;
   if (cardId) {
@@ -867,6 +867,8 @@ async function buildLoadout(raw) {
     seen.add(key);
     const entry = { id: r.id, name: r.name, icon: r.icon, staticIcon: r.staticIcon || null };
     (r.type === 'spray' ? out.sprays : out.flexes).push(entry);
+    // The wheel has four slots; this keeps them in the order Riot lists them.
+    out.expressions.push({ ...entry, kind: r.type });
   }
   if (!out.sprays.length && !out.flexes.length) {
     console.log(`[shop] loadout has no sprays or flexes; fields: ${Object.keys(raw || {}).join(',')}`);
@@ -878,7 +880,7 @@ async function buildLoadout(raw) {
 async function accountLoadout(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
-  const cacheKey = `loadout:v1:${discordId}:${account.puuid}`;
+  const cacheKey = `loadout:v2:${discordId}:${account.puuid}`;
   const box = await storage.kvGet(cacheKey).catch(() => null);
   if (box && box.loadout && box.at && Date.now() - box.at < LOADOUT_TTL) {
     return { status: 'ok', loadout: box.loadout, cached: true, account };

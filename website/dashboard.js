@@ -1919,38 +1919,23 @@
     const skin = (g && g.skin) || {};
     const random = Boolean(g && skin.random);
     const tip = g ? (random ? `${weapon}: random favorite skin` : `${weapon}: ${skin.name || ""}`) : weapon;
-    const info = [];
-    if (g && !random) {
-      if (skin.level && skin.levels > 1) info.push(`Lv ${skin.level}/${skin.levels}`);
-      if (skin.variant) info.push(`Variant ${skin.variant}`);
-    }
     const art = g ? skin.render || skin.icon : null;
-    const el = h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip },
+    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip },
       h("div", { class: "lo-gun-art" }, art ? imgOrFallback(art, skin.name) : null),
-      h("div", { class: "lo-gun-foot" },
-        h("div", { class: "lo-gun-names" },
-          h("span", { class: "lo-weapon", text: weapon }),
-          g && !random ? h("span", { class: "lo-skin", text: skin.name || "" }) : random ? h("span", { class: "lo-skin", text: "Random favorite" }) : null,
-          info.length ? h("span", { class: "lo-info", text: info.join(" · ") }) : null)),
-      g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null,
-      g && skin.tierIcon && !random ? h("div", { class: "lo-tier" }, makeImg(skin.tierIcon, skin.tier || "", (img) => img.remove())) : null);
-    return el;
+      h("span", { class: "lo-weapon", text: weapon }),
+      g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null);
   }
 
-  // Spray wheel: flex on top, sprays left, right and bottom, as in the game.
+  // Expression wheel: four slots, filled clockwise from the top in the order Riot lists
+  // them. A slot holds a spray or a flex.
   function loadoutWheelEl(lo) {
-    const sprays = lo.sprays || [];
-    const flex = (lo.flexes || [])[0] || null;
-    const slots = [
-      ["top", flex],
-      ["left", sprays[0] || null],
-      ["right", sprays[1] || null],
-      ["bottom", sprays[2] || null],
-    ];
+    const list = (lo.expressions && lo.expressions.length ? lo.expressions : [...(lo.sprays || []), ...(lo.flexes || [])]).slice(0, 4);
+    const positions = ["top", "right", "bottom", "left"];
     const wheel = h("div", { class: "lo-wheel" }, h("span", { class: "lo-wheel-dot" }));
-    for (const [pos, x] of slots) {
+    positions.forEach((pos, i) => {
+      const x = list[i] || null;
       wheel.appendChild(h("div", { class: `lo-slot ${pos}`, title: x ? x.name || "" : "" }, x ? imgOrFallback(x.icon || x.staticIcon, x.name) : null));
-    }
+    });
     return wheel;
   }
 
