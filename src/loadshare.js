@@ -75,7 +75,8 @@ async function buildCatalog() {
         id: low(s.uuid),
         name,
         kind,
-        icon: s.displayIcon || s.chromas[0].fullRender || s.levels[0].displayIcon || null,
+        // A standard skin's own displayIcon is a placeholder X; its first chroma holds the real render.
+        icon: (kind === 'standard' ? s.chromas[0].fullRender || w.displayIcon : s.displayIcon) || s.chromas[0].fullRender || s.levels[0].displayIcon || null,
         levels: s.levels.map((l, i) => ({ id: low(l.uuid), name: l.displayName || `Level ${i + 1}` })),
         chromas: s.chromas.map((c) => ({ id: low(c.uuid), name: c.displayName || '', icon: c.fullRender || c.displayIcon || null, swatch: c.swatch || null })),
       });
