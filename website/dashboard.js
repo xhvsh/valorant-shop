@@ -1416,6 +1416,7 @@
     const entries = [];
     if (!a.shared) {
       if (a.linked) entries.push({ icon: "share", label: "Share this account", sub: "Create or manage a share code", onClick: () => go(acctHref(a.puuid, "sharing")) });
+      if (a.linked) entries.push({ icon: "shield", label: "Loadout link", sub: "Beta: let someone change the skins", onClick: () => openLoadShare(a) });
       entries.push({ icon: "bell", label: "DM alerts", sub: "Daily shop, accessories, wishlist", onClick: () => go(acctHref(a.puuid, "alerts")) });
       if (!a.linked) entries.push({ icon: "link", label: "Re-link account", sub: "Sign in with Riot again", onClick: openAddOwn });
     }
@@ -1988,30 +1989,42 @@
     return wheel;
   }
 
-  // The owner's side of a loadout link: make one (shown once), see whether one is live,
-  // revoke it. The link itself is never stored in readable form, so it cannot be shown again.
+  // The owner's side of a loadout link (opened from the account's ... menu): make one
+  // (shown once), see whether one is live, revoke it. The link itself is never stored in
+  // readable form, so it cannot be shown again.
   const shareUi = Object.create(null);
+  let shareTarget = null;
 
-  function rerenderLoadoutTab(puuid) {
-    if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "loadout") renderPanel();
+  function openLoadShare(a) {
+    closeMenu();
+    closeSidebar();
+    shareTarget = a;
+    const st = shareUi[a.puuid] || (shareUi[a.puuid] = { cosmetics: false });
+    st.status = st.status || null;
+    renderLoadShare();
+    showOverlay($("shareLinkOverlay"));
+    // The live state comes from the server; the dialog shows what it knows meanwhile.
+    api(`/api/accounts/${encodeURIComponent(a.puuid)}/loadshare`)
+      .then((r) => { st.status = r; })
+      .catch(() => {})
+      .finally(() => { st.loaded = true; if (shareTarget === a) renderLoadShare(); });
+  }
+  function closeLoadShare() {
+    hideOverlay($("shareLinkOverlay"), () => { shareTarget = null; });
   }
 
-  function loadShareEl(a) {
-    const st = shareUi[a.puuid] || (shareUi[a.puuid] = { cosmetics: false });
+  function renderLoadShare() {
+    const a = shareTarget;
+    const body = $("slBody");
+    if (!a) return;
+    const st = shareUi[a.puuid];
     const enc = encodeURIComponent(a.puuid);
-    if (!st.loaded && !st.loading) {
-      st.loading = true;
-      api(`/api/accounts/${enc}/loadshare`)
-        .then((r) => { st.status = r; })
-        .catch(() => {})
-        .finally(() => { st.loading = false; st.loaded = true; rerenderLoadoutTab(a.puuid); });
-    }
     const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const live = st.url ? { expiresAt: st.expiresAt } : st.status && st.status.active ? st.status : null;
 
     async function create() {
       st.busy = true;
-      rerenderLoadoutTab(a.puuid);
+      renderLoadShare();
       try {
         const r = await api(`/api/accounts/${enc}/loadshare`, { method: "POST", json: { cosmetics: st.cosmetics } });
         st.url = r.url;
@@ -2021,47 +2034,60 @@
         toast(err.message, "error");
       }
       st.busy = false;
-      rerenderLoadoutTab(a.puuid);
+      if (shareTarget === a) renderLoadShare();
     }
     async function revoke() {
       st.busy = true;
-      rerenderLoadoutTab(a.puuid);
+      renderLoadShare();
       try {
         await api(`/api/accounts/${enc}/loadshare`, { method: "DELETE" });
         st.url = null;
         st.status = { active: false };
+        toast("Link revoked.", "ok");
       } catch (err) {
         toast(err.message, "error");
       }
       st.busy = false;
-      rerenderLoadoutTab(a.puuid);
+      if (shareTarget === a) renderLoadShare();
     }
 
     const kids = [
-      h("h3", { text: "Share this loadout" }),
-      h("p", { class: "muted", text: "Anyone with the link can change this account's skins and gun buddies, with no sign-in. They can only equip what this account owns. The link works for one save and ends after 30 minutes." }),
-      h("p", { class: "lo-share-warn", text: "Only share it with people you trust. They will see which skins and buddies this account owns." }),
+      h("div", { class: "dlg-note is-warn" }, iconEl("alert"),
+        h("p", {}, h("b", { text: "Beta feature. " }),
+          "This one writes to the account's in-game loadout through an unofficial Riot endpoint, so it is riskier than the read-only parts of this site. Only share it with people you trust.")),
+      h("ul", { class: "dlg-points" },
+        h("li", {}, "Anyone with the link can change this account's weapon skins and gun buddies. No sign-in needed."),
+        h("li", {}, "They can only equip what the account owns, plus Standard and Random Favorite skins."),
+        h("li", {}, h("b", { text: "One save only," }), " and the link ends 30 minutes after you make it."),
+        h("li", {}, "They will see which skins and buddies this account owns.")),
     ];
+
     if (!live) {
-      kids.push(
-        h("label", { class: "lo-share-opt" },
-          h("input", { type: "checkbox", checked: st.cosmetics, onchange: (e) => { st.cosmetics = e.target.checked; } }),
-          h("span", { text: "Also let them change the player card, title, sprays and flexes" })),
-        h("div", { class: "lo-share-row" }, h("button", { class: "btn sm", type: "button", disabled: st.busy, onclick: create }, "Create link")));
-      if (st.status && st.status.used) kids.push(h("p", { class: "faint", text: "The last link was used." }));
+      kids.push(h("div", { class: "rows sl-opts" }, h("div", { class: "row" },
+        iconEl("sparkle"),
+        h("div", { class: "row-text" }, h("b", { text: "Cosmetics" }), h("span", { text: "Also let them change the player card, title, sprays and flexes." })),
+        switchEl(st.cosmetics, "Allow cosmetics", (on) => { st.cosmetics = on; }))));
+      if (st.status && st.status.used) kids.push(h("p", { class: "faint sl-last", text: "The last link was used." }));
+      kids.push(h("div", { class: "modal-actions" },
+        h("button", { class: "btn btn-ghost", type: "button", onclick: closeLoadShare }, "Cancel"),
+        h("button", { class: `btn${st.busy ? " is-busy" : ""}`, type: "button", disabled: st.busy, onclick: create }, iconEl("link"), "Create link")));
     } else {
       if (st.url) {
-        const field = h("input", { class: "input", type: "text", readonly: true, value: st.url, "aria-label": "Share link" });
-        kids.push(h("div", { class: "lo-share-row" }, field,
-          h("button", { class: "btn sm", type: "button", onclick: () => copyText(st.url, "Link copied") }, iconEl("copy"), "Copy")));
+        kids.push(h("label", { class: "wipe-label", for: "slLink", text: "Your link (shown once)" }),
+          h("div", { class: "sl-link" },
+            h("input", { id: "slLink", class: "input", type: "text", readonly: true, value: st.url, "aria-label": "Share link", onfocus: (e) => e.target.select() }),
+            h("button", { class: "btn", type: "button", onclick: () => copyText(st.url, "Link copied") }, iconEl("copy"), "Copy")));
       } else {
-        kids.push(h("p", { class: "muted", text: "A link is active. It cannot be shown again; create a new one to replace it." }));
+        kids.push(h("div", { class: "dlg-note" }, iconEl("info"), h("p", { text: "A link is active. It cannot be shown again; revoke it and make a new one if you lost it." })));
       }
-      kids.push(h("div", { class: "lo-share-row" },
-        h("span", { class: "faint", text: `Works once, until ${time(live.expiresAt)}${st.status && st.status.cosmetics ? " · cosmetics allowed" : ""}` }),
-        h("button", { class: "btn btn-danger sm", type: "button", disabled: st.busy, onclick: revoke }, "Revoke")));
+      kids.push(h("p", { class: "sl-meta" },
+        h("span", { class: "chip ok", text: "Live" }),
+        ` Works once, until ${time(live.expiresAt)}${st.status && st.status.cosmetics ? " · cosmetics allowed" : ""}`),
+        h("div", { class: "modal-actions" },
+          h("button", { class: "btn btn-danger", type: "button", disabled: st.busy, onclick: revoke }, "Revoke"),
+          h("button", { class: "btn btn-ghost", type: "button", onclick: closeLoadShare }, "Done")));
     }
-    return h("div", { class: "lo-share" }, ...kids);
+    body.replaceChildren(...kids);
   }
 
   function renderLoadoutPanel(box, a) {
@@ -2085,7 +2111,6 @@
     }
 
     head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
-    if (!a.shared) box.appendChild(loadShareEl(a));
 
     const byWeapon = new Map();
     for (const g of lo.guns || []) if (g.weapon) byWeapon.set(g.weapon, g);
@@ -4270,6 +4295,9 @@
     });
     onBackdrop($("importOverlay"), closeImport);
 
+    $("slClose").addEventListener("click", closeLoadShare);
+    onBackdrop($("shareLinkOverlay"), closeLoadShare);
+
     $("confirmOk").addEventListener("click", () => closeConfirm(true));
     $("confirmCancel").addEventListener("click", () => closeConfirm(false));
     onBackdrop($("confirmOverlay"), () => closeConfirm(false));
@@ -4300,6 +4328,7 @@
       else if (!$("wipeOverlay").hidden) closeWipe();
       else if (!$("previewOverlay").hidden) closePreview();
       else if (!$("importOverlay").hidden) closeImport();
+      else if (!$("shareLinkOverlay").hidden) closeLoadShare();
       else if (!$("addOverlay").hidden) closeAdd();
       else if (box && !box.hidden) clearWlSearch();
       else if ($("sidebar").classList.contains("is-open")) closeSidebar();
@@ -4318,6 +4347,7 @@
     initDialogFocus();
     initSheetDrag($("addOverlay"), closeAdd);
     initSheetDrag($("importOverlay"), closeImport);
+    initSheetDrag($("shareLinkOverlay"), closeLoadShare);
     initSheetDrag($("wipeOverlay"), closeWipe);
     initSheetDrag($("confirmOverlay"), () => closeConfirm(false));
     initSheetDrag($("previewOverlay"), closePreview);

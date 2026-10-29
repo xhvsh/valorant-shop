@@ -10,7 +10,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=276" />
+  <link rel="stylesheet" href="/styles.css?v=277" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -214,6 +214,21 @@
     </div>
   </div>
 
+  <!-- Loadout link (beta) -->
+  <div class="overlay" id="shareLinkOverlay" role="dialog" aria-modal="true" aria-labelledby="slTitle" hidden>
+    <div class="modal">
+      <div class="dlg-head">
+        <span class="dlg-icon"><svg class="i"><use href="#i-shield"/></svg></span>
+        <div class="dlg-titles">
+          <h2 id="slTitle">Loadout link <span class="chip warn">Beta</span></h2>
+          <p class="dlg-sub">Let someone change this account's skins and gun buddies.</p>
+        </div>
+        <button class="icon-btn" id="slClose" type="button" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+      <div id="slBody"></div>
+    </div>
+  </div>
+
   <!-- Delete all data -->
   <div class="overlay" id="wipeOverlay" role="alertdialog" aria-modal="true" aria-labelledby="wipeTitle" hidden>
     <div class="modal">
@@ -286,6 +301,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=276"></script>
+  <script src="/dashboard.js?v=277"></script>
 </body>
 </html>

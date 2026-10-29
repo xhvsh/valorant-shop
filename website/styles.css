@@ -2529,11 +2529,16 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 }
 
 
-/* ---------- loadout share link (owner side) ---------- */
-.lo-share { display: grid; gap: 10px; max-width: 640px; margin: 0 0 18px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
-.lo-share h3 { margin: 0; font: 600 15px/1 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
-.lo-share p { margin: 0; font-size: 13px; }
-.lo-share-warn { color: var(--amber); }
-.lo-share-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
-.lo-share-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.lo-share-row .input { flex: 1; min-width: 200px; }
+/* ---------- loadout link dialog (beta) ---------- */
+.dlg-titles h2 .chip { margin-left: 8px; vertical-align: middle; }
+.dlg-note.is-warn { border-color: rgba(242, 184, 75, .4); background: var(--amber-soft); color: var(--text); }
+.dlg-note.is-warn .i { color: var(--amber); }
+.dlg-note.is-warn b { color: var(--amber); }
+#slBody > :first-child { margin-top: 0; }
+.sl-opts { margin-top: 14px; background: var(--bg-2); }
+.sl-opts .row { padding: 12px 14px; }
+.sl-opts .row > .i { color: var(--amber); }
+.sl-last { margin: 10px 0 0; font-size: 12.5px; }
+.sl-link { display: flex; gap: 8px; }
+.sl-link .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
+.sl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; color: var(--text-2); font-size: 13px; }
