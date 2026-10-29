@@ -2538,7 +2538,7 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 .sl-opts { margin-top: 14px; background: var(--bg-2); }
 .sl-opts .row { padding: 12px 14px; }
 .sl-opts .row > .i { color: var(--amber); }
-.sl-last { margin: 10px 0 0; font-size: 12.5px; }
+.sl-state { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; color: var(--text-2); font-size: 13px; }
 .sl-link { display: flex; gap: 8px; }
 .sl-link .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
 .sl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; color: var(--text-2); font-size: 13px; }

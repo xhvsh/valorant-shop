@@ -2004,12 +2004,28 @@
     renderLoadShare();
     showOverlay($("shareLinkOverlay"));
     // The live state comes from the server; the dialog shows what it knows meanwhile.
-    api(`/api/accounts/${encodeURIComponent(a.puuid)}/loadshare`)
-      .then((r) => { st.status = r; })
-      .catch(() => {})
-      .finally(() => { st.loaded = true; if (shareTarget === a) renderLoadShare(); });
+    // While it is open it keeps asking whether the link was used or ran out, so a used
+    // link disappears here (and can no longer be copied) as soon as it is saved.
+    pollLoadShare(a, true);
+    clearInterval(shareTimer);
+    shareTimer = setInterval(() => pollLoadShare(a, false), 4000);
+  }
+  let shareTimer = null;
+  function pollLoadShare(a, first) {
+    const st = shareUi[a.puuid];
+    return api(`/api/accounts/${encodeURIComponent(a.puuid)}/loadshare`)
+      .then((r) => {
+        const was = st.status;
+        st.status = r;
+        if (!r.active) st.url = null;
+        const changed = first || !was || was.active !== r.active || was.used !== r.used;
+        if (changed && shareTarget === a) renderLoadShare();
+      })
+      .catch(() => { if (first && shareTarget === a) renderLoadShare(); });
   }
   function closeLoadShare() {
+    clearInterval(shareTimer);
+    shareTimer = null;
     hideOverlay($("shareLinkOverlay"), () => { shareTarget = null; });
   }
 
@@ -2067,7 +2083,13 @@
         iconEl("sparkle"),
         h("div", { class: "row-text" }, h("b", { text: "Cosmetics" }), h("span", { text: "Also let them change the player card, title, sprays and flexes." })),
         switchEl(st.cosmetics, "Allow cosmetics", (on) => { st.cosmetics = on; }))));
-      if (st.status && st.status.used) kids.push(h("p", { class: "faint sl-last", text: "The last link was used." }));
+      const last = st.status;
+      if (last && last.used) {
+        kids.push(h("div", { class: "sl-state" }, h("span", { class: "chip ok", text: "Used" }),
+          h("span", { text: `The last link was used${last.lastSave ? ` at ${time(last.lastSave.at)}` : ""} and no longer works.` })));
+      } else if (last && last.expired) {
+        kids.push(h("div", { class: "sl-state" }, h("span", { class: "chip", text: "Expired" }), h("span", { text: "The last link ran out without being used." })));
+      }
       kids.push(h("div", { class: "modal-actions" },
         h("button", { class: "btn btn-ghost", type: "button", onclick: closeLoadShare }, "Cancel"),
         h("button", { class: `btn${st.busy ? " is-busy" : ""}`, type: "button", disabled: st.busy, onclick: create }, iconEl("link"), "Create link")));

@@ -10,6 +10,9 @@
   const $ = (id) => document.getElementById(id);
   const app = $("app");
   const modal = $("modal");
+  // Links back to the main site, wherever it is mounted.
+  for (const id of ["homeLink", "homeBtn", "homeFoot"]) $(id).href = BASE;
+  document.querySelector(".foot-links a").href = BASE + "legal";
 
   function h(tag, props, ...children) {
     const node = document.createElement(tag);
@@ -151,6 +154,24 @@
       buddy ? h("div", { class: "lo-buddy", title: buddy.name }, img(buddy.icon, buddy.name)) : null);
   }
 
+  function noteIcon() {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("class", "i");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const p = document.createElementNS(ns, "path");
+    p.setAttribute("d", "M12 8v5M12 16.5v.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z");
+    svg.appendChild(p);
+    return svg;
+  }
+
   function renderScreen() {
     const byName = new Map(V.guns.map((g) => [g.name, g]));
     const known = new Set(LOADOUT_COLUMNS.flatMap((col) => col.flatMap(([, list]) => list)));
@@ -196,10 +217,11 @@
       h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }), wheel));
 
     app.replaceChildren(
-      h("div", { class: "ls-note" }, h("b", { text: "One save only. " }),
-        "This link works for a single save and ends 30 minutes after it was made. Only items this account owns can be equipped, and nothing is sent until you press Save. ",
-        V.cosmetics ? "Click a weapon, the player card or a spray slot to change it." : "Click a weapon to change its skin or gun buddy."),
-      h("div", { class: "lo-wrap ls-wrap" }, screen));
+      h("div", { class: "ls-note" }, noteIcon(),
+        h("span", {}, h("b", { text: "One save only. " }),
+          "This link works for a single save and ends 30 minutes after it was made. Only items this account owns can be equipped, and nothing is sent until you press Save. ",
+          V.cosmetics ? "Click a weapon, the player card or a spray slot to change it." : "Click a weapon to change its skin or gun buddy.")),
+      h("div", { class: "ls-panel" }, h("div", { class: "lo-wrap ls-wrap" }, screen)));
   }
 
   /* ---------- picker (opens on click) ---------- */
@@ -355,7 +377,7 @@
   function setMsg(text, kind) {
     const m = $("barMsg");
     m.textContent = text || "";
-    m.className = `ls-bar-msg${kind ? ` is-${kind}` : ""}`;
+    m.className = `ls-bar-msg${kind === "changes" ? " has-changes" : kind ? ` is-${kind}` : ""}`;
   }
   function updateBar() {
     if (!V || done) return;
@@ -363,7 +385,7 @@
     $("bar").hidden = false;
     $("saveBtn").disabled = n === 0;
     $("resetBtn").disabled = n === 0;
-    setMsg(n ? `${n} change${n === 1 ? "" : "s"} not saved yet` : "No changes yet", "");
+    setMsg(n ? `${n} change${n === 1 ? "" : "s"} not saved yet` : "No changes yet", n ? "changes" : "");
   }
 
   async function save() {

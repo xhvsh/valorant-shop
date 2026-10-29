@@ -5,25 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="referrer" content="no-referrer" />
-  <title>Shared loadout</title>
-  <link rel="icon" href="valorant-v.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=277" />
-  <link rel="stylesheet" href="loadshare.css?v=3" />
+  <title>Shared loadout - valorant shop</title>
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="stylesheet" href="styles.css?v=278" />
+  <link rel="stylesheet" href="loadshare.css?v=5" />
 </head>
 <body class="ls">
   <header class="ls-top">
+    <a class="ls-brand" id="homeLink" href="./" title="Open valorant shop"><img src="logo.png" alt="" /><span>valorant shop</span></a>
+    <span class="ls-divider" aria-hidden="true"></span>
     <h1>Shared loadout</h1>
-    <span class="ls-timer" id="timer" hidden></span>
+    <div class="ls-top-right">
+      <span class="ls-timer" id="timer" hidden></span>
+      <a class="btn btn-ghost sm" id="homeBtn" href="./">Open valorant shop</a>
+    </div>
   </header>
   <main class="ls-main" id="app">
     <p class="muted" id="status">Loading the loadout...</p>
   </main>
   <div class="ls-modal" id="modal" hidden></div>
-  <footer class="ls-bar" id="bar" hidden>
+  <div class="ls-bar" id="bar" hidden>
     <span class="ls-bar-msg" id="barMsg"></span>
     <button class="btn btn-ghost" id="resetBtn" type="button">Reset</button>
-    <button class="btn" id="saveBtn" type="button" disabled>Save</button>
+    <button class="btn" id="saveBtn" type="button" disabled>Save changes</button>
+  </div>
+  <footer class="footer">
+    <p class="foot-note">Unofficial fan project. Not affiliated with Riot Games.</p>
+    <div class="foot-links">
+      <a href="legal">Disclaimer</a>
+      <a id="homeFoot" href="./">valorant shop</a>
+      <span>Bugs or questions? <b>@xhvsh</b> on Discord</span>
+    </div>
   </footer>
-  <script src="loadshare.js?v=2"></script>
+  <script src="loadshare.js?v=5"></script>
 </body>
 </html>

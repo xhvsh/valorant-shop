@@ -1,31 +1,69 @@
 /* Public loadout share page. The loadout itself uses the dashboard's .lo-* styles from
    styles.css; this file adds the page chrome, the picker and the save bar. */
-body.ls { padding-bottom: 84px; }
+body.ls { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body.ls > .footer { margin-top: auto; background: var(--bg-2); }
 .ls-top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px var(--pad);
+  gap: 14px;
+  height: var(--topbar);
+  padding: 0 var(--pad);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
+  background: rgba(11, 12, 15, .86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
-.ls-top h1 { margin: 0; font: 600 20px/1 var(--font-head); letter-spacing: .04em; text-transform: uppercase; }
-.ls-timer { font: 500 13px/1 var(--font-mono); color: var(--text-2); }
-.ls-timer.is-low { color: var(--amber); }
-.ls-main { max-width: 2000px; margin: 0 auto; padding: var(--pad); display: grid; gap: 18px; }
-/* The loadout keeps its 1633:920 shape, so its width is capped to the height left under the
-   header and above the save bar: it fills the screen on a PC without scrolling. */
-.ls-wrap { width: min(100%, max(640px, calc((100dvh - 275px) * 1.775))); margin: 0 auto; }
-.ls-note {
-  padding: 12px 14px;
+.ls-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font: 600 17px/1 var(--font-head); letter-spacing: .08em; text-transform: lowercase; }
+.ls-brand img { width: 28px; height: 28px; border-radius: 6px; }
+.ls-brand:hover { color: var(--red-2); }
+.ls-divider { width: 1px; height: 22px; background: var(--line-2); }
+.ls-top h1 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1 var(--font-head); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.ls-top-right { display: flex; align-items: center; gap: 10px; }
+.ls-timer {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
   border: 1px solid var(--line-2);
-  border-left: 3px solid var(--amber);
-  border-radius: var(--r);
+  border-radius: 999px;
   background: var(--surface);
+  font: 500 13px/1 var(--font-mono);
   color: var(--text-2);
-  font-size: 13px;
 }
+.ls-timer::before { content: ""; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--green); }
+.ls-timer.is-low { border-color: rgba(242, 184, 75, .4); background: var(--amber-soft); color: var(--amber); }
+.ls-timer.is-low::before { background: var(--amber); }
+.ls-main { flex: 1; width: 100%; max-width: 2000px; margin: 0 auto; padding: 16px var(--pad); display: grid; align-content: start; gap: 14px; }
+/* The loadout keeps its 1633:920 shape, so its width is capped to the height left between
+   the top bar and the save bar and footer: it fills the screen on a PC without scrolling. */
+.ls-panel {
+  width: min(100%, calc(max(640px, (100dvh - 335px) * 1.775) + 34px));
+  margin: 0 auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: radial-gradient(120% 90% at 50% 0, var(--surface-2) 0, var(--surface) 60%);
+  box-shadow: var(--shadow);
+}
+.ls-wrap { width: 100%; }
+.ls-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, calc(max(640px, (100dvh - 335px) * 1.775) + 34px));
+  margin: 0 auto;
+  padding: 9px 14px;
+  border: 1px solid rgba(242, 184, 75, .3);
+  border-radius: var(--r-lg);
+  background: var(--amber-soft);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.ls-note .i { flex: none; color: var(--amber); font-size: 16px; }
 .ls-note b { color: var(--text); }
 .ls-end { text-align: center; padding: 48px 16px; }
 .ls-end h2 { margin: 0 0 8px; font: 600 22px/1.1 var(--font-head); text-transform: uppercase; letter-spacing: .04em; }
@@ -89,11 +127,9 @@ button.lo-card-wrap:hover .lo-card { border-color: var(--line-2); }
 .ls-sw img { width: 100%; height: 100%; object-fit: contain; }
 .ls-sw.is-sel { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-soft); }
 
-/* Save bar */
+/* Save bar: sits above the footer and sticks to the bottom of the screen while it scrolls */
 .ls-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
+  position: sticky;
   bottom: 0;
   z-index: 10;
   display: flex;
@@ -101,8 +137,16 @@ button.lo-card-wrap:hover .lo-card { border-color: var(--line-2); }
   gap: 10px;
   padding: 12px var(--pad);
   border-top: 1px solid var(--line-2);
-  background: var(--bg-2);
+  background: rgba(14, 15, 19, .94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
-.ls-bar-msg { flex: 1; color: var(--text-2); font-size: 13px; }
+.ls-bar[hidden] { display: none; }
+.ls-bar-msg { flex: 1; display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+.ls-bar-msg.has-changes::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
 .ls-bar-msg.is-error { color: var(--red-2); }
 .ls-bar-msg.is-ok { color: var(--green); }
+@media (max-width: 640px) {
+  .ls-brand span, .ls-divider { display: none; }
+  #homeBtn { display: none; }
+}

@@ -452,7 +452,7 @@ async function saveLink(token, payload) {
     rec.used = true;
     rec.lastSave = { at: Date.now(), changes, verified };
     await storage.kvSet(recKey(hash), rec, LINK_TTL_MS + 60 * 1000);
-    await storage.kvDel(activeKey(rec.discordId, rec.puuid));
+    // The pointer stays, so the owner's dialog can see the link was used.
     await shop.dropLoadoutCaches(rec.discordId, ctx.account.puuid);
     console.log(`[loadshare] saved ${changes} change(s) on ${String(ctx.account.puuid).slice(0, 8)}, verified=${verified}`);
     return { saved: true, changes, verified };
