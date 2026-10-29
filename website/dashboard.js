@@ -2037,7 +2037,6 @@
   // account's tier and premium flag come from its own call, two at a time like the details.
   const battlepass = { pass: null, error: null, pending: null };
   const bpProgress = {};
-  const bpOpen = new Set();
 
   function loadBattlepass(force) {
     if (!force && (battlepass.pass || battlepass.pending)) return battlepass.pending || Promise.resolve(battlepass.pass);
@@ -2088,74 +2087,173 @@
       r && r.amount > 1 ? h("b", { text: fmt(r.amount) }) : null);
   }
 
-  // Every tier of the pass in its chapters: the premium reward for each tier, and the free
-  // rewards the chapter hands out below them.
-  function bpTrackEl(pass, p) {
-    const wrap = h("div", { class: "bp-track" });
-    const tier = p ? p.tier : 0;
-    const locked = p && p.premium === false;
+  // One pass shown the way the game shows it: pages of tiers (one chapter each) with the
+  // premium rewards in a row and the free ones below. Each account is a pin on the line,
+  // at its tier plus how far it is toward the next one. Without a premium pass the pin
+  // has no ring.
+  let bpPage = 0;
+  let bpPicked = false;
+
+  const bpTotal = (pass) => pass.chapters.reduce((n, ch) => n + ch.levels.length, 0);
+  const bpLinked = () => ordered().filter((a) => a.linked);
+
+  // Where an account sits on the track, in tiers: tier 25 and half way to 26 is 25.5.
+  function bpPos(p) {
+    if (p.tier >= p.totalTiers) return p.totalTiers;
+    return p.tier + (p.nextXp ? Math.min(1, p.towards / p.nextXp) : 0);
+  }
+
+  // The page that holds the tier an account is working on.
+  function bpPageOf(pass, p) {
+    const target = Math.min(p.tier + 1, bpTotal(pass));
+    const i = pass.chapters.findIndex((ch) => ch.levels.some((l) => l.tier === target));
+    return i < 0 ? 0 : i;
+  }
+
+  function bpPinEl(a, p, style, onPick) {
+    const pin = h("button", {
+      class: `bp-pin${p.premium ? " is-premium" : ""}`,
+      type: "button",
+      style,
+      title: `${acctName(a)}: tier ${p.tier}${p.premium === true ? ", premium" : p.premium === false ? ", free" : ""}`,
+      onclick: onPick,
+    }, emblemEl(a, "xs"));
+    return pin;
+  }
+
+  // The whole pass on one line, split into its pages. Pins that would overlap are lifted
+  // onto a second or third level.
+  function bpOverviewEl(pass, accts, onPage) {
+    const total = bpTotal(pass);
+    const wrap = h("div", { class: "bp-line" });
+    const pins = accts.map((a) => ({ a, p: (bpProgress[a.puuid] || {}).data })).filter((x) => x.p).map((x) => ({ ...x, pos: bpPos(x.p) })).sort((x, y) => x.pos - y.pos);
+    const lastAt = [-99, -99, -99, -99];
+    let levels = 1;
+    const pinsEl = h("div", { class: "bp-pins" });
+    for (const x of pins) {
+      let lv = 0;
+      while (lv < lastAt.length - 1 && (x.pos / total) * 100 - lastAt[lv] < 4.2) lv++;
+      lastAt[lv] = (x.pos / total) * 100;
+      levels = Math.max(levels, lv + 1);
+      pinsEl.appendChild(bpPinEl(x.a, x.p, `left:${((x.pos / total) * 100).toFixed(2)}%;--lv:${lv}`, () => onPage(bpPageOf(pass, x.p))));
+    }
+    wrap.style.setProperty("--levels", String(levels));
+    wrap.appendChild(pinsEl);
+    const segs = h("div", { class: "bp-segs" });
     pass.chapters.forEach((ch, i) => {
-      const last = ch.levels[ch.levels.length - 1];
-      const chapterDone = last && tier >= last.tier;
-      const tiles = h("div", { class: "bp-tiles" });
-      for (const l of ch.levels) {
-        // Without the premium pass nothing in this row was received, so no tile counts as done.
-        const state = p && !locked ? (tier >= l.tier ? " is-done" : l.tier === tier + 1 ? " is-next" : "") : "";
-        tiles.appendChild(h("div", { class: `bp-tile${state}${locked ? " is-locked" : ""}` },
-          h("span", { class: "bp-tier", text: String(l.tier) }),
-          bpRewardEl(l.reward),
-          h("span", { class: "bp-name", text: l.reward ? l.reward.name : "" })));
-      }
-      const free = ch.free.length
-        ? h("div", { class: `bp-free${chapterDone ? " is-done" : ""}` }, h("span", { class: "bp-free-label", text: "Free" }), ...ch.free.map((r) => bpRewardEl(r)))
-        : null;
-      wrap.appendChild(h("div", { class: "bp-chapter" }, h("h4", { text: `Chapter ${i + 1}` }), tiles, free));
+      segs.appendChild(h("button", { class: `bp-seg${i === bpPage ? " is-on" : ""}`, type: "button", title: `Tiers ${ch.levels[0].tier} to ${ch.levels[ch.levels.length - 1].tier}`, onclick: () => onPage(i) },
+        h("span", { text: String(i + 1) })));
     });
+    wrap.appendChild(segs);
     return wrap;
   }
 
-  function bpRowEl(a, pass) {
+  // The open page: a rail with the pins of accounts that are on it, then the tiers.
+  function bpPageEl(pass, accts, onPage) {
+    const ch = pass.chapters[bpPage];
+    const first = ch.levels[0].tier;
+    const n = ch.levels.length;
+    const stage = h("div", { class: "bp-stage" });
+    const inner = h("div", { class: "bp-stage-in", style: `--n:${n}` });
+
+    const rail = h("div", { class: "bp-rail" });
+    for (let i = 0; i < n; i++) rail.appendChild(h("span", { class: "bp-node", style: `left:${(((i + 0.5) / n) * 100).toFixed(2)}%` }));
+    const behind = [];
+    const ahead = [];
+    let levels = 1;
+    const lastAt = [-99, -99, -99];
+    const here = accts.map((a) => ({ a, p: (bpProgress[a.puuid] || {}).data })).filter((x) => x.p).map((x) => ({ ...x, pos: bpPos(x.p) })).sort((x, y) => x.pos - y.pos);
+    for (const x of here) {
+      const at = x.pos - first + 0.5; // in tile widths from the left edge
+      if (at < 0) behind.push(x);
+      else if (at > n) ahead.push(x);
+      else {
+        const pct = (at / n) * 100;
+        let lv = 0;
+        while (lv < lastAt.length - 1 && pct - lastAt[lv] < 9) lv++;
+        lastAt[lv] = pct;
+        levels = Math.max(levels, lv + 1);
+        rail.appendChild(bpPinEl(x.a, x.p, `left:${pct.toFixed(2)}%;--lv:${lv}`, () => {}));
+      }
+    }
+    // A page nobody is on keeps just the bare line.
+    rail.style.setProperty("--levels", String(rail.querySelector(".bp-pin") ? levels : 0));
+    inner.appendChild(rail);
+
+    const tiles = h("div", { class: "bp-tiles" });
+    for (const l of ch.levels) {
+      tiles.appendChild(h("div", { class: "bp-tile" },
+        h("span", { class: "bp-tier", text: String(l.tier) }),
+        bpRewardEl(l.reward),
+        h("span", { class: "bp-name", text: l.reward ? l.reward.name : "" }),
+        l.reward ? h("span", { class: "bp-kind", text: l.reward.kind === "buddy" ? "Gun buddy" : l.reward.kind === "other" ? "Flex" : l.reward.kind }) : null));
+    }
+    inner.appendChild(tiles);
+    if (ch.free.length) {
+      inner.appendChild(h("div", { class: "bp-free" }, h("span", { class: "bp-free-label", text: "Free" }), ...ch.free.map((r) => h("span", { class: "bp-free-item", title: r.name }, bpRewardEl(r, "sm"), h("span", { text: r.name })))));
+    }
+    stage.appendChild(inner);
+
+    const edge = (list, dir) => {
+      if (!list.length) return null;
+      return h("button", { class: `bp-edge ${dir}`, type: "button", title: `${list.map((x) => acctName(x.a)).join(", ")} ${dir === "left" ? "behind" : "ahead"}`,
+        onclick: () => onPage(bpPageOf(pass, list[dir === "left" ? list.length - 1 : 0].p)) },
+      dir === "left" ? iconEl("chevron-left") : null,
+      ...list.slice(0, 3).map((x) => emblemEl(x.a, "xs")),
+      list.length > 3 ? h("span", { text: `+${list.length - 3}` }) : null,
+      dir === "right" ? iconEl("chevron-right") : null);
+    };
+
+    const nav = (delta) => h("button", { class: "icon-btn", type: "button", "aria-label": delta < 0 ? "Previous page" : "Next page", disabled: bpPage + delta < 0 || bpPage + delta >= pass.chapters.length, onclick: () => onPage(bpPage + delta) }, iconEl(delta < 0 ? "chevron-left" : "chevron-right"));
+    const head = h("div", { class: "bp-page-head" }, nav(-1),
+      h("div", { class: "bp-page-title" }, h("b", { text: `Chapter ${bpPage + 1}` }), h("span", { text: `Tiers ${first} to ${ch.levels[n - 1].tier}` })),
+      nav(1));
+    return h("div", { class: "bp-page" }, head, h("div", { class: "bp-edges" }, edge(behind, "left"), edge(ahead, "right")), stage);
+  }
+
+  // One compact card per account under the pass: where it is and what it is working on.
+  function bpAcctEl(a, pass, onPage) {
     const box = bpProgress[a.puuid] || {};
     const p = box.data;
-    const open = bpOpen.has(a.puuid);
-    const total = (p && p.totalTiers) || pass.chapters.reduce((n, ch) => n + ch.levels.length, 0);
-    const row = h("div", { class: `bp-row${open ? " is-open" : ""}`, dataset: { puuid: a.puuid } });
-    const head = h("button", { class: "bp-head", type: "button", "aria-expanded": String(open), onclick: () => {
-      if (bpOpen.has(a.puuid)) bpOpen.delete(a.puuid);
-      else bpOpen.add(a.puuid);
-      renderBattlepassRows();
-    } }, emblemEl(a, "md"), h("span", { class: "bp-name-wrap" }, h("b", {}, ...nameNodes(acctName(a)))));
-    if (p) {
-      head.appendChild(h("span", { class: `chip bp-badge${p.premium ? " main" : ""}`, text: p.premium === true ? "Premium" : p.premium === false ? "Free" : "Unknown" }));
-      head.appendChild(h("span", { class: "bp-tier-big" }, h("b", { text: String(p.tier) }), h("span", { text: ` / ${total}` })));
-    }
-    head.appendChild(iconEl("chevron-down", "bp-caret"));
-    row.appendChild(head);
-
+    const card = h("button", { class: "bp-acct", type: "button", onclick: () => p && onPage(bpPageOf(pass, p)) }, emblemEl(a, "md"));
+    const body = h("span", { class: "bp-acct-body" }, h("b", {}, ...nameNodes(acctName(a))));
     if (!p) {
-      row.appendChild(box.error
-        ? h("div", { class: "bp-note" }, h("span", { text: box.error }), h("button", { class: "btn btn-ghost", type: "button", onclick: () => fetchBpProgress(a.puuid, true) }, iconEl("refresh"), "Try again"))
-        : h("div", { class: "bp-bar sk" }));
-      return row;
+      body.appendChild(h("span", { class: "bp-acct-sub", text: box.error || "Loading" }));
+      card.appendChild(body);
+      return card;
     }
+    const total = p.totalTiers;
     const done = p.tier >= total;
-    const within = !done && p.nextXp ? Math.min(1, p.towards / p.nextXp) : 0;
-    const pct = done ? 100 : ((p.tier + within) / total) * 100;
-    row.appendChild(h("div", { class: "bp-bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(total), "aria-valuenow": String(p.tier) },
-      h("span", { class: "bp-fill", style: `width:${pct.toFixed(2)}%` })));
-    const next = !done && pass.chapters.flatMap((ch) => ch.levels).find((l) => l.tier === p.tier + 1);
-    row.appendChild(h("div", { class: "bp-sub" },
-      h("span", { text: done ? "Pass complete" : p.nextXp ? `${fmt(p.towards)} / ${fmt(p.nextXp)} xp to tier ${p.tier + 1}` : "Not started" }),
-      next && next.reward ? h("span", { class: "bp-next" }, "Next: ", bpRewardEl(next.reward, "sm"), h("span", { text: next.reward.name })) : null));
-    if (open) row.appendChild(bpTrackEl(pass, p));
-    return row;
+    body.appendChild(h("span", { class: "bp-acct-sub", text: done ? "Pass complete" : p.nextXp ? `${fmt(p.towards)} / ${fmt(p.nextXp)} xp to tier ${p.tier + 1}` : "Not started" }));
+    card.appendChild(body);
+    card.appendChild(h("span", { class: "bp-acct-tier" }, h("b", { text: String(p.tier) }), h("span", { text: `/${total}` }),
+      h("span", { class: `chip${p.premium ? " main" : ""}`, text: p.premium === true ? "Premium" : p.premium === false ? "Free" : "?" })));
+    return card;
   }
 
   function renderBattlepassRows() {
-    const list = document.querySelector("#view .bp-list");
-    if (!list || !battlepass.pass) return;
+    const body = document.querySelector("#view .bp-body");
+    const pass = battlepass.pass;
+    if (!body || !pass) return;
+    const accts = bpLinked();
+    // The page opens where the first account that has loaded is working.
+    if (!bpPicked) {
+      const first = accts.map((a) => (bpProgress[a.puuid] || {}).data).find(Boolean);
+      if (first) {
+        bpPage = bpPageOf(pass, first);
+        bpPicked = true;
+      }
+    }
     const scroll = window.scrollY;
-    list.replaceChildren(...ordered().filter((a) => a.linked).map((a) => bpRowEl(a, battlepass.pass)));
+    const onPage = (i) => {
+      bpPage = Math.max(0, Math.min(pass.chapters.length - 1, i));
+      bpPicked = true;
+      renderBattlepassRows();
+    };
+    body.replaceChildren(
+      bpOverviewEl(pass, accts, onPage),
+      bpPageEl(pass, accts, onPage),
+      h("div", { class: "bp-accts" }, ...accts.map((a) => bpAcctEl(a, pass, onPage))));
     window.scrollTo({ top: scroll, behavior: "instant" });
   }
 
@@ -2164,7 +2262,7 @@
     const view = $("view");
     const pass = battlepass.pass;
     const head = h("div", { class: "page-head" }, h("div", null, h("h1", { text: "Battle pass" }),
-      h("p", { text: pass ? `${pass.act.name}. Where each account stands and what is left to earn.` : "Where each account stands on the current act's battle pass." })));
+      h("p", { text: pass ? `${pass.act.name}. Pins show where each of your accounts is on the pass.` : "Where each account stands on the current act's battle pass." })));
     view.appendChild(head);
     if (!pass) {
       if (battlepass.error && !battlepass.pending) {
@@ -2172,9 +2270,7 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => loadBattlepass(true) }, iconEl("refresh"), "Try again")));
         return;
       }
-      const list = h("div", { class: "bp-list" });
-      for (let i = 0; i < 3; i++) list.appendChild(h("div", { class: "bp-row" }, h("div", { class: "sk", style: "height:40px" }), h("div", { class: "bp-bar sk" })));
-      view.appendChild(list);
+      view.appendChild(h("div", { class: "bp-sk sk" }));
       loadBattlepass();
       return;
     }
@@ -2187,12 +2283,12 @@
       view.appendChild(h("div", { class: "empty-state" }, iconEl("info"), h("h3", { text: "Tiers not published yet" }), h("p", { text: "This act's battle pass is not in the catalog yet. Check back soon." })));
       return;
     }
-    const linked = ordered().filter((a) => a.linked);
+    const linked = bpLinked();
     if (!linked.length) {
       view.appendChild(h("div", { class: "empty-state" }, iconEl("user"), h("h3", { text: "No linked accounts" }), h("p", { text: "Link a Riot account to see its battle pass." })));
       return;
     }
-    view.appendChild(h("div", { class: "bp-list" }));
+    view.appendChild(h("div", { class: "bp-body" }));
     renderBattlepassRows();
     const todo = linked.filter((a) => !(bpProgress[a.puuid] && (bpProgress[a.puuid].data || bpProgress[a.puuid].pending || bpProgress[a.puuid].error)));
     let i = 0;
