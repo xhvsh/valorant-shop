@@ -931,8 +931,10 @@ async function battlepassTrack() {
     // each gun buddy, and shows them that way.
     if (kind === 'currency') {
       const c = currency.get(r.id);
-      const radianite = c && /radianite/i.test(c.name);
-      return { kind, name: radianite ? '10 Radianite Points' : c ? c.name : 'Currency', icon: c ? c.icon : null, amount: radianite ? 10 : r.amount };
+      // Radianite is known by its id, so a slow or failed currency list cannot turn it into "Currency".
+      const radianite = r.id === CURRENCY.rp;
+      const icon = c && c.icon ? c.icon : `https://media.valorant-api.com/currencies/${r.id}/displayicon.png`;
+      return { kind, name: radianite ? '10 Radianite Points' : c ? c.name : 'Currency', icon, amount: radianite ? 10 : r.amount };
     }
     const found = resolve(r.id);
     const icon = found.type === 'card' && found.art ? found.art.small || found.icon : found.icon;

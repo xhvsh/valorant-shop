@@ -2118,7 +2118,8 @@
   // The last page is the Epilogue, not a numbered chapter.
   const bpChapterName = (ch, i) => (ch.epilogue ? "Epilogue" : `Chapter ${i + 1}`);
 
-  // Titles read as the title itself ("Gearing Up"); only the item's own name carries "Title".
+  // Inside the art a title reads as the title itself ("Gearing Up"); the item name under it
+  // keeps "Title".
   const bpShownName = (r) => (r.kind === "title" ? titleName(r.name) : r.name);
 
   const BP_KINDS = { skin: "Skin", buddy: "Gun buddy", spray: "Spray", card: "Player card", title: "Title", currency: "Currency", other: "Flex" };
@@ -2140,11 +2141,11 @@
       art.appendChild(h("span", { class: "bp-here" }, ...o.here.slice(0, 3).map((a) => emblemEl(a, "xs")),
         o.here.length > 3 ? h("span", { class: "bp-here-more", text: `+${o.here.length - 3}` }) : null));
     }
-    const tip = [r ? `${bpShownName(r)}${r.amount > 1 ? ` x${fmt(r.amount)}` : ""} (${BP_KINDS[r.kind] || r.kind})` : o.label];
+    const tip = [r ? `${r.name}${r.amount > 1 ? ` x${fmt(r.amount)}` : ""}${r.kind === "title" ? "" : ` (${BP_KINDS[r.kind] || r.kind})`}` : o.label];
     if (o.here.length) tip.push(`Working on it: ${o.here.map(acctName).join(", ")}`);
     const tile = h("div", { class: `bp-tile${o.free ? " is-free" : ""}`, style: `grid-column:${o.col}`, title: tip.join("\n") },
       art,
-      h("span", { class: "bp-foot" }, h("b", { text: o.label }), h("span", { text: r ? bpShownName(r) : "" })));
+      h("span", { class: "bp-foot" }, h("b", { text: o.label }), h("span", { text: r ? r.name : "" })));
     // Skins and player cards open the same preview as everywhere else.
     if (r && canPreview(r)) previewTrigger(tile, r);
     return tile;
