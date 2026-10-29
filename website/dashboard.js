@@ -2210,8 +2210,8 @@
     // so a chapter with fewer free rewards (or none) sits in the middle of the box.
     const used = ch.free.length;
     const stage = h("div", { class: "bp-stage-in", style: `--s:${cols + freeCols};grid-template-columns:repeat(${cols}, var(--t))${used ? ` 10px repeat(${used}, var(--t))` : ""}` },
-      h("span", { class: "bp-col-label", style: `grid-column:1 / span ${cols}`, text: "Premium rewards" }),
-      used ? h("span", { class: "bp-col-label is-free", style: `grid-column:${cols + 2} / span ${used}`, text: "Free rewards" }) : null,
+      h("span", { class: "bp-col-label", style: `grid-column:1 / span ${cols}`, text: "Premium" }),
+      used ? h("span", { class: "bp-col-label is-free", style: `grid-column:${cols + 2} / span ${used}`, text: "Free" }) : null,
       used ? h("span", { class: "bp-sep", style: `grid-column:${cols + 1}`, "aria-hidden": "true" }) : null);
     ch.levels.forEach((l, i) => stage.appendChild(bpTileEl(l.reward, { label: `Tier ${l.tier}`, col: i + 1, here: hereOn(l.tier) })));
     ch.free.forEach((r, i) => stage.appendChild(bpTileEl(r, { label: "Free", col: cols + 2 + i, here: [], free: true })));
