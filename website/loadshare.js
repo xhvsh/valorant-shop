@@ -3,8 +3,14 @@
 
   // The link lives in the URL fragment, so it is never sent to the server as part of a
   // request line or a Referer. It is moved into memory and removed from the address bar.
-  const TOKEN = location.hash.replace(/^#/, "");
+  // It is also kept for this tab only (sessionStorage), so a reload does not lose the link.
+  let TOKEN = location.hash.replace(/^#/, "");
+  try {
+    if (TOKEN) sessionStorage.setItem("ls-token", TOKEN);
+    else TOKEN = sessionStorage.getItem("ls-token") || "";
+  } catch { /* storage can be blocked */ }
   try { history.replaceState(null, "", location.pathname); } catch { /* ignore */ }
+  const forgetToken = () => { try { sessionStorage.removeItem("ls-token"); } catch { /* ignore */ } };
 
   const BASE = location.pathname.replace(/\/loadout-share\/?$/, "/");
   const $ = (id) => document.getElementById(id);
@@ -398,6 +404,7 @@
       const res = await call("api/loadshare/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.saved) { setMsg(res.message || "Nothing was changed.", ""); nonce = res.nonce || nonce; btn.disabled = false; return; }
       done = true;
+      forgetToken();
       closePicker();
       $("bar").hidden = true;
       $("timer").hidden = true;
@@ -408,12 +415,22 @@
       if (err.status === 410 || err.status === 404) return finish(err.message);
       setMsg(err.message, "error");
       btn.disabled = false;
-      if (err.status === 409) setTimeout(() => location.reload(), 1500);
+      if (err.status === 409) {
+        // The page token was replaced (the link was opened again somewhere): fetch a new one
+        // and keep the choices made here, so the visitor only has to press Save again.
+        try {
+          nonce = (await call("api/loadshare/view")).nonce;
+          setMsg("The page was refreshed in the background. Press Save again.", "");
+        } catch (e2) {
+          setMsg(e2.message, "error");
+        }
+      }
     }
   }
 
   function finish(message) {
     done = true;
+    forgetToken();
     V = null;
     closePicker();
     $("bar").hidden = true;

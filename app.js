@@ -209,6 +209,8 @@ app.get(['/', '/index.html', '/wishlist', '/bundles', '/battlepass', '/settings'
 });
 // Loadout share page. Its asset links are relative, so it works at / and under the mount.
 app.get('/loadout-share', (req, res) => {
+  // The page's own links are relative, so a trailing slash would break them.
+  if (req.path.endsWith('/')) return res.redirect(302, `${req.mountPath || ''}/loadout-share`);
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
