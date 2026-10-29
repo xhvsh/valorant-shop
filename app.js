@@ -2908,6 +2908,17 @@ app.get('/health', async (req, res) => {
 
 // ---- Shared ---------------------------------------------------------------
 
+// Unknown pages: a page that matches the site's layout for browsers, the usual JSON for the API.
+const NOT_FOUND_HTML = fs.readFileSync(path.join(__dirname, 'website', '404.html'), 'utf8');
+app.use((req, res, next) => {
+  const wantsPage = (req.method === 'GET' || req.method === 'HEAD') && !/^\/api(\/|$)/.test(req.path) && req.accepts(['html', 'json']) === 'html';
+  if (!wantsPage) return next(httpError('Not found.', 404));
+  res.status(404);
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.type('html').send(NOT_FOUND_HTML.replace(/\{\{base\}\}/g, `${res.locals.mountPath || ''}/`));
+});
+
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   const status = err.status || 500;

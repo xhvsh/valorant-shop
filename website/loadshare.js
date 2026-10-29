@@ -11,7 +11,7 @@
   const app = $("app");
   const modal = $("modal");
   // Links back to the main site, wherever it is mounted.
-  for (const id of ["homeLink", "homeBtn", "homeFoot"]) $(id).href = BASE;
+  for (const id of ["homeLink", "homeBtn"]) $(id).href = BASE;
   document.querySelector(".foot-links a").href = BASE + "legal";
 
   function h(tag, props, ...children) {
@@ -400,9 +400,10 @@
       done = true;
       closePicker();
       $("bar").hidden = true;
-      app.replaceChildren(h("div", { class: "ls-end" },
-        h("h2", { text: "Saved" }),
-        h("p", { class: "muted", text: res.verified === false ? "Riot accepted the change but did not keep all of it. Check the loadout in-game. This link is now used up." : "The loadout was updated. This link is now used up." })));
+      $("timer").hidden = true;
+      endScreen("Saved", res.verified === false
+        ? "Riot accepted the change but did not keep all of it. Check the loadout in-game. This link is now used up."
+        : "The loadout was updated. This link is now used up.", "You can now close this page.");
     } catch (err) {
       if (err.status === 410 || err.status === 404) return finish(err.message);
       setMsg(err.message, "error");
@@ -417,7 +418,29 @@
     closePicker();
     $("bar").hidden = true;
     $("timer").hidden = true;
-    app.replaceChildren(h("div", { class: "ls-end" }, h("h2", { text: "Link unavailable" }), h("p", { class: "muted", text: message })));
+    endScreen("Link unavailable", message, "You can close this page.");
+  }
+
+  // The last screen of a link: what happened, that the page can be closed, and the way
+  // back to the main site.
+  function endScreen(title, text, closing) {
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("width", "15");
+    icon.setAttribute("height", "15");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "2");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M7 17 17 7M8 7h9v9");
+    icon.appendChild(path);
+    app.replaceChildren(h("div", { class: "ls-end" },
+      h("h2", { text: title }),
+      h("p", { class: "muted", text: text }),
+      h("p", { class: "ls-close", text: closing }),
+      h("a", { class: "btn", href: BASE }, icon, "Back to valorant shop")));
   }
 
   function tick() {
