@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const storage = require('./storage');
 const riot = require('./riot');
 const shop = require('./shop');
+const items = require('./items');
 
 const LINK_TTL_MS = 30 * 60 * 1000;
 const SAVE_LOCK_MS = 60 * 1000;
@@ -62,6 +63,8 @@ async function buildCatalog() {
     apiJson('playertitles'),
     apiJson('flex'),
   ]);
+  // The main catalog knows which skins are battle pass skins and their rarity tier.
+  await items.load().catch(() => {});
   const out = { weapons: new Map(), buddyLevels: new Map(), sprays: new Map(), cards: new Map(), titles: new Map(), flexes: new Map() };
   for (const w of weapons) {
     const skins = [];
@@ -71,10 +74,14 @@ async function buildCatalog() {
       let kind = 'normal';
       if (low(s.uuid) === low(w.defaultSkinUuid) || /^standard /i.test(name)) kind = 'standard';
       else if (/random favorite/i.test(name)) kind = 'random';
+      const known = items.resolve(s.levels[0].uuid);
+      const isSkin = known && known.type === 'skin';
       skins.push({
         id: low(s.uuid),
         name,
         kind,
+        tier: (isSkin && known.tier) || null,
+        bp: Boolean(isSkin && items.skinKind(known.name, known.tier, known.edition) === 'battlepass'),
         // A standard skin's own displayIcon is a placeholder X; its first chroma holds the real render.
         icon: (kind === 'standard' ? s.chromas[0].fullRender || w.displayIcon : s.displayIcon) || s.chromas[0].fullRender || s.levels[0].displayIcon || null,
         levels: s.levels.map((l, i) => ({ id: low(l.uuid), name: l.displayName || `Level ${i + 1}` })),
@@ -89,7 +96,7 @@ async function buildCatalog() {
     }
   }
   for (const s of sprays) out.sprays.set(low(s.uuid), { id: low(s.uuid), name: s.displayName, icon: s.animationGif || s.fullTransparentIcon || s.displayIcon || null });
-  for (const c of cards) out.cards.set(low(c.uuid), { id: low(c.uuid), name: c.displayName, icon: c.smallArt || c.displayIcon || null, art: c.wideArt || c.largeArt || null });
+  for (const c of cards) out.cards.set(low(c.uuid), { id: low(c.uuid), name: c.displayName, icon: c.smallArt || c.displayIcon || null, large: c.largeArt || c.wideArt || c.smallArt || null });
   for (const t of titles) out.titles.set(low(t.uuid), { id: low(t.uuid), name: String(t.titleText || t.displayName || '').trim() || 'Title' });
   for (const f of flexes) out.flexes.set(low(f.uuid), { id: low(f.uuid), name: f.displayName, icon: f.displayIcon || null });
   return out;
@@ -210,7 +217,7 @@ function limitSkin(s, owned, own, current) {
   const single = s.kind === 'standard' || s.kind === 'random';
   const levels = s.levels.filter((l, i) => i === 0 || (!single && owned.levels.has(l.id)) || (s.id === current.skin && l.id === current.level));
   const chromas = s.chromas.filter((c, i) => i === 0 || (!single && owned.chromas.has(c.id)) || (s.id === current.skin && c.id === current.chroma));
-  return { id: s.id, name: s.name, kind: s.kind, icon: s.icon, owned: own, levels, chromas };
+  return { id: s.id, name: s.name, kind: s.kind, tier: s.tier, bp: s.bp, icon: s.icon, owned: own, levels, chromas };
 }
 
 const gunState = (g) => ({
@@ -246,9 +253,28 @@ async function viewLink(token) {
   }
   buddies.sort((a, b) => a.name.localeCompare(b.name));
 
-  const view = { guns, buddies, cosmetics: null };
+  // What the player card, title and wheel show now. Always sent, so the page can draw the
+  // loadout; the lists to pick from below only go out when the owner allowed cosmetics.
+  const identity = raw.Identity || {};
+  const currentCard = cat.cards.get(low(identity.PlayerCardID));
+  const currentTitle = cat.titles.get(low(identity.PlayerTitleID));
+  const wheel = (raw.ActiveExpressions || []).map((e) => {
+    const type = low(e.TypeID) === TYPE.flex ? 'flex' : 'spray';
+    const info = (type === 'flex' ? cat.flexes : cat.sprays).get(low(e.AssetID));
+    return { type, id: low(e.AssetID), name: info ? info.name : '', icon: info ? info.icon : null };
+  });
+  const view = {
+    guns,
+    buddies,
+    cosmetics: null,
+    identity: {
+      card: currentCard ? { id: currentCard.id, name: currentCard.name, large: currentCard.large } : null,
+      title: currentTitle ? { id: currentTitle.id, name: currentTitle.name } : null,
+      expressions: wheel,
+      incognito: Boolean(raw.Incognito),
+    },
+  };
   if (rec.cosmetics) {
-    const identity = raw.Identity || {};
     const pick = (map, set, currentId) => {
       const list = [];
       for (const [id, item] of map) if (set.has(id) || id === low(currentId)) list.push(item);

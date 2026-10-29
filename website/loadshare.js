@@ -9,6 +9,7 @@
   const BASE = location.pathname.replace(/\/loadout-share\/?$/, "/");
   const $ = (id) => document.getElementById(id);
   const app = $("app");
+  const modal = $("modal");
 
   function h(tag, props, ...children) {
     const node = document.createElement(tag);
@@ -16,6 +17,7 @@
       if (v === null || v === undefined || v === false) continue;
       if (k === "class") node.className = v;
       else if (k === "text") node.textContent = v;
+      else if (k === "style") node.setAttribute("style", v);
       else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
       else if (v === true) node.setAttribute(k, "");
       else node.setAttribute(k, v);
@@ -26,15 +28,19 @@
     }
     return node;
   }
-  const img = (src, alt) => {
+  const fallback = (name) => h("span", { class: "fallback", text: String(name || "?").slice(0, 2).toUpperCase() });
+  function img(src, alt) {
+    if (!src) return fallback(alt);
     const i = document.createElement("img");
     i.loading = "lazy";
     i.decoding = "async";
+    i.draggable = false;
     i.alt = alt || "";
     i.referrerPolicy = "no-referrer";
-    if (src) i.src = src;
+    i.onerror = () => i.replaceWith(fallback(alt));
+    i.src = src;
     return i;
-  };
+  }
 
   async function call(path, init) {
     const res = await fetch(BASE + path, { ...init, headers: { ...((init && init.headers) || {}), "X-Share-Token": TOKEN } });
@@ -47,13 +53,33 @@
     return data;
   }
 
-  let V = null;          // what the server sent: guns, buddies, cosmetics
+  /* ---------- loadout layout (the same columns and tile sizes as the dashboard's Loadout tab) ---------- */
+
+  const LOADOUT_COLUMNS = [
+    [["Sidearms", ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff"]]],
+    [["SMGs", ["Stinger", "Spectre"]], ["Shotguns", ["Bucky", "Judge"]], ["Melee", ["Melee"]]],
+    [["Rifles", ["Bulldog", "Guardian", "Warden", "Phantom", "Vandal"]]],
+    [["Sniper rifles", ["Marshal", "Outlaw", "Operator"]], ["Machine guns", ["Ares", "Odin"]]],
+  ];
+  const LOADOUT_GUN_WIDTH = {
+    Classic: 0.44, Shorty: 0.62, Frenzy: 0.44, Ghost: 0.6, Bandit: 0.46, Sheriff: 0.54,
+    Stinger: 0.66, Spectre: 0.68, Bucky: 0.8, Judge: 0.76, Melee: 0.6,
+    Bulldog: 0.78, Guardian: 0.8, Warden: 0.8, Phantom: 0.8, Vandal: 0.8,
+    Marshal: 0.8, Outlaw: 0.8, Operator: 0.8, Ares: 0.8, Odin: 0.8,
+  };
+  const TIER_COLORS = { select: "#5a9fe2", deluxe: "#009587", premium: "#d1548d", exclusive: "#f5955b", ultra: "#fad663" };
+  const tierColor = (tier) => TIER_COLORS[String(tier || "").toLowerCase().replace(/\s*edition/gi, "").trim()] || null;
+  const titleName = (name) => String(name || "").replace(/\s+title$/i, "").trim() || String(name || "Title");
+
+  /* ---------- state ---------- */
+
+  let V = null;          // what the server sent
   let nonce = "";
   let expiresAt = 0;
   let edits = null;      // { guns: { [weaponId]: { skin, level, chroma, buddy } }, cosmetics }
-  let selected = null;   // weapon id being edited
-  let tab = "skin";
-  let filter = "";
+  let picker = null;     // { kind: "gun" | "card" | "slot", ... , tab }
+  let hideBp = false;    // skin filter
+  const Q = Object.create(null); // search text per list
   let done = false;
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -65,7 +91,6 @@
     for (const g of V.guns) edits.guns[g.weapon] = clone(g.current);
     if (V.cosmetics) edits.cosmetics = { card: V.cosmetics.card, title: V.cosmetics.title, expressions: clone(V.cosmetics.expressions) };
   }
-
   function changedGuns() {
     return V.guns.filter((g) => {
       const e = edits.guns[g.weapon], c = g.current;
@@ -83,143 +108,246 @@
     return n;
   }
 
-  /* ---------- rendering ---------- */
-
-  function render() {
-    app.replaceChildren();
-    app.appendChild(h("div", { class: "ls-note" },
-      h("b", { text: "One save only. " }),
-      "This link works for a single save and ends 30 minutes after it was made. Only items this account owns can be equipped, and nothing is sent until you press Save."));
-    app.appendChild(gunsSection());
-    if (selected && gunOf(selected)) app.appendChild(editor(gunOf(selected)));
-    if (V.cosmetics) app.appendChild(cosmeticsSection());
-    updateBar();
+  // Current card, title and wheel as shown: the edited choice when cosmetics are editable,
+  // otherwise what the account has equipped.
+  function cardNow() {
+    if (!edits.cosmetics) return V.identity.card;
+    return V.cosmetics.cards.find((c) => c.id === edits.cosmetics.card) || V.identity.card;
   }
-
-  function gunsSection() {
-    const grid = h("div", { class: "ls-guns" });
-    for (const g of V.guns) {
-      const e = edits.guns[g.weapon];
-      const skin = skinOf(g, e.skin);
-      const buddy = e.buddy && V.buddies.find((b) => b.instance === e.buddy);
-      const changed = changedGuns().includes(g);
-      grid.appendChild(h("button", {
-        type: "button",
-        class: `ls-gun${selected === g.weapon ? " is-sel" : ""}${changed ? " is-changed" : ""}`,
-        onclick: () => { selected = g.weapon; tab = "skin"; filter = ""; render(); },
-      },
-        h("div", { class: "ls-gun-art" }, skin && skin.icon ? img(chromaIcon(skin, e.chroma) || skin.icon, skin.name) : null),
-        h("div", { class: "ls-gun-name" }, g.name, h("span", { class: "ls-gun-skin", text: skin ? skin.name : "" })),
-        buddy ? h("div", { class: "ls-gun-buddy" }, img(buddy.icon, buddy.name)) : null));
-    }
-    return h("section", { class: "ls-sec" }, h("h2", { text: "Weapons" }), grid);
+  function titleNow() {
+    if (!edits.cosmetics) return V.identity.title;
+    return V.cosmetics.titles.find((t) => t.id === edits.cosmetics.title) || V.identity.title;
   }
+  function expressionInfo(x) {
+    const lists = V.cosmetics ? (x.type === "flex" ? V.cosmetics.flexes : V.cosmetics.sprays) : [];
+    return lists.find((i) => i.id === x.id) || V.identity.expressions.find((i) => i.id === x.id && i.type === x.type) || null;
+  }
+  const wheelNow = () => (edits.cosmetics ? edits.cosmetics.expressions : V.identity.expressions);
+
+  /* ---------- loadout screen ---------- */
 
   function chromaIcon(skin, chromaId) {
     const c = skin.chromas.find((x) => x.id === chromaId);
     return c && c.icon;
   }
 
-  function editor(g) {
+  function gunEl(g) {
     const e = edits.guns[g.weapon];
-    const tabs = h("div", { class: "ls-tabs" },
-      h("button", { type: "button", class: `btn sm ${tab === "skin" ? "" : "btn-ghost"}`, onclick: () => { tab = "skin"; render(); } }, "Skin"),
-      g.melee ? null : h("button", { type: "button", class: `btn sm ${tab === "buddy" ? "" : "btn-ghost"}`, onclick: () => { tab = "buddy"; render(); } }, "Gun buddy"));
-    const body = tab === "buddy" && !g.melee ? buddyPicker(g, e) : skinPicker(g, e);
-    return h("section", { class: "ls-edit" }, h("h3", { text: g.name }), tabs, body);
+    const skin = skinOf(g, e.skin) || {};
+    const random = skin.kind === "random";
+    const buddy = e.buddy && V.buddies.find((b) => b.instance === e.buddy);
+    const color = !random && tierColor(skin.tier);
+    const art = chromaIcon(skin, e.chroma) || skin.icon;
+    const changed = changedGuns().includes(g);
+    return h("button", {
+      type: "button",
+      class: `lo-gun ls-click${random ? " is-random" : ""}${color ? " has-tier" : ""}${changed ? " is-changed" : ""}`,
+      title: random ? `${g.name}: random favorite skin` : `${g.name}: ${skin.name || ""}`,
+      style: `--gw:${LOADOUT_GUN_WIDTH[g.name] || 0.7}${color ? `;--tier:${color}` : ""}`,
+      onclick: () => openPicker({ kind: "gun", weapon: g.weapon, tab: "skin" }),
+    },
+      h("div", { class: "lo-gun-art" }, art ? img(art, skin.name) : null),
+      h("span", { class: `lo-weapon${!random && skin.name ? " has-skin" : ""}` }, h("span", { class: "lo-weapon-name", text: g.name }), !random && skin.name ? h("span", { class: "lo-skin-name", text: skin.name }) : null),
+      buddy ? h("div", { class: "lo-buddy", title: buddy.name }, img(buddy.icon, buddy.name)) : null);
   }
 
-  function skinPicker(g, e) {
-    const wrap = h("div", { style: "display:grid;gap:12px" });
-    const search = h("input", { class: "input ls-search", type: "search", placeholder: "Search skins", value: filter, "aria-label": "Search skins" });
-    search.addEventListener("input", () => { filter = search.value; fill(); });
+  function renderScreen() {
+    const byName = new Map(V.guns.map((g) => [g.name, g]));
+    const known = new Set(LOADOUT_COLUMNS.flatMap((col) => col.flatMap(([, list]) => list)));
+    const screen = h("div", { class: "lo-screen" });
+    LOADOUT_COLUMNS.forEach((groups, i) => {
+      const col = h("div", { class: "lo-col" });
+      for (const [label, weapons] of groups) {
+        col.appendChild(h("h3", { class: "lo-h", text: label }));
+        for (const w of weapons) {
+          const g = byName.get(w);
+          col.appendChild(g ? gunEl(g) : h("div", { class: "lo-gun is-empty" }, h("span", { class: "lo-weapon" }, h("span", { class: "lo-weapon-name", text: w }))));
+        }
+      }
+      if (i === 2) for (const g of V.guns) if (!known.has(g.name)) col.appendChild(gunEl(g));
+      screen.appendChild(col);
+    });
+
+    // Player card and the expression wheel.
+    const editable = Boolean(V.cosmetics);
+    const card = cardNow();
+    const title = titleNow();
+    const cardBox = h(editable ? "button" : "div", {
+      type: editable ? "button" : null,
+      class: `lo-card-wrap${editable ? " ls-click" : ""}`,
+      onclick: editable ? () => openPicker({ kind: "card", tab: "card" }) : null,
+    },
+      h("div", { class: "lo-card", title: card ? card.name : "" }, card && card.large ? img(card.large, card.name) : h("div", { class: "lo-card-none", text: "No card equipped" })),
+      h("div", { class: "lo-card-name" }, h("b", { text: "Player" }), title ? h("span", {}, h("i", { text: titleName(title.name) })) : null));
+    const wheel = h("div", { class: "lo-wheel" }, h("span", { class: "lo-wheel-dot" }));
+    ["top", "right", "bottom", "left"].forEach((pos, i) => {
+      const x = wheelNow()[i];
+      const info = x && expressionInfo(x);
+      wheel.appendChild(h(editable ? "button" : "div", {
+        type: editable ? "button" : null,
+        class: `lo-slot ${pos}${editable ? " ls-click" : ""}`,
+        title: info ? info.name : "",
+        onclick: editable && x ? () => openPicker({ kind: "slot", index: i, tab: x.type === "flex" ? "flex" : "spray" }) : null,
+      }, info && info.icon ? img(info.icon, info.name) : null));
+    });
+    screen.appendChild(h("div", { class: "lo-col lo-side" },
+      h("h3", { class: "lo-h", text: "Player card" }), cardBox,
+      V.identity.incognito ? h("span", { class: "chip lo-incognito", text: "Incognito" }) : null,
+      h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }), wheel));
+
+    app.replaceChildren(
+      h("div", { class: "ls-note" }, h("b", { text: "One save only. " }),
+        "This link works for a single save and ends 30 minutes after it was made. Only items this account owns can be equipped, and nothing is sent until you press Save. ",
+        V.cosmetics ? "Click a weapon, the player card or a spray slot to change it." : "Click a weapon to change its skin or gun buddy."),
+      h("div", { class: "lo-wrap ls-wrap" }, screen));
+  }
+
+  /* ---------- picker (opens on click) ---------- */
+
+  function openPicker(p) {
+    picker = p;
+    renderModal();
+  }
+  function closePicker() {
+    picker = null;
+    modal.hidden = true;
+    modal.replaceChildren();
+  }
+
+  // A searchable grid. `items` is filtered by the search text and, optionally, `pass`.
+  function listPane(key, items, tile, { pass, controls, header } = {}) {
+    const search = h("input", { class: "input ls-search", type: "search", placeholder: "Search", value: Q[key] || "", "aria-label": "Search" });
     const grid = h("div", { class: "ls-grid" });
-    const detail = h("div", { style: "display:grid;gap:8px" });
-    const order = { standard: 0, random: 1, normal: 2 };
-    const list = [...g.skins].sort((a, b) => (order[a.kind] - order[b.kind]) || a.name.localeCompare(b.name));
     function fill() {
       grid.replaceChildren();
-      const q = filter.trim().toLowerCase();
-      for (const s of list) {
-        if (q && !s.name.toLowerCase().includes(q)) continue;
-        grid.appendChild(h("button", { type: "button", class: `ls-tile${e.skin === s.id ? " is-sel" : ""}`, onclick: () => pick(s) },
-          h("div", { class: "art" }, s.icon ? img(s.icon, s.name) : null),
-          h("div", { class: "nm", title: s.name, text: s.name }),
-          s.kind === "random" ? h("div", { class: "tag", text: "Random favorite" }) : s.kind === "standard" ? h("div", { class: "tag", text: "Standard" }) : null));
+      const q = (Q[key] || "").trim().toLowerCase();
+      let n = 0;
+      for (const it of items) {
+        if (q && !String(it.name).toLowerCase().includes(q)) continue;
+        if (pass && !pass(it)) continue;
+        grid.appendChild(tile(it, fill));
+        n += 1;
       }
+      if (!n) grid.appendChild(h("p", { class: "muted", text: "Nothing found." }));
     }
-    function pick(s) {
-      e.skin = s.id;
-      e.level = s.levels[s.levels.length - 1].id;
-      e.chroma = s.chromas[0].id;
-      render();
-    }
-    const cur = skinOf(g, e.skin);
-    if (cur && (cur.levels.length > 1 || cur.chromas.length > 1)) {
+    search.addEventListener("input", () => { Q[key] = search.value; fill(); });
+    fill();
+    const pane = h("div", { class: "ls-pane" }, h("div", { class: "ls-tools" }, search, controls ? controls(fill) : null), header ? header(fill) : null, grid);
+    return pane;
+  }
+
+  function skinPane(g) {
+    const e = edits.guns[g.weapon];
+    const order = { standard: 0, random: 1, normal: 2 };
+    const items = [...g.skins].sort((a, b) => (order[a.kind] - order[b.kind]) || a.name.localeCompare(b.name));
+    const detail = h("div", { class: "ls-detail" });
+    function drawDetail() {
+      detail.replaceChildren();
+      const cur = skinOf(g, e.skin);
+      if (!cur) return;
       if (cur.levels.length > 1) {
         detail.appendChild(h("div", { class: "ls-row" }, h("span", { class: "lbl", text: "Level" }),
-          ...cur.levels.map((l, i) => h("button", { type: "button", class: `btn sm ${e.level === l.id ? "" : "btn-ghost"}`, onclick: () => { e.level = l.id; render(); } }, String(i + 1)))));
+          ...cur.levels.map((l, i) => h("button", { type: "button", class: `btn sm ${e.level === l.id ? "" : "btn-ghost"}`, onclick: () => { e.level = l.id; changed(); drawDetail(); } }, String(i + 1)))));
       }
       if (cur.chromas.length > 1) {
         detail.appendChild(h("div", { class: "ls-row" }, h("span", { class: "lbl", text: "Variant" }),
-          ...cur.chromas.map((c, i) => h("button", { type: "button", class: `ls-sw${e.chroma === c.id ? " is-sel" : ""}`, title: c.name || `Variant ${i + 1}`, onclick: () => { e.chroma = c.id; render(); } }, c.icon ? img(c.icon, c.name) : String(i + 1)))));
+          ...cur.chromas.map((c, i) => h("button", { type: "button", class: `ls-sw${e.chroma === c.id ? " is-sel" : ""}`, title: c.name || `Variant ${i + 1}`, onclick: () => { e.chroma = c.id; changed(); drawDetail(); } }, c.icon ? img(c.icon, c.name) : String(i + 1)))));
       }
     }
-    wrap.append(search, detail, grid);
-    fill();
-    return wrap;
+    const pane = listPane(`skin:${g.weapon}`, items, (s, fill) => {
+      const sel = e.skin === s.id;
+      return h("button", { type: "button", class: `ls-tile${sel ? " is-sel" : ""}`, onclick: () => {
+        e.skin = s.id;
+        e.level = s.levels[s.levels.length - 1].id;
+        e.chroma = s.chromas[0].id;
+        changed();
+        drawDetail();
+        fill();
+      } },
+        h("div", { class: "art" }, s.icon ? img(s.icon, s.name) : null),
+        h("div", { class: "nm", title: s.name, text: s.name }),
+        s.kind === "random" ? h("div", { class: "tag", text: "Random favorite" }) : s.kind === "standard" ? h("div", { class: "tag", text: "Standard" }) : s.bp ? h("div", { class: "tag", text: "Battle pass" }) : null);
+    }, {
+      // Battle pass skins can be hidden; the equipped one and the free skins always stay.
+      pass: (s) => !(hideBp && s.bp && s.kind === "normal" && s.id !== e.skin),
+      controls: (fill) => h("label", { class: "ls-check" },
+        h("input", { type: "checkbox", checked: hideBp, onchange: (ev) => { hideBp = ev.target.checked; fill(); } }),
+        h("span", { text: "Hide battle pass skins" })),
+    });
+    drawDetail();
+    pane.insertBefore(detail, pane.lastChild);
+    return pane;
   }
 
-  function buddyPicker(g, e) {
-    const grid = h("div", { class: "ls-grid" });
-    grid.appendChild(h("button", { type: "button", class: `ls-tile${e.buddy ? "" : " is-sel"}`, onclick: () => { e.buddy = null; render(); } },
-      h("div", { class: "art" }), h("div", { class: "nm", text: "No gun buddy" })));
-    for (const b of V.buddies) {
-      const holder = V.guns.find((x) => x.weapon !== g.weapon && edits.guns[x.weapon].buddy === b.instance);
-      grid.appendChild(h("button", {
-        type: "button",
-        class: `ls-tile${e.buddy === b.instance ? " is-sel" : ""}`,
-        onclick: () => {
-          // A copy sits on one weapon at a time: taking it frees it from the other.
-          if (holder) edits.guns[holder.weapon].buddy = null;
-          e.buddy = b.instance;
-          render();
-        },
-      },
+  function buddyPane(g) {
+    const e = edits.guns[g.weapon];
+    const items = [{ id: "", name: "No gun buddy", none: true }, ...V.buddies.map((b) => ({ id: b.instance, name: b.name, icon: b.icon }))];
+    return listPane("buddy", items, (b, fill) => {
+      const holder = b.none ? null : V.guns.find((x) => x.weapon !== g.weapon && edits.guns[x.weapon].buddy === b.id);
+      const sel = b.none ? !e.buddy : e.buddy === b.id;
+      return h("button", { type: "button", class: `ls-tile${sel ? " is-sel" : ""}`, onclick: () => {
+        // One copy sits on one weapon at a time: taking it frees it from the other.
+        if (holder) edits.guns[holder.weapon].buddy = null;
+        e.buddy = b.none ? null : b.id;
+        changed();
+        fill();
+      } },
         h("div", { class: "art" }, b.icon ? img(b.icon, b.name) : null),
         h("div", { class: "nm", title: b.name, text: b.name }),
-        holder ? h("div", { class: "tag", text: `On ${holder.name}` }) : null));
-    }
-    return h("div", { style: "display:grid;gap:12px" },
-      V.buddies.length ? null : h("p", { class: "muted", text: "This account has no gun buddies." }), grid);
+        holder ? h("div", { class: "tag", text: `On ${holder.name}` }) : null);
+    });
   }
 
-  function cosmeticsSection() {
-    const C = V.cosmetics, e = edits.cosmetics;
-    const cards = h("div", { class: "ls-grid" });
-    for (const c of C.cards) {
-      cards.appendChild(h("button", { type: "button", class: `ls-tile cardish${e.card === c.id ? " is-sel" : ""}`, onclick: () => { e.card = c.id; render(); } },
-        h("div", { class: "art" }, c.icon ? img(c.icon, c.name) : null), h("div", { class: "nm", title: c.name, text: c.name })));
-    }
-    const titleSel = h("select", { "aria-label": "Title" });
-    for (const t of C.titles) titleSel.appendChild(h("option", { value: t.id, text: t.name, selected: t.id === e.title }));
-    titleSel.addEventListener("change", () => { e.title = titleSel.value; updateBar(); });
+  function cardPane() {
+    const e = edits.cosmetics;
+    return listPane("card", V.cosmetics.cards, (c, fill) => h("button", { type: "button", class: `ls-tile cardish${e.card === c.id ? " is-sel" : ""}`, onclick: () => { e.card = c.id; changed(); fill(); } },
+      h("div", { class: "art" }, c.icon ? img(c.icon, c.name) : null), h("div", { class: "nm", title: c.name, text: c.name })));
+  }
+  function titlePane() {
+    const e = edits.cosmetics;
+    return listPane("title", V.cosmetics.titles, (t, fill) => h("button", { type: "button", class: `ls-tile txt${e.title === t.id ? " is-sel" : ""}`, onclick: () => { e.title = t.id; changed(); fill(); } },
+      h("div", { class: "nm", title: t.name, text: titleName(t.name) })));
+  }
+  function slotPane(type) {
+    const e = edits.cosmetics;
+    const i = picker.index;
+    const list = type === "flex" ? V.cosmetics.flexes : V.cosmetics.sprays;
+    return listPane(type, list, (x, fill) => h("button", { type: "button", class: `ls-tile${e.expressions[i].type === type && e.expressions[i].id === x.id ? " is-sel" : ""}`, onclick: () => { e.expressions[i] = { type, id: x.id }; changed(); fill(); } },
+      h("div", { class: "art" }, x.icon ? img(x.icon, x.name) : null), h("div", { class: "nm", title: x.name, text: x.name })));
+  }
 
-    const slots = h("div", { class: "ls-slots" });
-    e.expressions.forEach((x, i) => {
-      const sel = h("select", { "aria-label": `Slot ${i + 1}` });
-      const sp = h("optgroup", { label: "Sprays" }), fx = h("optgroup", { label: "Flexes" });
-      for (const s of C.sprays) sp.appendChild(h("option", { value: `spray:${s.id}`, text: s.name, selected: x.type === "spray" && x.id === s.id }));
-      for (const f of C.flexes) fx.appendChild(h("option", { value: `flex:${f.id}`, text: f.name, selected: x.type === "flex" && x.id === f.id }));
-      sel.append(sp, fx);
-      sel.addEventListener("change", () => { const [type, id] = sel.value.split(":"); e.expressions[i] = { type, id }; updateBar(); });
-      slots.appendChild(h("label", {}, `Slot ${i + 1}`, sel));
-    });
-    return h("section", { class: "ls-sec" }, h("h2", { text: "Cosmetics" }),
-      h("div", { class: "ls-edit" },
-        h("h3", { text: "Player card" }), cards,
-        h("h3", { text: "Title" }), h("div", { class: "ls-row" }, titleSel),
-        h("h3", { text: "Sprays and flexes" }), slots));
+  function renderModal() {
+    if (!picker) return closePicker();
+    let title = "";
+    let tabs = [];
+    if (picker.kind === "gun") {
+      const g = gunOf(picker.weapon);
+      title = g.name;
+      tabs = [{ id: "skin", label: "Skins", pane: () => skinPane(g) }];
+      if (!g.melee) tabs.push({ id: "buddy", label: "Gun buddies", pane: () => buddyPane(g) });
+    } else if (picker.kind === "card") {
+      title = "Player card";
+      tabs = [{ id: "card", label: "Cards", pane: cardPane }, { id: "title", label: "Titles", pane: titlePane }];
+    } else {
+      title = `Expression slot ${picker.index + 1}`;
+      tabs = [{ id: "spray", label: "Sprays", pane: () => slotPane("spray") }, { id: "flex", label: "Flexes", pane: () => slotPane("flex") }];
+    }
+    if (!tabs.some((t) => t.id === picker.tab)) picker.tab = tabs[0].id;
+    const current = tabs.find((t) => t.id === picker.tab);
+    modal.hidden = false;
+    modal.replaceChildren(h("div", { class: "ls-dlg", role: "dialog", "aria-modal": "true", "aria-label": title },
+      h("div", { class: "ls-dlg-head" }, h("h2", { text: title }),
+        h("div", { class: "ls-tabs" }, ...tabs.map((t) => h("button", { type: "button", class: `btn sm ${t.id === picker.tab ? "" : "btn-ghost"}`, onclick: () => { picker.tab = t.id; renderModal(); } }, t.label))),
+        h("button", { type: "button", class: "btn btn-ghost sm", onclick: closePicker }, "Done")),
+      current.pane()));
+  }
+  modal.addEventListener("click", (e) => { if (e.target === modal) closePicker(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && picker) closePicker(); });
+
+  // Called after any edit: the loadout behind the picker and the save bar follow along.
+  function changed() {
+    renderScreen();
+    updateBar();
   }
 
   /* ---------- save bar ---------- */
@@ -248,6 +376,7 @@
       const res = await call("api/loadshare/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.saved) { setMsg(res.message || "Nothing was changed.", ""); nonce = res.nonce || nonce; btn.disabled = false; return; }
       done = true;
+      closePicker();
       $("bar").hidden = true;
       app.replaceChildren(h("div", { class: "ls-end" },
         h("h2", { text: "Saved" }),
@@ -263,6 +392,7 @@
   function finish(message) {
     done = true;
     V = null;
+    closePicker();
     $("bar").hidden = true;
     $("timer").hidden = true;
     app.replaceChildren(h("div", { class: "ls-end" }, h("h2", { text: "Link unavailable" }), h("p", { class: "muted", text: message })));
@@ -279,7 +409,7 @@
   }
 
   $("saveBtn").addEventListener("click", save);
-  $("resetBtn").addEventListener("click", () => { startEdits(); render(); });
+  $("resetBtn").addEventListener("click", () => { startEdits(); changed(); if (picker) renderModal(); });
 
   (async () => {
     if (!TOKEN) return finish("This link is not valid.");
@@ -289,8 +419,8 @@
       nonce = res.nonce;
       expiresAt = res.expiresAt;
       startEdits();
-      selected = V.guns[0] ? V.guns[0].weapon : null;
-      render();
+      renderScreen();
+      updateBar();
       tick();
       setInterval(tick, 1000);
     } catch (err) {
