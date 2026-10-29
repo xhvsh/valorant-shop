@@ -143,7 +143,7 @@
   --line-2: #30333d;
   --text: #ececf0;
   --text-2: #a7abb6;
-  --text-3: #767a87;
+  --text-3: #80848f; /* 4.65:1 or better on every surface (WCAG AA for small text) */
   --red: #ff4655;
   --red-2: #ff6370;
   --red-dark: #c62e3c;
@@ -805,6 +805,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 /* With the sidebar docked, the account row and the footer share one height so
    their top borders line up along the bottom of the page. */
 @media (min-width: 1024px) {
+  /* The page heading already says it; the sticky bar repeats it once that has scrolled away. */
+  .topbar-title { transition: opacity .15s; }
+  .topbar-title.is-quiet { opacity: 0; }
   .sb-user { box-sizing: border-box; height: var(--foot-h); padding-top: 0; padding-bottom: 0; }
   .footer { box-sizing: border-box; min-height: var(--foot-h); align-items: center; align-content: center; padding-top: 0; padding-bottom: 0; }
 }
@@ -980,11 +983,12 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 }
 .acct-card .warn-line .i { margin-top: 2px; }
 .acct-card-add {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 8px;
-  min-height: 220px;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
   border: 1px dashed var(--line-2);
   border-radius: var(--r-lg);
   background: transparent;
@@ -992,7 +996,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   transition: border-color .2s, color .2s, background .2s;
 }
 .acct-card-add:hover { border-color: var(--red); color: var(--text); background: var(--red-soft); }
-.acct-card-add .i { font-size: 26px; }
+.acct-card-add .i { font-size: 20px; }
 
 /* ==========================================================================
    Account page
@@ -1108,6 +1112,14 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
+/* On phones the tab row scrolls sideways: fade the right edge so it reads as "more". */
+@media (max-width: 719px) {
+  .tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    padding-right: 36px;
+  }
+}
 .tab {
   position: relative;
   display: inline-flex;

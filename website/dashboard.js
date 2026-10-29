@@ -748,6 +748,22 @@
     el.textContent = text;
     el.classList.toggle("is-label", !isName);
     document.title = text && text !== "Overview" ? `${text} - valorant shop` : "valorant shop";
+    requestAnimationFrame(watchHeading);
+  }
+
+  // On desktop the page heading and the sticky top bar would both say the same thing:
+  // keep the bar's title quiet until the heading has scrolled out of view.
+  let headingObs = null;
+  function watchHeading() {
+    if (headingObs) headingObs.disconnect();
+    headingObs = null;
+    const bar = $("topbarTitle");
+    const heading = document.querySelector("#view h1");
+    bar.classList.remove("is-quiet");
+    if (!heading || !("IntersectionObserver" in window)) return;
+    bar.classList.add("is-quiet");
+    headingObs = new IntersectionObserver(([entry]) => bar.classList.toggle("is-quiet", entry.isIntersecting), { rootMargin: "-56px 0px 0px 0px" });
+    headingObs.observe(heading);
   }
 
   function updateNav() {
@@ -1203,7 +1219,7 @@
     if (store) {
       for (const it of items.slice(0, 4)) {
         const color = tierColor(it.tier);
-        shop.appendChild(h("div", { class: "mini-item", title: it.name || "", style: color ? `--tier:${color}` : null }, it.icon ? makeImg(it.icon, it.name) : fallbackText(it.name)));
+        shop.appendChild(h("div", { class: "mini-item", title: it.price != null ? `${it.name || ""} - ${fmt(it.price)} VP` : it.name || "", style: color ? `--tier:${color}` : null }, it.icon ? makeImg(it.icon, it.name) : fallbackText(it.name)));
       }
     } else if (S.storeError[a.puuid]) {
       shop.style.gridTemplateColumns = "1fr";
@@ -1428,7 +1444,7 @@
     nav.scrollLeft = scroll;
     const active = nav.querySelector(".tab.is-active");
     if (active && (active.offsetLeft < nav.scrollLeft || active.offsetLeft + active.offsetWidth > nav.scrollLeft + nav.clientWidth)) {
-      nav.scrollLeft = active.offsetLeft - 16;
+      nav.scrollLeft = Math.max(0, active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2);
     }
   }
 
