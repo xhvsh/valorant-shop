@@ -728,6 +728,11 @@
         go(path("/"), true);
         return;
       }
+      // A link (or back/forward) to a tab this account does not have opens its daily shop.
+      if (!tabAllowed(a, r.tab)) {
+        go(acctHref(a.puuid), true);
+        return;
+      }
       renderAccountView(a);
     } else if (r.name === "wishlist") renderWishlistView();
     else if (r.name === "bundles") renderBundlesView();
@@ -855,7 +860,12 @@
     if (a.is_default) li.appendChild(iconEl("crown", "mark"));
     else if (a.shared) li.appendChild(iconEl("share", "mark shared"));
     if (S.route.name === "account" && S.route.puuid === a.puuid) li.classList.add("is-active");
-    const open = () => go(acctHref(a.puuid));
+    // Switching accounts keeps the open tab (Loadout stays Loadout) when the other account
+    // has it too; otherwise it opens on the daily shop.
+    const open = () => {
+      const tab = S.route.name === "account" && tabAllowed(a, S.route.tab) ? S.route.tab : "daily";
+      go(acctHref(a.puuid, tab));
+    };
     li.addEventListener("click", open);
     li.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -1437,6 +1447,11 @@
       tabs.push({ id: "sharing", label: "Sharing", icon: "share" });
     }
     return tabs;
+  }
+
+  // Alerts and Sharing belong to the owner: an account shared with you has neither.
+  function tabAllowed(a, tab) {
+    return tabDefs(a).some((t) => t.id === tab);
   }
 
   function renderTabs() {
