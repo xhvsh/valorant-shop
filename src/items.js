@@ -243,11 +243,14 @@ const SOURCES = [
       const src = assetFolder(d.assetPath, 'Buddies');
       const levels = d.levels || [];
       // Easter egg: "Fist Bump Buddy" is displayed as "Riot Gunbuddy" (see the
-      // EASTER_EGG_* constants above). This is the only name override. Its
-      // per-level icon ships as a broken 32x32 placeholder, so use the buddy's
-      // top-level art for it instead.
+      // EASTER_EGG_* constants above). This is the only name override.
+      //
+      // Icons come from the buddy's own art (/buddies/..), not the level's
+      // (/buddylevels/..): a dozen level icons (HAZ + MATT, the VCT x buddies, Fist
+      // Bump) are broken 32x32 black placeholders, and a few more are another
+      // buddy's image. Every buddy has exactly one level, so nothing is lost.
       const nameFor = (id) => (isEasterEggBuddy(id) ? EASTER_EGG_BUDDY_NAME : d.displayName);
-      const iconFor = (id, lvlIcon) => (isEasterEggBuddy(id) ? d.displayIcon || lvlIcon : lvlIcon) || null;
+      const iconFor = (id, lvlIcon) => d.displayIcon || lvlIcon || null;
       const out = levels.map((l) => ({ id: l.uuid, name: nameFor(l.uuid), icon: iconFor(l.uuid, l.displayIcon), src }));
       if (!levels.length) out.push({ id: d.uuid, name: nameFor(d.uuid), icon: iconFor(d.uuid, null), src });
       return out;
@@ -398,7 +401,7 @@ async function loadTiers() {
 // Every cold serverless instance used to download ~5 MB from valorant-api, which
 // throttles or stalls under that load. The built catalog is kept gzipped in the
 // database instead: instances read it from there, and only one refreshes it.
-const SNAP_KEY = 'catalog:snapshot:v1';
+const SNAP_KEY = 'catalog:snapshot:v2';
 const SNAP_LOCK = 'catalog:refresh_lock';
 const SNAP_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 

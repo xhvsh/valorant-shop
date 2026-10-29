@@ -30,7 +30,7 @@ const EMOJI_IDS = {
 };
 
 // Bump this whenever grid rendering changes so CDN/edge caches are bypassed.
-const GRID_CACHE_VERSION = '12';
+const GRID_CACHE_VERSION = '13';
 
 // Animated grid limits: frames per loop, and the byte budget Discord uploads allow.
 const GIF_MAX_FRAMES = 150;

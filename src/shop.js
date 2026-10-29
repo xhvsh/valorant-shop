@@ -653,8 +653,8 @@ async function accountDetails(discordId, puuid, opts = {}) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
-  const fullKey = `acctdetails:v10:${discordId}:${account.puuid}`;
-  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v10:${scope}:${discordId}:${account.puuid}`;
+  const fullKey = `acctdetails:v11:${discordId}:${account.puuid}`;
+  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v11:${scope}:${discordId}:${account.puuid}`;
   // The scoped copy is the small one: try it first, and only read the big full copy
   // (hundreds of KB) when it misses.
   const fresh = (box) => box && box.details && box.at && Date.now() - box.at < DETAILS_TTL;
