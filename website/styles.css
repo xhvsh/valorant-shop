@@ -1326,7 +1326,20 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   border-radius: var(--r);
   background: var(--surface);
 }
-.tile-media { display: flex; align-items: center; justify-content: center; height: 78px; padding: 8px; background: var(--bg-2); }
+.tile-media { position: relative; display: flex; align-items: center; justify-content: center; height: 78px; padding: 8px; background: var(--bg-2); }
+.tile.is-equipped { border-color: var(--red); }
+.eq-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--red);
+  color: #fff;
+  font: 600 9.5px/1 var(--font-head);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 .tiles.square .tile-media { height: auto; aspect-ratio: 1; }
 .tile-media img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .tile.is-previewable { position: relative; cursor: pointer; transition: border-color .15s, transform .15s var(--ease); }
