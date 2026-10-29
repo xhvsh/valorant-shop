@@ -1916,14 +1916,14 @@
   }
 
   // Every skin image is cropped to the weapon and 512px wide, so by itself a Classic would
-  // look as long as an Operator. These are the widths the game draws each weapon at, as a
-  // share of its tile's width (measured off the in-game loadout screen). None goes past
-  // 0.79, so the art always ends short of the buddy hanging in the bottom-right corner.
+  // look as long as an Operator. These are the widths each weapon is drawn at, as a share
+  // of its tile's width: sidearms smallest, then SMGs, then the long guns. Long guns stop
+  // at 0.8 and sit mid-height, clear of the buddy hanging in the bottom-right corner.
   const LOADOUT_GUN_WIDTH = {
-    Classic: 0.29, Shorty: 0.51, Frenzy: 0.34, Ghost: 0.51, Bandit: 0.34, Sheriff: 0.42,
-    Stinger: 0.55, Spectre: 0.59, Bucky: 0.78, Judge: 0.69, Melee: 0.55,
-    Bulldog: 0.74, Guardian: 0.77, Warden: 0.79, Phantom: 0.78, Vandal: 0.76,
-    Marshal: 0.79, Outlaw: 0.78, Operator: 0.79, Ares: 0.75, Odin: 0.68,
+    Classic: 0.44, Shorty: 0.62, Frenzy: 0.44, Ghost: 0.6, Bandit: 0.46, Sheriff: 0.54,
+    Stinger: 0.66, Spectre: 0.68, Bucky: 0.8, Judge: 0.76, Melee: 0.6,
+    Bulldog: 0.78, Guardian: 0.8, Warden: 0.8, Phantom: 0.8, Vandal: 0.8,
+    Marshal: 0.8, Outlaw: 0.8, Operator: 0.8, Ares: 0.8, Odin: 0.8,
   };
 
   function loadoutGunEl(weapon, g) {
@@ -1931,9 +1931,12 @@
     const random = Boolean(g && skin.random);
     const tip = g ? (random ? `${weapon}: random favorite skin` : `${weapon}: ${skin.name || ""}`) : weapon;
     const art = g ? skin.render || skin.icon : null;
-    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip, style: `--gw:${LOADOUT_GUN_WIDTH[weapon] || 0.7}` },
+    const color = !random && tierColor(skin.tier);
+    // The label shows the weapon, and the skin's name on hover.
+    const skinName = g && !random && skin.name ? skin.name : "";
+    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}${color ? " has-tier" : ""}`, title: tip, style: `--gw:${LOADOUT_GUN_WIDTH[weapon] || 0.7}${color ? `;--tier:${color}` : ""}` },
       h("div", { class: "lo-gun-art" }, art ? imgOrFallback(art, skin.name) : null),
-      h("span", { class: "lo-weapon", text: weapon }),
+      h("span", { class: `lo-weapon${skinName ? " has-skin" : ""}` }, h("span", { class: "lo-weapon-name", text: weapon }), skinName ? h("span", { class: "lo-skin-name", text: skinName }) : null),
       g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null);
   }
 
@@ -1996,11 +1999,10 @@
     const screen = loadoutColumnsEl(byWeapon);
 
     // Last column: player card and the expressions wheel. As in the game, the player's
-    // name and title sit on the card itself.
+    // name and title sit on the card itself. The account level is shown elsewhere.
     const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
     const card = h("div", { class: "lo-card", title: lo.card ? lo.card.name || "" : "" },
       cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" }),
-      lo.level != null && !lo.levelHidden ? h("span", { class: "lo-level", text: String(lo.level) }) : null,
       h("div", { class: "lo-card-name" }, h("b", { text: String(a.name || acctName(a)).replace(/#.*$/, "") }),
         lo.title ? h("span", { text: titleName(lo.title.name) }) : null));
     const side = h("div", { class: "lo-col lo-side" },
