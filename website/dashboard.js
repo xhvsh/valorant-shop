@@ -1915,14 +1915,15 @@
       });
   }
 
-  // Every skin image is cropped to the same width, so by itself a Classic would look as
-  // long as an Operator. These are the weapons' in-game lengths relative to the longest
-  // (read off the game's loadout screen), used to size each image inside its tile.
-  const LOADOUT_GUN_LENGTH = {
-    Classic: 0.37, Shorty: 0.65, Frenzy: 0.3, Ghost: 0.64, Bandit: 0.42, Sheriff: 0.53,
-    Stinger: 0.7, Spectre: 0.75, Bucky: 0.99, Judge: 0.88, Melee: 0.69,
-    Bulldog: 0.95, Guardian: 0.97, Warden: 0.97, Phantom: 1, Vandal: 0.96,
-    Marshal: 0.99, Outlaw: 0.99, Operator: 1, Ares: 0.95, Odin: 0.82,
+  // Every skin image is cropped to the weapon and 512px wide, so by itself a Classic would
+  // look as long as an Operator. These are the widths the game draws each weapon at, as a
+  // share of its tile's width (measured off the in-game loadout screen). None goes past
+  // 0.79, so the art always ends short of the buddy hanging in the bottom-right corner.
+  const LOADOUT_GUN_WIDTH = {
+    Classic: 0.29, Shorty: 0.51, Frenzy: 0.34, Ghost: 0.51, Bandit: 0.34, Sheriff: 0.42,
+    Stinger: 0.55, Spectre: 0.59, Bucky: 0.78, Judge: 0.69, Melee: 0.55,
+    Bulldog: 0.74, Guardian: 0.77, Warden: 0.79, Phantom: 0.78, Vandal: 0.76,
+    Marshal: 0.79, Outlaw: 0.78, Operator: 0.79, Ares: 0.75, Odin: 0.68,
   };
 
   function loadoutGunEl(weapon, g) {
@@ -1930,10 +1931,29 @@
     const random = Boolean(g && skin.random);
     const tip = g ? (random ? `${weapon}: random favorite skin` : `${weapon}: ${skin.name || ""}`) : weapon;
     const art = g ? skin.render || skin.icon : null;
-    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip, style: `--gw:${LOADOUT_GUN_LENGTH[weapon] || 0.8}` },
+    return h("div", { class: `lo-gun${random ? " is-random" : ""}${g ? "" : " is-empty"}`, title: tip, style: `--gw:${LOADOUT_GUN_WIDTH[weapon] || 0.7}` },
       h("div", { class: "lo-gun-art" }, art ? imgOrFallback(art, skin.name) : null),
       h("span", { class: "lo-weapon", text: weapon }),
       g && g.buddy ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null) : null);
+  }
+
+  // The columns of weapon tiles. Without a loadout (still loading) every tile is a skeleton.
+  function loadoutColumnsEl(byWeapon) {
+    const screen = h("div", { class: "lo-screen" });
+    const known = new Set(LOADOUT_COLUMNS.flatMap((col) => col.flatMap(([, list]) => list)));
+    LOADOUT_COLUMNS.forEach((groups, i) => {
+      const col = h("div", { class: "lo-col" });
+      groups.forEach(([label, weapons]) => {
+        col.appendChild(h("h3", { class: "lo-h", text: label }));
+        for (const w of weapons) col.appendChild(byWeapon ? loadoutGunEl(w, byWeapon.get(w)) : h("div", { class: "lo-gun sk" }));
+      });
+      // Anything the game added that is not listed above goes at the end of the rifles.
+      if (i === 2 && byWeapon) {
+        for (const [w, g] of byWeapon) if (!known.has(w)) col.appendChild(loadoutGunEl(w, g));
+      }
+      screen.appendChild(col);
+    });
+    return screen;
   }
 
   // Expression wheel: four slots, filled clockwise from the top in the order Riot lists
@@ -1961,13 +1981,11 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Try again")));
         return;
       }
-      const sk = h("div", { class: "lo-screen" });
-      for (let c = 0; c < 5; c++) {
-        const col = h("div", { class: "lo-col" });
-        for (let i = 0; i < (c === 4 ? 2 : 4); i++) col.appendChild(h("div", { class: "lo-gun sk", style: c === 4 ? "aspect-ratio:1/1.6" : "" }));
-        sk.appendChild(col);
-      }
-      box.appendChild(sk);
+      const sk = loadoutColumnsEl(null);
+      sk.appendChild(h("div", { class: "lo-col lo-side" },
+        h("h3", { class: "lo-h", text: "Player cards" }), h("div", { class: "lo-card sk" }),
+        h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }), h("div", { class: "lo-wheel sk" })));
+      box.appendChild(h("div", { class: "lo-wrap" }, sk));
       return;
     }
 
@@ -1975,36 +1993,24 @@
 
     const byWeapon = new Map();
     for (const g of lo.guns || []) if (g.weapon) byWeapon.set(g.weapon, g);
-    const known = new Set(LOADOUT_COLUMNS.flatMap((col) => col.flatMap(([, list]) => list)));
+    const screen = loadoutColumnsEl(byWeapon);
 
-    const screen = h("div", { class: "lo-screen" });
-    LOADOUT_COLUMNS.forEach((groups, i) => {
-      const col = h("div", { class: "lo-col" });
-      groups.forEach(([label, weapons]) => {
-        col.appendChild(h("h3", { class: "lo-h", text: label }));
-        for (const w of weapons) col.appendChild(loadoutGunEl(w, byWeapon.get(w)));
-      });
-      // Anything the game added that is not listed above goes at the end of the rifles.
-      if (i === 2) {
-        for (const [w, g] of byWeapon) if (!known.has(w)) col.appendChild(loadoutGunEl(w, g));
-      }
-      screen.appendChild(col);
-    });
-
-    // Last column: player card and the expressions wheel.
+    // Last column: player card and the expressions wheel. As in the game, the player's
+    // name and title sit on the card itself.
     const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
-    const card = h("div", { class: "lo-card" },
+    const card = h("div", { class: "lo-card", title: lo.card ? lo.card.name || "" : "" },
       cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" }),
-      lo.level != null && !lo.levelHidden ? h("span", { class: "lo-level", text: String(lo.level) }) : null);
+      lo.level != null && !lo.levelHidden ? h("span", { class: "lo-level", text: String(lo.level) }) : null,
+      h("div", { class: "lo-card-name" }, h("b", { text: String(a.name || acctName(a)).replace(/#.*$/, "") }),
+        lo.title ? h("span", { text: titleName(lo.title.name) }) : null));
     const side = h("div", { class: "lo-col lo-side" },
-      h("h3", { class: "lo-h", text: "Player card" }),
+      h("h3", { class: "lo-h", text: "Player cards" }),
       card,
-      h("div", { class: "lo-card-name" }, h("b", { text: lo.card ? lo.card.name : "" }), lo.title ? h("span", { text: titleName(lo.title.name) }) : null,
-        lo.incognito ? h("span", { class: "chip", text: "Incognito" }) : null),
+      lo.incognito ? h("span", { class: "chip lo-incognito", text: "Incognito" }) : null,
       h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }),
       loadoutWheelEl(lo));
     screen.appendChild(side);
-    box.appendChild(screen);
+    box.appendChild(h("div", { class: "lo-wrap" }, screen));
   }
 
   /* ---------- alerts ---------- */

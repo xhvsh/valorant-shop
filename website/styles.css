@@ -1337,54 +1337,86 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
-/* loadout page: laid out like the in-game loadout screen.
-   All five columns are the same height. Headings keep their size and the weapon tiles in
-   each column share what is left, so a column with six tiles has shorter tiles than one
-   with three (as in the game). */
-.lo-screen { display: grid; grid-template-columns: repeat(4, minmax(0, 1.2fr)) minmax(0, .8fr); gap: 20px; align-items: stretch; height: 700px; }
-.lo-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
-.lo-h { flex: none; margin: 0; text-align: center; font: 600 22px/30px var(--font-head); letter-spacing: .02em; text-transform: uppercase; }
-.lo-col .lo-h:not(:first-child) { margin-top: 10px; }
-.lo-gun { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 2px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
-/* The art is centred above a bottom strip that holds the weapon name (left) and the buddy
-   (right), so the two can never overlap. Its width is the weapon's real length (--gw) as a
-   share of the tile. */
-.lo-gun-art { position: absolute; inset: 8px 10px 34px; display: flex; align-items: center; justify-content: center; }
-.lo-gun-art img { width: calc(var(--gw, 1) * 100%); max-width: 100%; max-height: 100%; object-fit: contain; }
-.lo-gun.is-random .lo-gun-art img { opacity: .32; filter: grayscale(1) brightness(.7); }
+/* loadout page: laid out like the in-game loadout screen, at the game's proportions.
+   The whole screen keeps the game's aspect ratio and every size inside it is in cqw
+   (a share of the screen's width), so tiles, headings, weapon art and buddies all scale
+   together. All five columns are the same height: headings keep their size and the
+   weapon tiles in each column share what is left, so a column with six tiles has
+   shorter tiles than one with five (as in the game). */
+.lo-wrap { container-type: inline-size; --lo-name: clamp(9px, .67cqw, 12px); }
+.lo-screen { display: grid; grid-template-columns: repeat(4, minmax(0, 300fr)) minmax(0, 273fr); column-gap: 2.45%; aspect-ratio: 1633 / 851; }
+.lo-col { display: flex; flex-direction: column; gap: .98cqw; min-width: 0; min-height: 0; }
+.lo-h { flex: none; margin: 0; text-align: center; font: 600 clamp(12px, 1.72cqw, 30px)/1.2 var(--font-head); letter-spacing: .01em; text-transform: uppercase; }
+.lo-col .lo-h:not(:first-child) { margin-top: .86cqw; }
+.lo-gun { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; border: 2px solid #464a54; background: linear-gradient(180deg, #2a2d37, #21242c); transition: border-color .15s var(--ease); }
+.lo-gun:hover { border-color: #646974; }
+/* The game's bottom edge: a brighter middle segment with a short gap either side. */
+.lo-gun::before { content: ""; position: absolute; left: -2px; right: -2px; bottom: -2px; height: 2px; background: linear-gradient(90deg, #464a54 0 24.5%, transparent 24.5% 27%, #737883 27% 73%, transparent 73% 75.5%, #464a54 75.5%); }
+.lo-gun.sk { border-color: transparent; background: var(--surface-3); }
+.lo-gun.sk::before { content: none; }
+/* The art is centred in the tile, a little above the weapon name. Its width is the share
+   of the tile the game gives that weapon (--gw, never more than 0.79), so a Classic is
+   small and an Operator long. It is centred, so even the longest ends a tenth short of
+   the right edge, and it sits mid-height, above the buddy hanging in the bottom-right
+   corner: the two never overlap. */
+/* The bottom inset keeps it clear of the weapon name, whatever size the name ends up. */
+.lo-gun-art { position: absolute; inset: .5cqw 0 calc(.61cqw + var(--lo-name) + 2px); display: flex; align-items: center; justify-content: center; }
+.lo-gun-art img { width: calc(var(--gw, .7) * 100%); max-height: 100%; object-fit: contain; }
+/* Random favorite: the game shows a dark silhouette of the weapon with a white shuffle
+   mark. Riot's image is a grey silhouette with a light mark, so push the grey down and
+   the mark up. */
+.lo-gun.is-random .lo-gun-art img { filter: brightness(.65) contrast(3.7); opacity: .85; }
 .lo-gun.is-empty .lo-gun-art { opacity: .2; }
-.lo-weapon { position: absolute; left: 10px; bottom: 9px; color: var(--text-2); font-size: 11px; font-weight: 600; line-height: 1; letter-spacing: .08em; text-transform: uppercase; }
-.lo-buddy { position: absolute; right: 8px; bottom: 4px; width: 28px; height: 28px; }
-.lo-buddy img { width: 100%; height: 100%; object-fit: contain; }
-.lo-side { justify-content: flex-start; }
-.lo-card { position: relative; flex: none; overflow: hidden; width: min(100%, 150px); margin: 0 auto; border-radius: 2px; background: var(--bg-2); aspect-ratio: 452 / 998; }
+.lo-weapon { position: absolute; left: .61cqw; bottom: .61cqw; color: #8a909b; font-size: var(--lo-name); line-height: 1; letter-spacing: .05em; text-transform: uppercase; }
+/* Buddy icons are square with the charm in the middle half, so a 12% box shows the charm
+   at the game's size (about 6% of the tile) centred over the last few percent. */
+.lo-buddy { position: absolute; right: .5%; bottom: 6%; width: 12%; aspect-ratio: 1; display: flex; align-items: flex-end; justify-content: center; }
+.lo-buddy img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
+.lo-side { align-items: center; }
+.lo-card { position: relative; flex: none; width: 74%; overflow: hidden; border-top: 3px solid #d8dbe0; background: var(--bg-2); aspect-ratio: 268 / 640; }
+.lo-card.sk { border-top: 0; background: var(--surface-3); }
 .lo-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lo-card-none { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 12px; }
-.lo-level { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 10px; background: rgba(15, 17, 21, .85); color: #fff; font: 600 12px/1.4 var(--font-mono); }
-.lo-card-name { flex: none; display: grid; gap: 3px; justify-items: center; text-align: center; }
-.lo-card-name b { font: 600 13px/1.2 var(--font-head); letter-spacing: .04em; }
-.lo-card-name span:not(.chip) { color: var(--text-2); font-size: 12px; }
+.lo-level { position: absolute; top: 0; left: 50%; z-index: 1; transform: translateX(-50%); padding: .1cqw .55cqw; border: 1px solid rgba(216, 219, 224, .55); border-top: 0; background: #16181d; color: #fff; font: 600 clamp(10px, .7cqw, 13px)/1.4 var(--font-mono); }
+/* The player's name and title sit on the card, about two thirds of the way down. */
+.lo-card-name { position: absolute; left: 0; right: 0; top: 68%; display: grid; gap: .15cqw; justify-items: center; padding: 0 6px; text-align: center; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
+.lo-card-name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: clamp(11px, .74cqw, 14px); font-weight: 600; }
+.lo-card-name span { color: #d6d9df; font-size: clamp(9px, .6cqw, 12px); }
+.lo-incognito { flex: none; }
 /* Expressions sit at the bottom of the column, level with the last weapon tiles. */
 .lo-side .lo-h.lo-expr-h { margin-top: auto; }
-.lo-wheel { position: relative; flex: none; width: min(100%, 170px); aspect-ratio: 1; margin: 0 auto; border: 2px solid var(--line-2); border-radius: 50%; }
-.lo-wheel::before, .lo-wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-2); }
+.lo-wheel { position: relative; flex: none; width: 86%; aspect-ratio: 1; border: 2px solid #464a54; border-radius: 50%; }
+.lo-wheel.sk { border: 0; }
+.lo-wheel::before, .lo-wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #464a54; }
 .lo-wheel::before { transform: rotate(45deg); }
 .lo-wheel::after { transform: rotate(-45deg); }
-.lo-wheel-dot { position: absolute; left: 50%; top: 50%; z-index: 1; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 1px solid var(--line-2); border-radius: 50%; background: var(--bg-2); }
-.lo-slot { position: absolute; z-index: 2; display: grid; place-items: center; width: 26%; aspect-ratio: 1; }
+.lo-wheel.sk::before, .lo-wheel.sk::after { content: none; }
+.lo-wheel-dot { position: absolute; left: 50%; top: 50%; z-index: 1; width: 26%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 1px solid #464a54; border-radius: 50%; background: var(--surface) radial-gradient(circle, #8a909b 0 9%, transparent 10%); }
+.lo-slot { position: absolute; z-index: 2; display: grid; place-items: center; width: 22%; aspect-ratio: 1; }
 .lo-slot img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.lo-slot.top { left: 37%; top: 5%; }
-.lo-slot.bottom { left: 37%; bottom: 5%; }
-.lo-slot.left { left: 5%; top: 37%; }
-.lo-slot.right { right: 5%; top: 37%; }
-/* Narrower screens: columns stack in twos and the tiles get a fixed height. */
-@media (max-width: 1180px) {
-  .lo-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
-  .lo-gun { flex: none; height: 96px; }
-  .lo-side { grid-column: 1 / -1; grid-row: 1; max-width: 300px; margin: 0 auto 10px; }
-  .lo-side .lo-h.lo-expr-h { margin-top: 18px; }
+.lo-slot.top { left: 39%; top: 6.5%; }
+.lo-slot.bottom { left: 39%; bottom: 6.5%; }
+.lo-slot.left { left: 6.5%; top: 39%; }
+.lo-slot.right { right: 6.5%; top: 39%; }
+/* Narrow screens (phones): the weapon columns stack in twos, each tile keeps the game's
+   shape, and the card and wheel go first, side by side. Wider than this the game layout
+   just scales down. */
+@container (max-width: 680px) {
+  .lo-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 22px; aspect-ratio: auto; }
+  .lo-col { gap: 8px; }
+  .lo-col .lo-h:not(:first-child) { margin-top: 8px; }
+  .lo-h { font-size: 16px; }
+  .lo-gun { flex: none; aspect-ratio: 300 / 128; }
+  .lo-gun-art { inset: 5px 0 20px; }
+  .lo-weapon { left: 8px; bottom: 7px; }
+  .lo-side { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 160px)); justify-content: center; justify-items: center; gap: 8px 20px; }
+  .lo-side > .lo-h { grid-row: 1; }
+  .lo-card { grid-area: 2 / 1; width: 100%; }
+  .lo-incognito { grid-area: 3 / 1; }
+  .lo-side .lo-h.lo-expr-h { grid-column: 2; margin-top: 0; }
+  .lo-wheel { grid-area: 2 / 2; align-self: center; width: 100%; }
+  .lo-level { padding: 1px 8px; }
 }
-@media (max-width: 640px) { .lo-screen { grid-template-columns: 1fr; } }
 .coll-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
