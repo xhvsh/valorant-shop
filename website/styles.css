@@ -1337,6 +1337,29 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
+/* loadout page */
+.lo-id { display: flex; gap: 20px; align-items: center; margin-bottom: 8px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.lo-card { flex: none; width: 120px; border-radius: var(--r); overflow: hidden; background: var(--bg-2); }
+.lo-card img { display: block; width: 100%; height: auto; }
+.lo-id-text { display: flex; flex-direction: column; min-width: 0; }
+.lo-id-text b { font: 600 16px/1.3 var(--font-head); letter-spacing: .04em; overflow-wrap: anywhere; }
+.lo-label { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.lo-h { margin: 22px 0 10px; color: var(--text-2); font: 600 13px/1 var(--font-head); letter-spacing: .1em; text-transform: uppercase; }
+.lo-guns { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.lo-gun { display: grid; grid-template-rows: auto 1fr; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.lo-gun-media { display: flex; align-items: center; justify-content: center; height: 96px; padding: 10px; background: var(--bg-2); }
+.lo-gun-media img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lo-gun-info { display: flex; flex-direction: column; gap: 4px; padding: 9px 11px 11px; min-width: 0; }
+.lo-weapon { color: var(--text-3); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.lo-skin { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.lo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.lo-meta > img { width: 18px; height: 18px; object-fit: contain; }
+.lo-swatch { display: inline-flex; width: 12px; height: 12px; margin-right: 5px; border-radius: 50%; overflow: hidden; }
+.lo-swatch img { width: 100%; height: 100%; object-fit: cover; }
+.lo-buddy { display: flex; align-items: center; gap: 7px; margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--line); color: var(--text-2); font-size: 12px; min-width: 0; }
+.lo-buddy img { width: 24px; height: 24px; flex: none; object-fit: contain; }
+.lo-buddy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 719px) { .lo-card { width: 88px; } }
 .coll-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

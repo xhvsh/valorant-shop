@@ -798,6 +798,111 @@ async function accountDetails(discordId, puuid, opts = {}) {
   }
 }
 
+// ---- Full loadout (every weapon, card, title, sprays, flexes) -----------------
+// Backs the dashboard's Loadout page. Riot's loadout response is undocumented, so every
+// field is read defensively and anything that does not resolve is left out.
+const LOADOUT_TTL = 5 * 60 * 1000;
+const lowerId = (v) => String(v || '').toLowerCase();
+
+async function buildLoadout(raw) {
+  const out = { card: null, title: null, level: null, levelHidden: false, incognito: false, guns: [], sprays: [], flexes: [] };
+  const identity = (raw && raw.Identity) || {};
+  const cardId = identity.PlayerCardID || identity.PlayerCard;
+  if (cardId) {
+    const r = items.resolve(cardId);
+    if (r.type === 'card') out.card = { id: r.id, name: r.name, icon: r.icon, art: r.art || null };
+  }
+  const titleId = identity.PlayerTitleID || identity.PlayerTitle;
+  if (titleId) {
+    const r = items.resolve(titleId);
+    if (r.type === 'title') out.title = { id: r.id, name: r.name };
+  }
+  if (Number.isFinite(Number(identity.AccountLevel))) out.level = Number(identity.AccountLevel);
+  out.levelHidden = Boolean(identity.HideAccountLevel);
+  out.incognito = Boolean(raw && raw.Incognito);
+
+  for (const g of (raw && raw.Guns) || []) {
+    const skinKey = g && (g.SkinID || g.SkinLevelID);
+    if (!skinKey) continue;
+    const skin = await items.details(skinKey).catch(() => null);
+    if (!skin || skin.type !== 'skin') continue;
+    const chromas = skin.chromas || [];
+    const chromaIdx = chromas.findIndex((c) => lowerId(c.id) === lowerId(g.ChromaID));
+    const chroma = chromaIdx >= 0 ? chromas[chromaIdx] : null;
+    const levels = skin.levels || [];
+    const levelIdx = levels.findIndex((l) => lowerId(l.id) === lowerId(g.SkinLevelID));
+    const charm = g.CharmLevelID || g.CharmID ? items.resolve(g.CharmLevelID || g.CharmID) : null;
+    out.guns.push({
+      weapon: skin.weapon || String(skin.name || '').replace(/^Standard\s+/i, '') || null,
+      category: skin.category || null,
+      skin: {
+        id: skin.id,
+        name: skin.name,
+        tier: skin.tier || null,
+        tierIcon: skin.tierIcon || null,
+        icon: skin.icon || null,
+        render: (chroma && chroma.render) || skin.render || skin.icon || null,
+        swatch: chromaIdx > 0 ? chroma.swatch || null : null,
+        variant: chromaIdx > 0 ? chromaIdx + 1 : null,
+        level: levelIdx >= 0 ? levelIdx + 1 : null,
+        levels: levels.length || null,
+      },
+      buddy: charm && charm.type === 'buddy' ? { id: charm.id, name: charm.name, icon: charm.icon } : null,
+    });
+  }
+
+  // Older responses list sprays under `Sprays`; newer ones put sprays and flexes in
+  // `ActiveExpressions` as { TypeID, AssetID }. Read both and keep what resolves.
+  const seen = new Set();
+  const expressionIds = [
+    ...((raw && raw.Sprays) || []).map((x) => x && x.SprayID),
+    ...((raw && raw.ActiveExpressions) || []).map((x) => x && x.AssetID),
+  ];
+  for (const rawId of expressionIds) {
+    const r = rawId ? items.resolve(rawId) : null;
+    if (!r || (r.type !== 'spray' && r.type !== 'flex')) continue;
+    const key = `${r.type}:${lowerId(r.id)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const entry = { id: r.id, name: r.name, icon: r.icon, staticIcon: r.staticIcon || null };
+    (r.type === 'spray' ? out.sprays : out.flexes).push(entry);
+  }
+  if (!out.sprays.length && !out.flexes.length) {
+    console.log(`[shop] loadout has no sprays or flexes; fields: ${Object.keys(raw || {}).join(',')}`);
+  }
+  return out;
+}
+
+// Returns { status: 'unlinked' | 'ok' | 'relink' | 'error', loadout?, account? }
+async function accountLoadout(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  const cacheKey = `loadout:v1:${discordId}:${account.puuid}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  if (box && box.loadout && box.at && Date.now() - box.at < LOADOUT_TTL) {
+    return { status: 'ok', loadout: box.loadout, cached: true, account };
+  }
+  let auth;
+  try {
+    auth = storage.decrypt(account.auth_encrypted);
+  } catch {
+    return { status: 'relink', account };
+  }
+  try {
+    const token = await ensureAccessToken(discordId, account.puuid, auth);
+    const entitlement = await entitlementFor(token.access_token);
+    const tokens = { ...token, entitlement };
+    await items.load().catch(() => {});
+    const raw = await riot.playerLoadout(account.shard || 'na', account.puuid, tokens);
+    const loadout = await buildLoadout(raw);
+    await storage.kvSet(cacheKey, { at: Date.now(), loadout }, LOADOUT_TTL).catch(() => {});
+    return { status: 'ok', loadout, account };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
 // ---- Featured bundles: resilient global cache --------------------------------
 // The featured bundles are the same for everyone, but the live source depends on
 // one account (BUNDLE_SOURCE_ID). If that account ever needs a re-link, every
@@ -832,4 +937,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

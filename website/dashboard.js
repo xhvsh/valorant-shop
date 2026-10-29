@@ -630,7 +630,7 @@
      Router
      ========================================================================== */
 
-  const ACCOUNT_TABS = ["daily", "acc", "nm", "collection", "alerts", "sharing"];
+  const ACCOUNT_TABS = ["daily", "acc", "nm", "collection", "loadout", "alerts", "sharing"];
 
   // Routes are real paths (/a/<puuid>/<tab>, /wishlist, ...) under BASE_PATH and
   // use the History API. The server returns index.html for each of them.
@@ -1430,6 +1430,7 @@
       { id: "acc", label: "Accessories", icon: "sparkle" },
       { id: "nm", label: "Night Market", icon: "moon", night: true, dot: nmOpen, disabled: store && !nmOpen },
       { id: "collection", label: "Collection", icon: "box" },
+      { id: "loadout", label: "Loadout", icon: "shield" },
     ];
     if (!a.shared) {
       tabs.push({ id: "alerts", label: "Alerts", icon: "bell" });
@@ -1467,12 +1468,13 @@
     if (!box || !a) return;
     const tab = S.route.tab;
     box.innerHTML = "";
-    if (!a.linked && ["daily", "acc", "nm", "collection"].includes(tab)) {
+    if (!a.linked && ["daily", "acc", "nm", "collection", "loadout"].includes(tab)) {
       box.appendChild(h("div", { class: "empty-state" }, iconEl("link"), h("h3", { text: "Not connected" }), h("p", { text: "Re-link this account to load its shops and collection." })));
       return;
     }
     if (tab === "daily" || tab === "acc" || tab === "nm") renderShopPanel(box, a, tab);
     else if (tab === "collection") renderCollectionPanel(box, a);
+    else if (tab === "loadout") renderLoadoutPanel(box, a);
     else if (tab === "alerts") renderAlertsPanel(box, a);
     else if (tab === "sharing") renderSharingPanel(box, a);
   }
@@ -1876,6 +1878,127 @@
       apply();
     });
     apply();
+  }
+
+  /* ---------- loadout ---------- */
+
+  // puuid -> { data, error, pending }. Fetched when the tab opens, kept for the session.
+  const loadouts = Object.create(null);
+  const LOADOUT_CATEGORIES = [
+    ["Sidearm", "Sidearms"], ["SMG", "SMGs"], ["Shotgun", "Shotguns"], ["Rifle", "Rifles"],
+    ["Sniper", "Sniper rifles"], ["Heavy", "Heavy weapons"], ["Melee", "Melee"],
+  ];
+  const LOADOUT_WEAPON_ORDER = ["Classic", "Shorty", "Frenzy", "Ghost", "Bandit", "Sheriff", "Stinger", "Spectre", "Bucky", "Judge", "Bulldog", "Guardian", "Phantom", "Vandal", "Marshal", "Outlaw", "Operator", "Ares", "Odin", "Melee"];
+
+  function fetchLoadout(puuid, force) {
+    const box = loadouts[puuid] || (loadouts[puuid] = {});
+    if (force) {
+      box.data = null;
+      box.error = null;
+    }
+    if (box.data || box.pending) return;
+    box.error = null;
+    box.pending = api(`/api/accounts/${encodeURIComponent(puuid)}/loadout`, { timeoutMs: 35000 })
+      .then((res) => {
+        if (res && res.status === "relink") box.error = "Riot asked to sign in again. Re-link this account to see its loadout.";
+        else box.data = (res && res.loadout) || null;
+        if (!box.data && !box.error) box.error = "Riot did not return a loadout for this account.";
+      })
+      .catch((err) => {
+        box.error = err.message || "Could not load the loadout.";
+      })
+      .finally(() => {
+        box.pending = null;
+        if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "loadout") renderPanel();
+      });
+  }
+
+  function loadoutGunEl(g) {
+    const skin = g.skin || {};
+    const media = h("div", { class: "lo-gun-media" }, imgOrFallback(skin.render || skin.icon, skin.name));
+    const meta = h("div", { class: "lo-meta" });
+    if (skin.tierIcon) meta.appendChild(makeImg(skin.tierIcon, skin.tier || "", (img) => img.remove()));
+    if (skin.level && skin.levels > 1) meta.appendChild(h("span", { class: "chip", text: `Level ${skin.level}/${skin.levels}` }));
+    if (skin.variant) {
+      meta.appendChild(
+        h("span", { class: "chip" }, skin.swatch ? h("span", { class: "lo-swatch" }, makeImg(skin.swatch, "")) : null, `Variant ${skin.variant}`)
+      );
+    }
+    const buddy = g.buddy
+      ? h("div", { class: "lo-buddy", title: g.buddy.name || "" }, g.buddy.icon ? makeImg(g.buddy.icon, g.buddy.name, (img) => img.remove()) : null, h("span", { text: g.buddy.name || "Buddy" }))
+      : null;
+    return h("div", { class: "lo-gun" }, media,
+      h("div", { class: "lo-gun-info" },
+        h("span", { class: "lo-weapon", text: g.weapon || "" }),
+        h("b", { class: "lo-skin", text: skin.name || "Unknown" }),
+        meta.childNodes.length ? meta : null,
+        buddy));
+  }
+
+  function renderLoadoutPanel(box, a) {
+    const head = h("div", { class: "panel-head" }, h("h2", { text: "Loadout" }));
+    box.appendChild(head);
+    const st = loadouts[a.puuid] || (loadouts[a.puuid] = {});
+    if (!st.data && !st.error && !st.pending) fetchLoadout(a.puuid);
+    const lo = st.data;
+    if (!lo) {
+      if (st.error && !st.pending) {
+        box.appendChild(h("div", { class: "empty-state" }, iconEl("alert"), h("h3", { text: "Could not load the loadout" }), h("p", { text: st.error }),
+          h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Try again")));
+        return;
+      }
+      box.appendChild(h("div", { class: "sk", style: "height:200px;border-radius:var(--r-lg)" }));
+      const sk = h("div", { class: "lo-guns", style: "margin-top:16px" });
+      for (let i = 0; i < 8; i++) sk.appendChild(h("div", { class: "lo-gun sk", style: "height:150px" }));
+      box.appendChild(sk);
+      return;
+    }
+
+    head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchLoadout(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
+
+    // Identity: player card, title, level.
+    const cardArt = lo.card && lo.card.art && (lo.card.art.large || lo.card.art.wide || lo.card.art.small);
+    const idCol = h("div", { class: "lo-id-text" },
+      h("span", { class: "lo-label", text: "Player card" }),
+      h("b", { text: lo.card ? lo.card.name : "None equipped" }),
+      h("span", { class: "lo-label", style: "margin-top:12px", text: "Title" }),
+      h("b", { text: lo.title ? titleName(lo.title.name) : "None equipped" }));
+    if (lo.level != null && !lo.levelHidden) idCol.append(h("span", { class: "lo-label", style: "margin-top:12px", text: "Account level" }), h("b", { text: String(lo.level) }));
+    else if (lo.levelHidden) idCol.append(h("span", { class: "lo-label", style: "margin-top:12px", text: "Account level" }), h("b", { text: "Hidden" }));
+    if (lo.incognito) idCol.append(h("span", { class: "chip", style: "margin-top:12px;align-self:flex-start", text: "Incognito" }));
+    box.appendChild(h("div", { class: "lo-id" }, cardArt ? h("div", { class: "lo-card" }, imgOrFallback(cardArt, lo.card && lo.card.name)) : null, idCol));
+
+    // Sprays and flexes.
+    const extras = [...(lo.sprays || []).map((x) => ({ ...x, kind: "Spray" })), ...(lo.flexes || []).map((x) => ({ ...x, kind: "Flex" }))];
+    if (extras.length) {
+      box.appendChild(h("h3", { class: "lo-h", text: "Sprays and flexes" }));
+      const tiles = h("div", { class: "tiles square" });
+      for (const x of extras) {
+        tiles.appendChild(h("div", { class: "tile", title: x.name || "" }, h("div", { class: "tile-media" }, imgOrFallback(x.icon || x.staticIcon, x.name)), h("div", { class: "tile-name", text: x.name || x.kind })));
+      }
+      box.appendChild(tiles);
+    }
+
+    // Weapons, grouped by category.
+    const guns = lo.guns || [];
+    if (!guns.length) {
+      box.appendChild(h("div", { class: "inline-msg", text: "Riot did not report any equipped weapons." }));
+      return;
+    }
+    const order = (g) => {
+      const i = LOADOUT_WEAPON_ORDER.indexOf(g.weapon);
+      return i === -1 ? 999 : i;
+    };
+    const groups = new Map(LOADOUT_CATEGORIES.map(([key, label]) => [key, { label, guns: [] }]));
+    const other = { label: "Other", guns: [] };
+    for (const g of guns) (groups.get(g.category) || other).guns.push(g);
+    for (const grp of [...groups.values(), other]) {
+      if (!grp.guns.length) continue;
+      box.appendChild(h("h3", { class: "lo-h", text: grp.label }));
+      const grid = h("div", { class: "lo-guns" });
+      for (const g of grp.guns.sort((x, y) => order(x) - order(y))) grid.appendChild(loadoutGunEl(g));
+      box.appendChild(grid);
+    }
   }
 
   /* ---------- alerts ---------- */

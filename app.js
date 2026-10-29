@@ -563,6 +563,28 @@ app.get('/api/accounts/:puuid/details', requireDiscord, async (req, res, next) =
   }
 });
 
+// The equipped loadout (every weapon with its skin, level, variant and buddy, plus the
+// player card, title, sprays and flexes) for the Loadout page. Same access rules and
+// throttling as the details route.
+app.get('/api/accounts/:puuid/loadout', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    rateLimit(`${discordId}:loadout`, 30, 60000);
+    const puuid = String(req.params.puuid || '');
+    const access = await accountAccessFor(discordId, puuid);
+    if (!access) throw httpError('Unknown account.', 404);
+    const result = await shop.accountLoadout(access.ownerId, puuid);
+    if (result.status === 'unlinked') throw httpError('Unknown account.', 404);
+    if (result.status === 'relink') return res.json({ ok: true, status: 'relink' });
+    if (result.status === 'error') {
+      return res.json({ ok: false, status: 'error', error: result.error || 'Could not load the loadout.' });
+    }
+    res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), loadout: result.loadout });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Persist the dashboard's drag order for the user's own accounts. Purely
 // cosmetic, stored in kv (no schema change); unknown puuids are dropped and any
 // account missing from the payload is appended so the list stays complete.
