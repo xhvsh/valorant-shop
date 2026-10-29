@@ -1345,7 +1345,7 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .lo-wrap { container-type: inline-size; --lo-name: clamp(9px, .66cqw, 12px); }
 .lo-screen { display: grid; grid-template-columns: repeat(4, minmax(0, 300fr)) minmax(0, 273fr); column-gap: 2%; aspect-ratio: 1633 / 920; }
 .lo-col { display: flex; flex-direction: column; gap: .8cqw; min-width: 0; min-height: 0; }
-.lo-h { flex: none; margin: 0; color: var(--text-2); font: 600 clamp(12px, 1.05cqw, 17px)/1.2 var(--font-head); letter-spacing: .1em; text-transform: uppercase; }
+.lo-h { flex: none; margin: 0; color: var(--text-2); font: 600 clamp(12px, 1.05cqw, 17px)/1.2 var(--font-head); letter-spacing: .1em; text-align: center; text-transform: uppercase; }
 .lo-col .lo-h:not(:first-child) { margin-top: 1cqw; }
 /* Tiles look like the app's skin cards: a glow and bottom edge in the skin's tier colour
    (neutral grey for standard and random skins). */
@@ -1387,27 +1387,30 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .lo-buddy img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .55)); }
 .lo-side { align-items: center; }
 .lo-side > .lo-h { align-self: stretch; }
-.lo-card { position: relative; flex: none; width: 80%; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-2); box-shadow: var(--shadow); aspect-ratio: 268 / 640; }
-.lo-card.sk { border-color: transparent; background: var(--surface-3); box-shadow: none; }
+/* The card's bottom fifth fades out (a mask, so it blends into whatever is behind it). */
+.lo-card { position: relative; flex: none; width: 80%; overflow: hidden; border: 1px solid var(--line); border-bottom: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--bg-2); aspect-ratio: 268 / 640; -webkit-mask-image: linear-gradient(180deg, #000 80%, rgba(0, 0, 0, .5) 91%, transparent); mask-image: linear-gradient(180deg, #000 80%, rgba(0, 0, 0, .5) 91%, transparent); }
+.lo-card.sk { border-color: transparent; background: var(--surface-3); }
 .lo-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lo-card-none { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 12px; }
 /* The player's name and title sit on a dark band about two thirds of the way down, so
-   they stay readable on any card art. */
+   they stay readable on any card art. The name is the headline; the title sits tight
+   under it, smaller and dimmer. */
 .lo-card-name {
   position: absolute;
+  z-index: 1;
   left: 0;
   right: 0;
-  top: 66%;
+  top: 64%;
   display: grid;
-  gap: .2cqw;
+  gap: .1cqw;
   justify-items: center;
-  padding: .55cqw 8px .6cqw;
+  padding: .6cqw 8px .55cqw;
   border-block: 1px solid rgba(255, 255, 255, .08);
-  background: linear-gradient(90deg, rgba(8, 9, 12, .35), rgba(8, 9, 12, .78) 22%, rgba(8, 9, 12, .78) 78%, rgba(8, 9, 12, .35));
+  background: linear-gradient(90deg, rgba(8, 9, 12, .35), rgba(8, 9, 12, .8) 22%, rgba(8, 9, 12, .8) 78%, rgba(8, 9, 12, .35));
   text-align: center;
 }
-.lo-card-name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: clamp(11px, .8cqw, 15px); font-weight: 600; }
-.lo-card-name span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: clamp(9px, .64cqw, 12px); }
+.lo-card-name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: clamp(13px, 1.05cqw, 19px); font-weight: 700; line-height: 1.15; letter-spacing: .02em; text-shadow: 0 1px 8px rgba(0, 0, 0, .8); }
+.lo-card-name span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: clamp(9px, .56cqw, 11px); line-height: 1.2; letter-spacing: .03em; }
 .lo-incognito { flex: none; }
 /* Expressions sit at the bottom of the column, level with the last weapon tiles. */
 .lo-side .lo-h.lo-expr-h { margin-top: auto; }
