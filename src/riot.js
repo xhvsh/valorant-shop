@@ -567,14 +567,23 @@ async function getDpopKey(store) {
     }
     return dpopKeyMemo.key;
   }
-  const existing = await store.kvGet('dpop:key').catch(() => null);
+  // A failed read must throw: treating it as "no key yet" would create a new key over
+  // the stored one, and every refresh token is bound to the old key.
+  const existing = await store.kvGet('dpop:key');
   if (existing) {
     dpopKeyMemo = { key: existing, renewedAt: Date.now() };
     await store.kvSet('dpop:key', existing, DPOP_KEY_TTL).catch(() => {});
     return existing;
   }
+  // Create only if the row is truly absent (insert, never upsert). If another instance
+  // won the race, use the key it stored.
   const key = createDpopKey();
-  await store.kvSet('dpop:key', key, DPOP_KEY_TTL);
+  if (!(await store.kvInsert('dpop:key', key, DPOP_KEY_TTL))) {
+    const stored = await store.kvGet('dpop:key');
+    if (!stored) throw new Error('DPoP key could not be loaded.');
+    dpopKeyMemo = { key: stored, renewedAt: Date.now() };
+    return stored;
+  }
   dpopKeyMemo = { key, renewedAt: Date.now() };
   return key;
 }

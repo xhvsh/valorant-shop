@@ -169,9 +169,15 @@ function rememberBig(key, value, expiresAt) {
   bigMemo.set(key, { value, expiresAt, at: Date.now(), ttl });
 }
 
+// A row with expires_at = null never expires. Pass KV_NO_EXPIRY as the ttl for data that
+// must outlive any cache window (settings, share links, the DPoP key). Every reader goes
+// through expMs(), because new Date(null).getTime() is 0 and would read as "long expired".
+const KV_NO_EXPIRY = null;
+const expMs = (v) => (v == null ? Infinity : new Date(v).getTime());
+
 async function kvSet(key, value, ttlMs) {
   bigMemo.delete(key);
-  const expiresAt = new Date(Date.now() + (ttlMs || 15 * 60 * 1000)).toISOString();
+  const expiresAt = ttlMs === KV_NO_EXPIRY ? null : new Date(Date.now() + (ttlMs || 15 * 60 * 1000)).toISOString();
   if (!hasDb) {
     mem.kv.set(key, { value, expires_at: expiresAt });
     return;
@@ -187,7 +193,7 @@ async function kvLock(key, ttlMs) {
   const expiresAt = new Date(Date.now() + (ttlMs || 30000)).toISOString();
   if (!hasDb) {
     const row = mem.kv.get(key);
-    if (row && new Date(row.expires_at).getTime() > Date.now()) return false;
+    if (row && expMs(row.expires_at) > Date.now()) return false;
     mem.kv.set(key, { value: JSON.stringify({ at: Date.now() }), expires_at: expiresAt });
     return true;
   }
@@ -196,6 +202,23 @@ async function kvLock(key, ttlMs) {
   if (!error) return true;
   if (error.code === '23505') return false; // unique violation: someone else holds it
   dbFail('kv lock', error);
+}
+
+// Writes a row only when the key does not exist yet (an expired row counts as absent).
+// Returns true when this call created it, false when another writer got there first.
+async function kvInsert(key, value, ttlMs) {
+  const expiresAt = ttlMs === KV_NO_EXPIRY ? null : new Date(Date.now() + (ttlMs || 15 * 60 * 1000)).toISOString();
+  if (!hasDb) {
+    const row = mem.kv.get(key);
+    if (row && expMs(row.expires_at) > Date.now()) return false;
+    mem.kv.set(key, { value, expires_at: expiresAt });
+    return true;
+  }
+  await client.from('kv').delete().eq('key', key).lt('expires_at', new Date().toISOString());
+  const { error } = await client.from('kv').insert({ key, value: JSON.stringify(value), expires_at: expiresAt });
+  if (!error) return true;
+  if (error.code === '23505') return false;
+  dbFail('kv insert', error);
 }
 
 async function kvUnlock(key) {
@@ -214,7 +237,7 @@ async function kvGet(key) {
   if (!hasDb) {
     const row = mem.kv.get(key);
     if (!row) return null;
-    if (new Date(row.expires_at).getTime() <= Date.now()) {
+    if (expMs(row.expires_at) <= Date.now()) {
       mem.kv.delete(key);
       return null;
     }
@@ -223,12 +246,12 @@ async function kvGet(key) {
   const { data, error } = await client.from('kv').select('value, expires_at').eq('key', key).maybeSingle();
   if (error) dbFail('kv get', error);
   if (!data) return null;
-  if (new Date(data.expires_at).getTime() <= Date.now()) {
+  if (expMs(data.expires_at) <= Date.now()) {
     await kvDel(key);
     return null;
   }
   if (typeof data.value === 'string' && data.value.length >= BIG_MIN_CHARS) {
-    rememberBig(key, data.value, new Date(data.expires_at).getTime());
+    rememberBig(key, data.value, expMs(data.expires_at));
   }
   try {
     return JSON.parse(data.value);
@@ -244,11 +267,18 @@ async function kvExists(key) {
   if (big && Date.now() - big.at < big.ttl && big.expiresAt > Date.now()) return true;
   if (!hasDb) {
     const row = mem.kv.get(key);
-    return Boolean(row && new Date(row.expires_at).getTime() > Date.now());
+    return Boolean(row && expMs(row.expires_at) > Date.now());
   }
   const { data, error } = await client.from('kv').select('expires_at').eq('key', key).maybeSingle();
   if (error) dbFail('kv exists', error);
-  return Boolean(data && new Date(data.expires_at).getTime() > Date.now());
+  return Boolean(data && expMs(data.expires_at) > Date.now());
+}
+
+// Drops expired sessions and kv rows (rows with a null expiry are kept). Service role only.
+async function cleanupExpired() {
+  if (!hasDb) return;
+  const { error } = await client.rpc('cleanup_expired');
+  if (error) dbFail('cleanup expired', error);
 }
 
 async function kvDel(key) {
@@ -266,7 +296,7 @@ async function kvList(prefix) {
   if (!hasDb) {
     const out = [];
     for (const [key, row] of mem.kv.entries()) {
-      if (key.startsWith(p) && new Date(row.expires_at).getTime() > Date.now()) {
+      if (key.startsWith(p) && expMs(row.expires_at) > Date.now()) {
         out.push({ key, value: row.value });
       }
     }
@@ -283,7 +313,7 @@ async function kvList(prefix) {
     if (error) dbFail('kv list', error);
     if (!data || !data.length) break;
     for (const row of data) {
-      if (new Date(row.expires_at).getTime() <= Date.now()) continue;
+      if (expMs(row.expires_at) <= Date.now()) continue;
       let value = row.value;
       try {
         value = JSON.parse(row.value);
@@ -575,6 +605,9 @@ module.exports = {
   kvUnlock,
   kvGet,
   kvExists,
+  cleanupExpired,
+  kvInsert,
+  KV_NO_EXPIRY,
   kvDel,
   kvList,
   getAccount,

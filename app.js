@@ -25,7 +25,7 @@ const { handleInteraction, bundlePayload, prewarmBundles, BUNDLE_SOURCE_ID, acco
 const { dedupeBundles } = require('./src/parse');
 const dcLog = require('./src/discord/log');
 const { waitUntil } = require('@vercel/functions');
-const { renderSkinGrid, renderAnimatedSkinGrid, renderWalletImage, renderBundleGrid, renderBundleMedia, renderRankImage, renderCollectionImage } = require('./src/grid');
+const { renderSkinGrid, renderAnimatedSkinGrid, renderWalletImage, renderBundleMedia, renderRankImage, renderCollectionImage } = require('./src/grid');
 
 // fetch with a hard deadline. Without one, a stalled Discord (or self) call holds
 // the request until the serverless function is killed at 60s.
@@ -157,8 +157,6 @@ const BOT_PATHS = [
   '/api/cron/refresh',
   '/api/cron/dailyshop',
   '/api/cron/bundles',
-  '/api/skin-grid',
-  '/api/bundle-grid',
   '/health',
 ];
 app.use((req, res, next) => {
@@ -299,6 +297,8 @@ app.get('/auth/discord/callback', async (req, res, next) => {
     });
     if (!meRes.ok) throw httpError('Discord login failed. Try again.', 400);
     const me = await meRes.json();
+    // A fresh session id at login, so an id planted before sign-in is worthless.
+    await new Promise((resolve, reject) => req.session.regenerate((e) => (e ? reject(e) : resolve())));
     req.session.discordId = me.id;
     req.session.discordName = me.username;
     req.session.discordAvatar = me.avatar;
@@ -872,7 +872,7 @@ async function revokeShareFor(discordId, puuid) {
 // tokens, alert settings, wishlist, share codes they own (recipients lose access
 // at once), shares they imported, markers, and every website session. Returns a
 // summary of what was removed.
-const WIPE_MARKER_PREFIXES = ['shop_reset:', 'dailyshop_sent:', 'accshop_sent:', 'wishlist_notify:'];
+const WIPE_MARKER_PREFIXES = ['shop_reset:', 'dailyshop_sent:', 'accshop_sent:', 'wishlist_notify:', 'relinknotify:'];
 async function wipeUserData(discordId) {
   const summary = { accounts: 0, sharesRevoked: 0, recipientsRemoved: 0, importsRemoved: 0 };
 
@@ -915,6 +915,7 @@ async function wipeUserData(discordId) {
     `share:owner:${discordId}`,
     `share:user:${discordId}`,
     `shop_reset:${discordId}`,
+    `acctorder:${discordId}`,
   ];
   for (const a of accounts) keys.push(`share:puuid:${a.puuid}`);
   for (const prefix of WIPE_MARKER_PREFIXES) {
@@ -2111,85 +2112,25 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
   }
 });
 
-// ---- Skin grid image --------------------------------------------------------
-
-// Internal use requires the link secret; the dashboard viewer additionally
-// allows a logged-in Discord user to render their own accounts only.
-function gridAllowed(req, ownerDiscordId) {
-  if ((req.query.secret || req.headers['x-link-secret']) === LINK_SECRET) return true;
-  const me = req.session && req.session.discordId;
-  return Boolean(me && (!ownerDiscordId || me === String(ownerDiscordId)));
-}
-
-app.get('/api/skin-grid', async (req, res) => {
-  try {
-    if (!gridAllowed(req, String(req.query.id || ''))) return res.status(403).end();
-    const id = String(req.query.id || '');
-    if (!/^\d{5,25}$/.test(id)) return res.status(400).end();
-    const account = await storage.getAccount(id);
-    if (!account || !account.store_cache) return res.status(404).end();
-    let png;
-    if (req.query.type === 'wallet') {
-      png = await renderWalletImage(account.store_cache.wallet);
-    } else if (req.query.type === 'accessory') {
-      const ks = account.store_cache.kingdomShop;
-      png =
-        ks && ks.items && ks.items.length
-          ? await renderSkinGrid(account.store_cache, { items: ks.items, limit: 8, showType: true })
-          : null;
-    } else {
-      png = await renderSkinGrid(account.store_cache);
-    }
-    if (!png) return res.status(404).end();
-    res.set({
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=1800, s-maxage=1800',
-    });
-    res.end(png);
-  } catch (err) {
-    console.warn('[skin-grid]', err.message);
-    res.status(502).end();
-  }
-});
-
-// ---- Bundle items grid image ------------------------------------------------
-
-app.get('/api/bundle-grid', async (req, res) => {
-  try {
-    if (!gridAllowed(req, null)) return res.status(403).end();
-    const bundleId = String(req.query.b || '');
-    if (!bundleId) return res.status(400).end();
-    const account = await storage.getAccount(BUNDLE_SOURCE_ID);
-    const bundles = (account && account.store_cache && account.store_cache.bundles) || [];
-    const bundle = bundles.find((b) => b && String(b.id) === bundleId);
-    if (!bundle || !bundle.items || !bundle.items.length) return res.status(404).end();
-    await items.load().catch(() => {});
-    const png = await renderBundleGrid(bundle.items);
-    if (!png) return res.status(404).end();
-    res.set({
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=1800, s-maxage=1800',
-    });
-    res.end(png);
-  } catch (err) {
-    console.warn('[bundle-grid]', err.message);
-    res.status(502).end();
-  }
-});
-
 // ---- Cron --------------------------------------------------------------------
 
-// Cron endpoints accept Vercel's CRON_SECRET bearer, the internal link secret,
-// or a dedicated SCHEDULER_SECRET (used by the external exact-time scheduler).
+// Cron endpoints accept Vercel's CRON_SECRET bearer or the SCHEDULER_SECRET header
+// (sent by the Cloudflare Worker). Headers only: a secret in a query string would end
+// up in request logs. LINK_SECRET is not accepted here, it only guards the
+// internal follow-up call.
+function safeEqual(a, b) {
+  const x = crypto.createHash('sha256').update(String(a)).digest();
+  const y = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(x, y);
+}
+
 function cronAuthorized(req) {
-  const secureSecret = process.env.CRON_SECRET || LINK_SECRET;
+  const cronSecret = process.env.CRON_SECRET || '';
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const scheduler = String(req.headers['x-scheduler-secret'] || req.query.key || '');
+  const scheduler = String(req.headers['x-scheduler-secret'] || '');
   return (
-    req.query.secret === secureSecret ||
-    req.headers['x-link-secret'] === LINK_SECRET ||
-    bearer === secureSecret ||
-    (SCHEDULER_SECRET !== '' && scheduler === SCHEDULER_SECRET)
+    (cronSecret !== '' && safeEqual(bearer, cronSecret)) ||
+    (SCHEDULER_SECRET !== '' && safeEqual(scheduler, SCHEDULER_SECRET))
   );
 }
 
@@ -2283,6 +2224,8 @@ app.get('/api/cron/refresh', async (req, res, next) => {
         { ping: failed > 0 }
       );
     }
+    // Expired sessions and cache rows otherwise only go when somebody reads them.
+    await storage.cleanupExpired().catch((e) => console.warn(`[cron] cleanup_expired failed: ${(e && e.message) || e}`));
     res.json({ ok: true, checked: accounts.length, needed, refreshed, relink, failed, relinkDmed });
   } catch (err) {
     next(err);
@@ -2806,12 +2749,18 @@ app.get('/api/cron/bundles', async (req, res, next) => {
 app.get('/health', async (req, res) => {
   let storageStatus = storage.isConfigured() ? 'supabase' : 'memory';
   try {
+    rateLimit(`health:${req.ip}`, 30, 60000);
+  } catch {
+    return res.status(429).json({ ok: false, storage: storageStatus });
+  }
+  try {
     if (storage.isConfigured()) {
       await storage.kvSet('__health__', { t: Date.now() }, 60000);
       await storage.kvDel('__health__');
     }
   } catch (err) {
-    return res.status(503).json({ ok: false, storage: storageStatus, error: err.message });
+    console.warn(`[health] storage check failed: ${(err && err.message) || err}`);
+    return res.status(503).json({ ok: false, storage: storageStatus });
   }
   res.json({ ok: true, storage: storageStatus });
 });
@@ -2822,7 +2771,10 @@ app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   const status = err.status || 500;
   if (status >= 500) console.error('[error]', err);
-  res.status(status).json({ ok: false, error: err.message || 'Unexpected error', status });
+  // Deliberate errors carry a status and a user-facing message. Anything else is an
+  // unexpected failure whose message may hold database or Riot internals.
+  const message = err.status ? err.message || 'Unexpected error' : 'Something went wrong. Try again in a minute.';
+  res.status(status).json({ ok: false, error: message, status });
 });
 
 items.load().catch((err) => console.warn('[items] catalog load failed:', err.message));

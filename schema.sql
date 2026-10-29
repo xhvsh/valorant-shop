@@ -85,8 +85,13 @@ create or replace function cleanup_expired() returns void language sql security 
   delete from sessions where expires_at < now();
   delete from kv where expires_at < now();
 $$;
--- Run cleanup_expired() on a schedule (Database -> pg_cron, e.g. every hour),
--- or rely on the bot's delete-on-read. These indexes keep both paths cheap.
+-- Only the service role may run it (it is SECURITY DEFINER). The app calls it at the
+-- end of /api/cron/refresh; rows with expires_at = null (settings, share links, the
+-- DPoP key) are never deleted.
+alter function public.cleanup_expired() set search_path = public;
+revoke execute on function public.cleanup_expired() from public, anon, authenticated;
+grant execute on function public.cleanup_expired() to service_role;
+-- These indexes keep the cleanup and delete-on-read paths cheap.
 create index if not exists sessions_expires_at_idx on sessions (expires_at);
 create index if not exists kv_expires_at_idx on kv (expires_at);
 

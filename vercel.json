@@ -13,7 +13,7 @@
     },
     {
       "path": "/api/cron/dailyshop",
-      "schedule": "0 0 * * *"
+      "schedule": "30 0 * * *"
     }
   ]
 }
