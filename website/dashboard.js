@@ -2002,7 +2002,7 @@
       }
       const sk = loadoutColumnsEl(null);
       sk.appendChild(h("div", { class: "lo-col lo-side" },
-        h("h3", { class: "lo-h", text: "Player cards" }), h("div", { class: "lo-card sk" }),
+        h("h3", { class: "lo-h", text: "Player card" }), h("div", { class: "lo-card sk" }),
         h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }), h("div", { class: "lo-wheel sk" })));
       box.appendChild(h("div", { class: "lo-wrap" }, sk));
       return;
@@ -2020,9 +2020,9 @@
     const card = h("div", { class: "lo-card", title: lo.card ? lo.card.name || "" : "" },
       cardArt ? imgOrFallback(cardArt, lo.card && lo.card.name) : h("div", { class: "lo-card-none", text: "No card equipped" }),
       h("div", { class: "lo-card-name" }, h("b", { text: String(a.name || acctName(a)).replace(/#.*$/, "") }),
-        lo.title ? h("span", { text: titleName(lo.title.name) }) : null));
+        lo.title ? h("span", {}, h("i", { text: titleName(lo.title.name) })) : null));
     const side = h("div", { class: "lo-col lo-side" },
-      h("h3", { class: "lo-h", text: "Player cards" }),
+      h("h3", { class: "lo-h", text: "Player card" }),
       card,
       lo.incognito ? h("span", { class: "chip lo-incognito", text: "Incognito" }) : null,
       h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }),
