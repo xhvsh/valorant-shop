@@ -202,7 +202,7 @@ function renderIndexHtml(mountPath) {
     .replace(/<head>/i, `<head>\n  <base href="${mountPath}/" />`);
 }
 // Dashboard routes are real paths (history API), so each one returns the shell.
-app.get(['/', '/index.html', '/wishlist', '/bundles', '/settings', '/a/:puuid', '/a/:puuid/:tab'], (req, res) => {
+app.get(['/', '/index.html', '/wishlist', '/bundles', '/battlepass', '/settings', '/a/:puuid', '/a/:puuid/:tab'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store, must-revalidate');
   res.type('html').send(renderIndexHtml(res.locals.mountPath || ''));
 });
@@ -580,6 +580,37 @@ app.get('/api/accounts/:puuid/loadout', requireDiscord, async (req, res, next) =
       return res.json({ ok: false, status: 'error', error: result.error || 'Could not load the loadout.' });
     }
     res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), loadout: result.loadout });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// The current act's battle pass (dates, tiers, rewards). Same for everyone.
+app.get('/api/battlepass', requireDiscord, async (req, res, next) => {
+  try {
+    rateLimit(`${req.session.discordId}:battlepass-pass`, 30, 60000);
+    const pass = await items.battlepassTrack();
+    res.json({ ok: true, pass });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// One account's progress on that pass. Same access rules and throttling as the loadout route.
+app.get('/api/accounts/:puuid/battlepass', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    rateLimit(`${discordId}:battlepass`, 30, 60000);
+    const puuid = String(req.params.puuid || '');
+    const access = await accountAccessFor(discordId, puuid);
+    if (!access) throw httpError('Unknown account.', 404);
+    const result = await shop.accountBattlepass(access.ownerId, puuid);
+    if (result.status === 'unlinked') throw httpError('Unknown account.', 404);
+    if (result.status === 'relink') return res.json({ ok: true, status: 'relink' });
+    if (result.status === 'error') {
+      return res.json({ ok: false, status: 'error', error: result.error || 'Could not load the battle pass.' });
+    }
+    res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), progress: result.progress });
   } catch (err) {
     next(err);
   }

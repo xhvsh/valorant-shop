@@ -12,6 +12,7 @@ const PD_URLS = {
   wallet: (shard, puuid) => `https://pd.${shard}.a.pvp.net/store/v1/wallet/${puuid}`,
   mmr: (shard, puuid) => `https://pd.${shard}.a.pvp.net/mmr/v1/players/${puuid}`,
   accountXp: (shard, puuid) => `https://pd.${shard}.a.pvp.net/account-xp/v1/players/${puuid}`,
+  contracts: (shard, puuid) => `https://pd.${shard}.a.pvp.net/contracts/v1/contracts/${puuid}`,
   entitlements: (shard, puuid) => `https://pd.${shard}.a.pvp.net/store/v1/entitlements/${puuid}`,
 };
 
@@ -448,6 +449,12 @@ async function accountXp(shard, puuid, tokens) {
   return pdFetch(PD_URLS.accountXp(shard, puuid), tokens);
 }
 
+// Progress on every contract (battle passes, agent contracts): { Contracts: [{ ContractDefinitionID,
+// ProgressionLevelReached, ProgressionTowardsNextLevel, ContractProgression }], Missions, ... }.
+async function contracts(shard, puuid, tokens) {
+  return pdFetch(PD_URLS.contracts(shard, puuid), tokens);
+}
+
 async function accountEntitlements(shard, puuid, tokens) {
   return pdFetch(PD_URLS.entitlements(shard, puuid), tokens);
 }
@@ -772,6 +779,7 @@ module.exports = {
   wallet,
   mmr,
   accountXp,
+  contracts,
   accountEntitlements,
   playerLoadout,
   revealNightMarket,

@@ -906,6 +906,61 @@ async function accountLoadout(discordId, puuid) {
   }
 }
 
+// ---- Battle pass progress -----------------------------------------------------
+// Where an account is on the current act's battle pass. The tier comes straight from
+// the contracts call; the premium track counts as bought when the account owns the
+// pass's first premium reward (buying the pass grants it at once). XP only moves after
+// matches, so a result is kept for a few minutes.
+const BATTLEPASS_TTL = 10 * 60 * 1000;
+
+async function accountBattlepass(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  const cacheKey = `battlepass:v1:${discordId}:${account.puuid}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  if (box && box.progress && box.at && Date.now() - box.at < BATTLEPASS_TTL) {
+    return { status: 'ok', progress: box.progress, cached: true, account };
+  }
+  let auth;
+  try {
+    auth = storage.decrypt(account.auth_encrypted);
+  } catch {
+    return { status: 'relink', account };
+  }
+  try {
+    const meta = await items.battlepassMeta();
+    if (!meta) return { status: 'ok', progress: null, account };
+    const token = await ensureAccessToken(discordId, account.puuid, auth);
+    const entitlement = await entitlementFor(token.access_token);
+    const tokens = { ...token, entitlement };
+    const shard = account.shard || 'na';
+    const [contracts, owned] = await Promise.all([
+      riot.contracts(shard, account.puuid, tokens),
+      riot.accountEntitlements(shard, account.puuid, tokens).catch(() => null),
+    ]);
+    const mine = ((contracts && contracts.Contracts) || []).find((c) => String(c.ContractDefinitionID).toLowerCase() === meta.contractId);
+    const tier = mine ? Number(mine.ProgressionLevelReached) || 0 : 0;
+    const towards = mine ? Number(mine.ProgressionTowardsNextLevel) || 0 : 0;
+    let premium = null; // unknown when the ownership list did not come back
+    if (owned && meta.premiumMarker) {
+      premium = (owned.EntitlementsByTypes || []).some((t) => (t.Entitlements || []).some((e) => String(e.ItemID).toLowerCase() === meta.premiumMarker));
+    }
+    const progress = {
+      tier,
+      towards,
+      // XP the next tier asks for; the tier list is 0-based, so the next tier's entry is meta.xp[tier].
+      nextXp: tier < meta.xp.length ? meta.xp[tier] : null,
+      totalTiers: meta.xp.length,
+      premium,
+    };
+    await storage.kvSet(cacheKey, { at: Date.now(), progress }, BATTLEPASS_TTL).catch(() => {});
+    return { status: 'ok', progress, account };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
 // ---- Featured bundles: resilient global cache --------------------------------
 // The featured bundles are the same for everyone, but the live source depends on
 // one account (BUNDLE_SOURCE_ID). If that account ever needs a re-link, every
@@ -940,4 +995,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountBattlepass, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

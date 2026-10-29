@@ -1337,6 +1337,50 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
+/* battle pass page: one row per account (tier, progress, premium or free), opening into
+   the whole reward track grouped by chapter. */
+.bp-ends { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 18px; color: var(--text-2); font-size: 14px; }
+.bp-ends .i { font-size: 16px; color: var(--text-3); }
+.bp-count { color: var(--text); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.bp-ends-date { color: var(--text-3); }
+.bp-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.bp-row { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.bp-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.bp-name-wrap { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.bp-tier-big { display: inline-flex; align-items: baseline; gap: 2px; color: var(--text-3); font-size: 13px; }
+.bp-tier-big b { color: var(--text); font: 700 22px/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.bp-caret { flex: none; font-size: 16px; color: var(--text-3); transition: transform .15s var(--ease); }
+.bp-row.is-open .bp-caret { transform: rotate(180deg); }
+.bp-bar { position: relative; height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface-3); }
+.bp-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--red-dark), var(--red)); }
+.bp-sub { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.bp-next { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); }
+.bp-next > span:last-child { color: var(--text-2); }
+.bp-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--text-3); font-size: 13px; }
+.bp-reward { position: relative; display: inline-grid; flex: none; place-items: center; width: 52px; height: 52px; }
+.bp-reward img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .45)); }
+.bp-reward.sm { width: 28px; height: 28px; }
+.bp-reward b { position: absolute; right: -2px; bottom: -2px; padding: 1px 4px; border-radius: 2px; background: rgba(8, 9, 12, .85); color: var(--text); font: 600 10px/1.3 var(--font-mono); }
+.bp-reward-kind { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.bp-track { display: grid; gap: 18px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+.bp-chapter h4 { margin: 0 0 8px; color: var(--text-3); font: 600 11px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; }
+.bp-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.bp-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 0; padding: 8px 6px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2); }
+.bp-tile.is-next { border-color: var(--red-line); }
+.bp-tile.is-done { opacity: .55; }
+.bp-tile.is-locked .bp-reward { opacity: .45; filter: grayscale(.6); }
+.bp-tier { align-self: start; justify-self: start; color: var(--text-3); font: 600 11px/1 var(--font-mono); }
+.bp-name { max-width: 100%; overflow: hidden; color: var(--text-2); font-size: 11px; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.bp-free { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 10px; border: 1px dashed var(--line-2); border-radius: var(--r); }
+.bp-free.is-done { opacity: .55; }
+.bp-free-label { color: var(--green); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.bp-free .bp-reward { width: 36px; height: 36px; }
+@media (max-width: 640px) {
+  .bp-row { padding: 12px; }
+  .bp-tiles { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); }
+  .bp-badge { display: none; }
+}
+
 /* loadout page: the weapons grouped in columns as the game groups them, with the player
    card and expressions wheel last. The whole screen keeps one aspect ratio and every size
    inside it is in cqw (a share of the screen's width), so tiles, headings, weapon art and
@@ -2162,7 +2206,7 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
     inset: auto 0 0 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     height: var(--bottom-nav);
     padding-bottom: env(safe-area-inset-bottom);
     border-top: 1px solid var(--line);

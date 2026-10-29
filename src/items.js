@@ -857,4 +857,107 @@ async function currencies() {
   }
 }
 
-module.exports = { CURRENCY, CURRENCY_LABEL, load, resolve, refreshIcons, details, byType, search, storeIndex, kindOf, normalizeName, currencies, tierIcon, competitiveTiers, rankTier, isStoreEligible, isStoreEligibleId, skinKind, skinBuckets };
+// ---- Battle pass of the current act ------------------------------------------
+// The act's dates come from /v1/seasons and its tiers and rewards from /v1/contracts (the
+// contract whose relationUuid is the act). Kept in the database like the rank tiers, so a
+// request reads that copy and valorant-api is only asked when it is older than TTL or the
+// act it describes has ended.
+const BP_KEY = 'catalog:battlepass:v1';
+let bpPass = null;
+let bpFailedAt = 0;
+
+const bpCurrent = (p) => p && p.act && Date.now() - p.at < TTL && Date.parse(p.act.end) > Date.now();
+
+async function battlepassRefresh() {
+  if (Date.now() - bpFailedAt < 2 * 60 * 1000) return null;
+  try {
+    const [seasons, contracts] = await Promise.all([
+      fetchJson(`${API}/v1/seasons`, 2, 12000),
+      fetchJson(`${API}/v1/contracts`, 2, 12000),
+    ]);
+    const now = Date.now();
+    const act = (seasons.data || []).find((s) => s.type && Date.parse(s.startTime) <= now && now < Date.parse(s.endTime));
+    if (!act) throw new Error('no current act');
+    const contract = (contracts.data || []).find((c) => c.content && c.content.relationType === 'Season' && c.content.relationUuid === act.uuid);
+    const reward = (r) => ({ type: r.type, id: String(r.uuid).toLowerCase(), amount: r.amount || 1 });
+    const pass = {
+      at: now,
+      act: { id: act.uuid, name: act.title || act.displayName, start: act.startTime, end: act.endTime },
+      // The act can start a little before its pass shows up in the contracts list.
+      contract: contract
+        ? {
+            id: contract.uuid,
+            premiumVP: contract.content.premiumVPCost || null,
+            chapters: (contract.content.chapters || []).map((ch) => ({
+              levels: (ch.levels || []).map((l) => ({ xp: l.xp || 0, reward: l.reward ? reward(l.reward) : null })),
+              free: (ch.freeRewards || []).map(reward),
+            })),
+          }
+        : null,
+    };
+    bpPass = pass;
+    await storage.kvSet(BP_KEY, pass, SNAP_KEEP_MS).catch(() => {});
+    return pass;
+  } catch (err) {
+    console.warn('[items] battle pass unavailable:', err.message);
+    bpFailedAt = Date.now();
+    return null;
+  }
+}
+
+async function battlepass() {
+  if (bpCurrent(bpPass)) return bpPass;
+  const saved = await storage.kvGet(BP_KEY).catch(() => null);
+  if (bpCurrent(saved)) {
+    bpPass = saved;
+    return saved;
+  }
+  return (await battlepassRefresh()) || saved || bpPass || null;
+}
+
+const BP_KINDS = { EquippableSkinLevel: 'skin', EquippableCharmLevel: 'buddy', Spray: 'spray', PlayerCard: 'card', Title: 'title', Currency: 'currency' };
+
+// The pass as the page shows it: every reward resolved to a name and icon.
+async function battlepassTrack() {
+  const pass = await battlepass();
+  if (!pass) return null;
+  const [cur] = await Promise.all([currencies(), load().catch(() => {})]);
+  const currency = new Map([...cur].map(([id, c]) => [String(id).toLowerCase(), c]));
+  const show = (r) => {
+    if (!r) return null;
+    const kind = BP_KINDS[r.type] || 'other';
+    if (kind === 'currency') {
+      const c = currency.get(r.id);
+      return { kind, name: c ? c.name : 'Currency', icon: c ? c.icon : null, amount: r.amount };
+    }
+    const found = resolve(r.id);
+    const icon = found.type === 'card' && found.art ? found.art.small || found.icon : found.icon;
+    return { kind, name: found.name, icon: icon || null, amount: r.amount };
+  };
+  const track = {
+    act: pass.act,
+    premiumVP: pass.contract ? pass.contract.premiumVP : null,
+    contractId: pass.contract ? pass.contract.id : null,
+    // First premium reward: owning it means the account bought the premium pass.
+    premiumMarker: pass.contract && pass.contract.chapters[0] && pass.contract.chapters[0].levels[0] && pass.contract.chapters[0].levels[0].reward
+      ? pass.contract.chapters[0].levels[0].reward.id
+      : null,
+    chapters: [],
+  };
+  let tier = 0;
+  for (const ch of (pass.contract && pass.contract.chapters) || []) {
+    const levels = ch.levels.map((l) => ({ tier: ++tier, xp: l.xp, reward: show(l.reward) }));
+    track.chapters.push({ levels, free: ch.free.map(show) });
+  }
+  return track;
+}
+
+async function battlepassMeta() {
+  const pass = await battlepass();
+  if (!pass || !pass.contract) return null;
+  const levels = pass.contract.chapters.flatMap((ch) => ch.levels);
+  const first = levels[0] && levels[0].reward;
+  return { contractId: pass.contract.id, premiumMarker: first ? first.id : null, xp: levels.map((l) => l.xp) };
+}
+
+module.exports = { CURRENCY, CURRENCY_LABEL, load, resolve, refreshIcons, details, byType, search, storeIndex, kindOf, normalizeName, currencies, tierIcon, competitiveTiers, rankTier, battlepass, battlepassTrack, battlepassMeta, isStoreEligible, isStoreEligibleId, skinKind, skinBuckets };
