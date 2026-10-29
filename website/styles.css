@@ -1494,9 +1494,9 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .lo-card.sk { border-color: transparent; background: var(--surface-3); }
 .lo-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lo-card-none { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 12px; }
-/* The player's name and title sit on a light shade across the full width of the card, about
-   two thirds of the way down. The name is the headline (as typed: Riot IDs are case
-   sensitive), in a soft tint, spaced out a little; the title is smaller under it. */
+/* The player's name and title sit on a red shade (the site's accent) across the full width of
+   the card, about two thirds of the way down. The name is the headline in white (as typed:
+   Riot IDs are case sensitive), spaced out a little; the title is smaller under it. */
 .lo-card-name {
   position: absolute;
   z-index: 1;
@@ -1507,11 +1507,11 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
   gap: .3cqw;
   justify-items: center;
   padding: .75cqw 8px .7cqw;
-  background: rgba(8, 9, 12, .5);
+  background: rgba(198, 46, 60, .62);
   text-align: center;
 }
-.lo-card-name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ffcdd2; font: 600 clamp(15px, 1.4cqw, 24px)/1.1 var(--font-head); letter-spacing: .09em; }
-.lo-card-name span { max-width: 100%; overflow: hidden; color: var(--text-2); font-size: clamp(10px, .68cqw, 13px); line-height: 1.2; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.lo-card-name b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font: 600 clamp(15px, 1.4cqw, 24px)/1.1 var(--font-head); letter-spacing: .09em; }
+.lo-card-name span { max-width: 100%; overflow: hidden; color: rgba(255, 255, 255, .8); font-size: clamp(10px, .68cqw, 13px); line-height: 1.2; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
 .lo-card-name span > i { font-style: normal; }
 .lo-incognito { flex: none; }
 /* Expressions sit at the bottom of the column, level with the last weapon tiles. */
