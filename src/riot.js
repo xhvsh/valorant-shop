@@ -15,7 +15,8 @@ const PD_URLS = {
   entitlements: (shard, puuid) => `https://pd.${shard}.a.pvp.net/store/v1/entitlements/${puuid}`,
   // Unofficial personalization endpoint: the player's currently equipped
   // loadout (identity card/title + spray wheel + primary gun skin).
-  loadout: (shard, puuid) => `https://pd.${shard}.a.pvp.net/personalization/v2/players/${puuid}/loadout`,
+  loadout: (shard, puuid) => `https://pd.${shard}.a.pvp.net/personalization/v2/players/${puuid}/playerloadout`,
+  loadoutLegacy: (shard, puuid) => `https://pd.${shard}.a.pvp.net/personalization/v2/players/${puuid}/loadout`,
 };
 
 const CLIENT_PLATFORM = Buffer.from(
@@ -458,7 +459,13 @@ async function accountEntitlements(shard, puuid, tokens) {
 // Currently equipped loadout (identity / spray wheel / primary gun). Shape is
 // undocumented and can change; callers must treat this as optional data.
 async function playerLoadout(shard, puuid, tokens) {
-  return pdFetch(PD_URLS.loadout(shard, puuid), tokens);
+  try {
+    return await pdFetch(PD_URLS.loadout(shard, puuid), tokens);
+  } catch (err) {
+    // The path has moved before; try the older one once before giving up.
+    if (err.status === 404 || err.status === 405) return pdFetch(PD_URLS.loadoutLegacy(shard, puuid), tokens);
+    throw err;
+  }
 }
 
 // Marks the night market offers as "seen" in-game. The storefront sometimes

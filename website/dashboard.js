@@ -799,8 +799,21 @@
     const d = S.details[a.puuid];
     const rank = d && d.rank;
     const box = h("span", { class: `emblem ${size || ""}` });
-    // Unranked accounts get Riot's unranked emblem (tier 0 icon) too.
-    if (rank && rank.icon) {
+    // The equipped player card is the avatar. Without it (loadout unavailable, or the
+    // art fails to load) the rank emblem or initials show as before.
+    const card = d && d.equipped && d.equipped.identityCard;
+    const cardArt = card && card.art && card.art.small;
+    const fallback = () => {
+      box.classList.remove("is-card");
+      box.title = "";
+      box.textContent = initials(acctName(a));
+    };
+    if (cardArt) {
+      box.classList.add("is-card");
+      box.title = card.name || "";
+      box.appendChild(makeImg(cardArt, card.name || "", fallback));
+    } else if (rank && rank.icon) {
+      // Unranked accounts get Riot's unranked emblem (tier 0 icon) too.
       box.appendChild(makeImg(rank.icon, rank.tierName || "", (img) => img.replaceWith(document.createTextNode(initials(acctName(a))))));
       box.title = Number(rank.tier) >= 3 ? rank.tierName || "" : "Unranked";
     } else if (S.detailsPending[a.puuid] && !d) {

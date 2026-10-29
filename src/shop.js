@@ -647,14 +647,17 @@ function equippedFromLoadout(loadout) {
     seen.add(key);
     out.sprays.push({ id: r.id, name: r.name, icon: r.icon, staticIcon: r.staticIcon || null });
   }
-  if (id.PlayerCard) {
-    const r = items.resolve(id.PlayerCard);
+  // Riot's field names end in "ID"; older notes had them without it.
+  const cardId = id.PlayerCardID || id.PlayerCard;
+  const titleId = id.PlayerTitleID || id.PlayerTitle;
+  if (cardId) {
+    const r = items.resolve(cardId);
     if (r.type === 'card') {
       out.identityCard = { id: r.id, name: r.name, icon: r.icon, art: r.art || null };
     }
   }
-  if (id.PlayerTitle) {
-    const r = items.resolve(id.PlayerTitle);
+  if (titleId) {
+    const r = items.resolve(titleId);
     if (r.type === 'title') out.identityTitle = { id: r.id, name: r.name };
   }
   return out;
@@ -670,8 +673,8 @@ async function accountDetails(discordId, puuid, opts = {}) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
 
-  const fullKey = `acctdetails:v11:${discordId}:${account.puuid}`;
-  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v11:${scope}:${discordId}:${account.puuid}`;
+  const fullKey = `acctdetails:v12:${discordId}:${account.puuid}`;
+  const cacheKey = scope === 'full' ? fullKey : `acctdetails:v12:${scope}:${discordId}:${account.puuid}`;
   // The scoped copy is the small one: try it first, and only read the big full copy
   // (hundreds of KB) when it misses.
   const fresh = (box) => box && box.details && box.at && Date.now() - box.at < DETAILS_TTL;
@@ -777,8 +780,9 @@ async function accountDetails(discordId, puuid, opts = {}) {
       if (process.env.DETAIL_DEBUG) {
         console.log('[shop] loadout raw:', JSON.stringify(loadoutRes.value).slice(0, 2000));
       }
-    } else if (loadoutRes.status === 'rejected' && process.env.DETAIL_DEBUG) {
-      console.log('[shop] loadout failed:', loadoutRes.reason && loadoutRes.reason.message, loadoutRes.reason && loadoutRes.reason.status);
+    } else if (loadoutRes.status === 'rejected') {
+      // Optional data, but a silent failure hid a wrong path for a long time.
+      console.warn(`[shop] loadout failed for ${discordId}: ${loadoutRes.reason && loadoutRes.reason.message} (${loadoutRes.reason && loadoutRes.reason.status})`);
     }
 
     // Only cache a fully loaded result. A transient entitlements failure would
