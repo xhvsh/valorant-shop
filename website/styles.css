@@ -1337,30 +1337,36 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .tiles.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
 .tiles.wide .tile-media { height: 120px; padding: 12px; }
 .tile-name { overflow: hidden; padding: 7px 9px; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 12px; }
-/* loadout page: laid out like the in-game loadout screen */
-.lo-screen { display: grid; grid-template-columns: repeat(4, minmax(0, 1.2fr)) minmax(0, .8fr); gap: 20px; align-items: start; }
-.lo-col { display: grid; gap: 10px; min-width: 0; }
-.lo-h { margin: 10px 0 2px; text-align: center; font: 600 22px/1 var(--font-head); letter-spacing: .02em; text-transform: uppercase; }
-.lo-col > .lo-h:first-child { margin-top: 0; }
-.lo-col .lo-h:not(:first-child) { margin-top: 18px; }
-.lo-gun { position: relative; display: block; aspect-ratio: 5 / 2.1; min-width: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 2px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
-/* The art keeps clear of the buddy corner so the two never overlap. */
-.lo-gun-art { position: absolute; inset: 8px 48px 24px 10px; display: flex; align-items: center; justify-content: center; }
+/* loadout page: laid out like the in-game loadout screen.
+   All five columns are the same height. Headings keep their size and the weapon tiles in
+   each column share what is left, so a column with six tiles has shorter tiles than one
+   with three (as in the game). */
+.lo-screen { display: grid; grid-template-columns: repeat(4, minmax(0, 1.2fr)) minmax(0, .8fr); gap: 20px; align-items: stretch; height: 700px; }
+.lo-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+.lo-h { flex: none; margin: 0; text-align: center; font: 600 22px/30px var(--font-head); letter-spacing: .02em; text-transform: uppercase; }
+.lo-col .lo-h:not(:first-child) { margin-top: 10px; }
+.lo-gun { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 2px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
+/* The art is centred in the tile. The same strip is kept clear on both sides (where the buddy
+   sits on the right) so it never touches the buddy, and the same strip top and bottom
+   (where the weapon name sits). */
+.lo-gun-art { position: absolute; inset: 18px 44px; display: flex; align-items: center; justify-content: center; }
 .lo-gun-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .lo-gun.is-random .lo-gun-art img { opacity: .32; filter: grayscale(1) brightness(.7); }
 .lo-gun.is-empty .lo-gun-art { opacity: .2; }
-.lo-weapon { position: absolute; left: 10px; bottom: 7px; color: var(--text-2); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-.lo-buddy { position: absolute; right: 8px; bottom: 6px; width: 36px; height: 36px; }
+.lo-weapon { position: absolute; left: 10px; bottom: 6px; color: var(--text-2); font-size: 11px; font-weight: 600; line-height: 1; letter-spacing: .08em; text-transform: uppercase; }
+.lo-buddy { position: absolute; right: 7px; bottom: 5px; width: 34px; height: 34px; }
 .lo-buddy img { width: 100%; height: 100%; object-fit: contain; }
-.lo-card { position: relative; overflow: hidden; border-radius: 2px; background: var(--bg-2); aspect-ratio: 452 / 998; }
+.lo-side { justify-content: flex-start; }
+.lo-card { position: relative; flex: none; overflow: hidden; width: min(100%, 150px); margin: 0 auto; border-radius: 2px; background: var(--bg-2); aspect-ratio: 452 / 998; }
 .lo-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lo-card-none { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 12px; }
 .lo-level { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 10px; background: rgba(15, 17, 21, .85); color: #fff; font: 600 12px/1.4 var(--font-mono); }
-.lo-card-name { display: grid; gap: 3px; justify-items: center; text-align: center; }
+.lo-card-name { flex: none; display: grid; gap: 3px; justify-items: center; text-align: center; }
 .lo-card-name b { font: 600 13px/1.2 var(--font-head); letter-spacing: .04em; }
 .lo-card-name span:not(.chip) { color: var(--text-2); font-size: 12px; }
-.lo-side .lo-card { width: min(100%, 150px); margin: 0 auto; }
-.lo-wheel { position: relative; width: min(100%, 180px); aspect-ratio: 1; margin: 6px auto 0; border: 2px solid var(--line-2); border-radius: 50%; }
+/* Expressions sit at the bottom of the column, level with the last weapon tiles. */
+.lo-side .lo-h.lo-expr-h { margin-top: auto; }
+.lo-wheel { position: relative; flex: none; width: min(100%, 170px); aspect-ratio: 1; margin: 0 auto; border: 2px solid var(--line-2); border-radius: 50%; }
 .lo-wheel::before, .lo-wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-2); }
 .lo-wheel::before { transform: rotate(45deg); }
 .lo-wheel::after { transform: rotate(-45deg); }
@@ -1371,7 +1377,13 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .lo-slot.bottom { left: 37%; bottom: 5%; }
 .lo-slot.left { left: 5%; top: 37%; }
 .lo-slot.right { right: 5%; top: 37%; }
-@media (max-width: 1180px) { .lo-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lo-side { grid-column: 1 / -1; grid-row: 1; max-width: 300px; margin: 0 auto 10px; } }
+/* Narrower screens: columns stack in twos and the tiles get a fixed height. */
+@media (max-width: 1180px) {
+  .lo-screen { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
+  .lo-gun { flex: none; height: 96px; }
+  .lo-side { grid-column: 1 / -1; grid-row: 1; max-width: 300px; margin: 0 auto 10px; }
+  .lo-side .lo-h.lo-expr-h { margin-top: 18px; }
+}
 @media (max-width: 640px) { .lo-screen { grid-template-columns: 1fr; } }
 .coll-summary {
   display: grid;

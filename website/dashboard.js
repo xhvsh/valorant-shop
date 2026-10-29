@@ -1991,7 +1991,7 @@
       card,
       h("div", { class: "lo-card-name" }, h("b", { text: lo.card ? lo.card.name : "" }), lo.title ? h("span", { text: titleName(lo.title.name) }) : null,
         lo.incognito ? h("span", { class: "chip", text: "Incognito" }) : null),
-      h("h3", { class: "lo-h", text: "Expressions" }),
+      h("h3", { class: "lo-h lo-expr-h", text: "Expressions" }),
       loadoutWheelEl(lo));
     screen.appendChild(side);
     box.appendChild(screen);
