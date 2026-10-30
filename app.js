@@ -710,6 +710,29 @@ app.get('/api/accounts/:puuid/battlepass', requireDiscord, async (req, res, next
   }
 });
 
+// One account's Agent Mastery (Bloomline): every playable agent with its mastery progress.
+app.get('/api/accounts/:puuid/bloomline', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    rateLimit(`${discordId}:bloomline`, 30, 60000);
+    const puuid = String(req.params.puuid || '');
+    const access = await accountAccessFor(discordId, puuid);
+    if (!access) throw httpError('Unknown account.', 404);
+    const result = await shop.accountBloomline(access.ownerId, puuid);
+    if (result.status === 'unlinked') throw httpError('Unknown account.', 404);
+    if (result.status === 'relink') return res.json({ ok: true, status: 'relink' });
+    if (result.status === 'error') {
+      return res.json({ ok: false, status: 'error', error: result.error || 'Could not load agent mastery.' });
+    }
+    const [roster, pass] = await Promise.all([items.agentRoster(), items.battlepass().catch(() => null)]);
+    const mine = new Map(result.agents.map((a) => [a.id, a]));
+    const agents = roster.map((r) => ({ ...r, ...(mine.get(r.id) || { points: 0, level: 0, previous: 0, lifetime: 0 }) }));
+    res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), agents, actEnd: pass && pass.act ? pass.act.end : null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Persist the dashboard's drag order for the user's own accounts. Purely
 // cosmetic, stored in kv (no schema change); unknown puuids are dropped and any
 // account missing from the payload is appended so the list stays complete.

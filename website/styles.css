@@ -2553,3 +2553,76 @@ button.wl-pick-thumb:hover .wl-pick-art { transform: scale(1.05); }
 .sl-link { display: flex; gap: 8px; }
 .sl-link .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
 .sl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; color: var(--text-2); font-size: 13px; }
+
+/* ---------- agent mastery ---------- */
+.mas-wrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; align-items: start; }
+.mas-roster { display: grid; gap: 4px; max-height: 640px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.mas-pick { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 46px; padding: 5px 10px 5px 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
+.mas-pick:hover { border-color: var(--line-2); background: var(--surface-2); }
+.mas-pick.is-on { border-color: var(--text-3); background: var(--surface-3); }
+.mas-pick.is-new { opacity: .55; }
+.mas-pick.is-new:hover, .mas-pick.is-new.is-on { opacity: 1; }
+.mas-pick-name { overflow: hidden; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.mas-pick-lvl { min-width: 22px; color: var(--text-2); font: 600 15px/1 var(--font-head); font-variant-numeric: tabular-nums; text-align: right; }
+div.mas-pick.sk { height: 46px; cursor: default; }
+
+/* the agent's square portrait in its level frame */
+.mas-face { position: relative; display: grid; place-items: center; flex: none; overflow: hidden; background: #1a2036; border: 2px solid #5b6584; }
+.mas-face img { width: 100%; height: 100%; object-fit: cover; }
+.mas-face.is-sm { width: 34px; height: 34px; border-width: 1px; }
+.mas-face.is-md { width: 52px; height: 52px; }
+.mas-face.is-lg { width: 96px; height: 96px; border-width: 3px; }
+.mas-face.f-II { border-color: #8fa3d9; }
+.mas-face.f-III { border-color: #c7a1ff; box-shadow: 0 0 0 1px rgba(199, 161, 255, .35); }
+.mas-face.f-IV { border-color: #ffd36b; box-shadow: 0 0 14px rgba(255, 211, 107, .45), inset 0 0 0 1px rgba(255, 211, 107, .5); }
+
+/* the stage: the game's navy backdrop, the agent's own colours behind its portrait */
+.mas-stage { --a: #e9ecf5; --c1: #33406b; --c2: #0e1428; position: relative; display: grid; gap: 22px; min-width: 0; min-height: 520px; padding: 24px clamp(14px, 2.4vw, 30px) 22px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: radial-gradient(70% 90% at 78% 30%, color-mix(in srgb, var(--c1) 55%, transparent), transparent 70%), radial-gradient(90% 70% at 20% 110%, color-mix(in srgb, var(--c2) 40%, transparent), transparent 70%), linear-gradient(180deg, #121a33, #0a1022); }
+.mas-stage > * { position: relative; z-index: 1; }
+.mas-art { position: absolute !important; inset: 0 0 0 auto; z-index: 0 !important; display: flex; justify-content: flex-end; width: min(58%, 520px); pointer-events: none; opacity: .95; }
+.mas-art img { width: 100%; height: 100%; object-fit: contain; object-position: right bottom; filter: drop-shadow(0 8px 30px rgba(0, 0, 0, .5)); }
+.mas-head { display: flex; align-items: center; gap: 16px; }
+.mas-title { display: grid; gap: 2px; min-width: 0; }
+.mas-title small { color: var(--text-2); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-title h3 { margin: 0; color: var(--a); font: 700 clamp(40px, 7vw, 68px)/.95 var(--font-head); letter-spacing: .01em; text-transform: uppercase; text-shadow: 0 2px 18px rgba(0, 0, 0, .35); }
+.mas-ends { margin-top: 6px; color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.mas-prev { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-lifetime { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.mas-lifetime div { display: grid; gap: 2px; }
+.mas-lifetime small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-lifetime b { font: 600 24px/1 var(--font-head); letter-spacing: .04em; }
+
+/* the 30 act levels as a segmented bar, upgrades hanging below it */
+.mas-trackbox { align-self: end; margin: 0 calc(clamp(14px, 2.4vw, 30px) * -1); }
+.mas-track-scroll { overflow-x: auto; padding: 0 clamp(14px, 2.4vw, 30px) 4px; scrollbar-width: thin; }
+.mas-track { position: relative; min-width: 1080px; padding-top: 44px; padding-bottom: 150px; }
+.mas-now { position: absolute; top: 0; display: grid; gap: 2px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+.mas-now b { color: var(--a); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.mas-now span { color: var(--text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mas-now em { color: var(--green); font-style: normal; }
+.mas-now::after { content: ""; justify-self: center; width: 1px; height: 12px; background: var(--text-3); }
+.mas-segs { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 3px; }
+.mas-seg { position: relative; height: 12px; overflow: hidden; background: rgba(122, 138, 205, .22); border: 1px solid rgba(160, 175, 230, .18); transform: skewX(-18deg); }
+.mas-seg i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--a), color-mix(in srgb, var(--a) 70%, #fff)); transition: width .4s var(--ease); }
+.mas-seg.is-cur { border-color: var(--a); }
+.mas-miles { position: absolute; inset: 56px 0 auto 0; height: 0; }
+.mas-mile { position: absolute; top: 0; display: grid; justify-items: center; gap: 2px; width: 104px; margin-left: -52px; text-align: center; }
+.mas-mile-tick { width: 1px; height: 14px; background: var(--text-3); }
+.mas-mile-face { position: relative; display: grid; place-items: center; width: 62px; height: 62px; margin-top: 4px; overflow: hidden; border: 1px solid var(--line-2); background: #1a2036; }
+.mas-mile-face img { width: 100%; height: 100%; object-fit: cover; opacity: .75; }
+.mas-mile.is-got .mas-mile-face { border-color: var(--a); }
+.mas-mile.is-got .mas-mile-face img { opacity: 1; }
+.mas-mile-face .i { position: absolute; right: 3px; bottom: 3px; padding: 2px; border-radius: 2px; background: rgba(8, 10, 20, .8); font-size: 11px; color: var(--text-2); }
+.mas-mile b { margin-top: 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.mas-mile small { color: var(--text-3); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.mas-mile-up { color: var(--text-2) !important; line-height: 1.25; text-wrap: balance; }
+.mas-mile.is-got .mas-mile-up { color: var(--a) !important; }
+.mas-stage-sk .mas-trackbox { margin: 0; }
+
+@media (max-width: 820px) {
+  .mas-wrap { grid-template-columns: minmax(0, 1fr); }
+  .mas-roster { grid-auto-flow: column; grid-auto-columns: 150px; max-height: none; overflow: auto hidden; padding: 0 0 6px; }
+  .mas-art { width: 70%; opacity: .5; }
+  .mas-face.is-lg { width: 72px; height: 72px; }
+}

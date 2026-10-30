@@ -630,7 +630,7 @@
      Router
      ========================================================================== */
 
-  const ACCOUNT_TABS = ["daily", "acc", "nm", "collection", "loadout", "alerts", "sharing"];
+  const ACCOUNT_TABS = ["daily", "acc", "nm", "collection", "loadout", "mastery", "alerts", "sharing"];
 
   // Routes are real paths (/a/<puuid>/<tab>, /wishlist, ...) under BASE_PATH and
   // use the History API. The server returns index.html for each of them.
@@ -1443,6 +1443,7 @@
       { id: "nm", label: "Night Market", icon: "moon", night: true, dot: nmOpen, disabled: store && !nmOpen },
       { id: "collection", label: "Collection", icon: "box" },
       { id: "loadout", label: "Loadout", icon: "shield" },
+      { id: "mastery", label: "Agent mastery", icon: "trophy" },
     ];
     if (!a.shared) {
       tabs.push({ id: "alerts", label: "Alerts", icon: "bell" });
@@ -1485,13 +1486,14 @@
     if (!box || !a) return;
     const tab = S.route.tab;
     box.innerHTML = "";
-    if (!a.linked && ["daily", "acc", "nm", "collection", "loadout"].includes(tab)) {
+    if (!a.linked && ["daily", "acc", "nm", "collection", "loadout", "mastery"].includes(tab)) {
       box.appendChild(h("div", { class: "empty-state" }, iconEl("link"), h("h3", { text: "Not connected" }), h("p", { text: "Re-link this account to load its shops and collection." })));
       return;
     }
     if (tab === "daily" || tab === "acc" || tab === "nm") renderShopPanel(box, a, tab);
     else if (tab === "collection") renderCollectionPanel(box, a);
     else if (tab === "loadout") renderLoadoutPanel(box, a);
+    else if (tab === "mastery") renderMasteryPanel(box, a);
     else if (tab === "alerts") renderAlertsPanel(box, a);
     else if (tab === "sharing") renderSharingPanel(box, a);
   }
@@ -2476,6 +2478,169 @@
       while (i < todo.length) await fetchBpProgress(todo[i++].puuid).catch(() => {});
     };
     Promise.all([worker(), worker(), worker()]).catch(() => {});
+  }
+
+  /* ---------- agent mastery (Bloomline) ---------- */
+
+  // Laid out like the game's Agent Mastery > Act Level page: the agent's portrait and name in
+  // its own colour, the act's 30 levels as a segmented track, and the portrait upgrades at
+  // levels 1, 4, 7 and 10. Mastery points per act level (the wiki's table; its level 9 total
+  // is a typo for 109,900) and the lifetime-level frames come from the game, not the API.
+  const MASTERY_STEPS = [2000, 8500, 9300, 10500, 12000, 13800, 15800, 17900, 20100, 22500, 35000, 78000, 205000, 418000];
+  const MASTERY_CUM = [0];
+  for (let i = 0; i < 30; i++) MASTERY_CUM.push(MASTERY_CUM[i] + (MASTERY_STEPS[i] || 715000));
+  const MASTERY_UPGRADES = { 1: "Level indicator", 4: "Level indicator upgrade", 7: "Background upgrade", 10: "Background animation" };
+  const MASTERY_FRAMES = [[30, "IV"], [20, "III"], [10, "II"], [0, "I"]];
+  const bloom = {};
+  let masSel = null;
+
+  const masLevel = (pts) => {
+    let l = 0;
+    while (l < 30 && pts >= MASTERY_CUM[l + 1]) l++;
+    return l;
+  };
+  const masFrame = (life) => (MASTERY_FRAMES.find(([min]) => life >= min) || [0, "I"])[1];
+
+  // The agent's name takes the most vivid colour of its own background, lightened a little
+  // so it reads on the dark page like the game's title.
+  function masAccent(colors) {
+    let best = null;
+    for (const c of colors || []) {
+      const n = parseInt(c.slice(1, 7), 16);
+      if (!Number.isFinite(n)) continue;
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      const score = Math.max(r, g, b) - Math.min(r, g, b) + Math.max(r, g, b) * 0.4;
+      if (!best || score > best.score) best = { r, g, b, score };
+    }
+    if (!best) return "#e9ecf5";
+    const mix = (v) => Math.round(v + (255 - v) * 0.6);
+    return `rgb(${mix(best.r)}, ${mix(best.g)}, ${mix(best.b)})`;
+  }
+
+  function fetchBloom(puuid, force) {
+    const box = bloom[puuid] || (bloom[puuid] = {});
+    if (force) {
+      box.data = null;
+      box.error = null;
+    }
+    if (box.data || box.pending) return box.pending;
+    box.error = null;
+    box.pending = api(`/api/accounts/${encodeURIComponent(puuid)}/bloomline`, { timeoutMs: 35000 })
+      .then((res) => {
+        if (res && res.status === "relink") box.error = "Riot asked to sign in again. Re-link this account.";
+        else if (res && res.agents) box.data = res;
+        else box.error = (res && res.error) || "No agent mastery data for this account.";
+      })
+      .catch((err) => {
+        box.error = err.message || "Could not load agent mastery.";
+      })
+      .finally(() => {
+        box.pending = null;
+        if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "mastery") renderPanel();
+      });
+    return box.pending;
+  }
+
+  // The agent's square portrait in the game's frame: level I until lifetime level 10, then
+  // II, III at 20 and IV at 30.
+  function masPortrait(ag, size) {
+    const frame = masFrame(ag.lifetime);
+    return h("span", { class: `mas-face is-${size || "md"} f-${frame}`, title: `Level ${frame} frame` },
+      ag.icon ? makeImg(ag.icon, ag.name) : fallbackText(ag.name));
+  }
+
+  function masRosterEl(agents, onPick) {
+    return h("div", { class: "mas-roster", role: "listbox", "aria-label": "Agents" }, ...agents.map((ag) =>
+      h("button", { class: `mas-pick${ag.id === masSel ? " is-on" : ""}${ag.points ? "" : " is-new"}`, type: "button", role: "option", "aria-selected": ag.id === masSel ? "true" : "false", onclick: () => onPick(ag.id) },
+        masPortrait(ag, "sm"),
+        h("span", { class: "mas-pick-name", text: ag.name }),
+        h("span", { class: "mas-pick-lvl", title: "Act level", text: ag.points ? String(masLevel(ag.points)) : "-" }))));
+  }
+
+  function masStageEl(ag, actEnd) {
+    const lvl = masLevel(ag.points);
+    const accent = masAccent(ag.colors);
+    const cols = ag.colors && ag.colors.length ? ag.colors : ["#33406b", "#0e1428"];
+    const toward = lvl >= 30 ? 0 : ag.points - MASTERY_CUM[lvl];
+    const need = lvl >= 30 ? 0 : MASTERY_CUM[lvl + 1] - MASTERY_CUM[lvl];
+    const daysLeft = actEnd ? Math.max(0, Math.ceil((Date.parse(actEnd) - Date.now()) / 86400000)) : null;
+
+    // 30 segments: the bar fills through the levels reached and part of the one being earned.
+    const segs = [];
+    for (let i = 1; i <= 30; i++) {
+      const done = i <= lvl;
+      const cur = i === lvl + 1;
+      const fill = done ? 100 : cur && need ? Math.min(100, (toward / need) * 100) : 0;
+      segs.push(h("span", { class: `mas-seg${done ? " is-done" : ""}${cur ? " is-cur" : ""}`, title: `Act level ${i}: ${fmt(MASTERY_CUM[i])} MP` },
+        h("i", { style: `width:${fill.toFixed(1)}%` })));
+    }
+    const marks = Object.keys(MASTERY_UPGRADES).map(Number).map((n) => {
+      const got = lvl >= n;
+      return h("div", { class: `mas-mile${got ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, title: MASTERY_UPGRADES[n] },
+        h("span", { class: "mas-mile-tick" }),
+        h("span", { class: "mas-mile-face" }, ag.icon ? makeImg(ag.icon, "") : null, got ? null : iconEl("lock")),
+        h("b", { text: `Act level ${n}` }),
+        h("small", { text: `${fmt(MASTERY_CUM[n])} MP` }),
+        h("small", { class: "mas-mile-up", text: MASTERY_UPGRADES[n] }));
+    });
+
+    const label = h("div", { class: "mas-now", style: `left:${((Math.min(lvl + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
+      h("b", { text: ag.points ? `Act level ${lvl}` : "Not played" }),
+      h("span", {}, h("em", { text: fmt(ag.points) }), lvl >= 30 ? " MP" : ` / ${fmt(MASTERY_CUM[lvl + 1])}`));
+
+    const next = MASTERY_FRAMES.slice().reverse().find(([min]) => ag.lifetime < min && min > 0);
+    return h("section", { class: "mas-stage", style: `--a:${accent};--c1:${cols[0]};--c2:${cols[cols.length > 2 ? 2 : cols.length - 1]}` },
+      h("div", { class: "mas-art" }, ag.portrait ? makeImg(ag.portrait, "") : null),
+      h("div", { class: "mas-head" },
+        masPortrait(ag, "lg"),
+        h("div", { class: "mas-title" },
+          h("small", { text: "Act levels" }),
+          h("h3", { text: ag.name }),
+          h("span", { class: "mas-ends", text: daysLeft == null ? "" : daysLeft === 1 ? "Act ends in 1 day" : `Act ends in ${daysLeft} days` }),
+          h("span", { class: "mas-prev", text: `Previous act level: ${ag.previous}` }))),
+      h("div", { class: "mas-lifetime" },
+        h("div", {}, h("small", { text: "Lifetime level" }), h("b", { text: String(ag.lifetime) })),
+        h("div", {}, h("small", { text: "Frame" }), h("b", { text: masFrame(ag.lifetime) })),
+        h("div", {}, h("small", { text: next ? `Frame ${next[1]} at` : "Top frame" }), h("b", { text: next ? `Level ${next[0]}` : "Unlocked" }))),
+      h("div", { class: "mas-trackbox" },
+        h("div", { class: "mas-track-scroll" },
+          h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-miles" }, ...marks)))));
+  }
+
+  function renderMasteryPanel(box, a) {
+    const st = bloom[a.puuid] || (bloom[a.puuid] = {});
+    if (!st.data && !st.error && !st.pending) fetchBloom(a.puuid);
+    const head = h("div", { class: "panel-head" }, h("h2", { text: "Agent mastery" }));
+    box.appendChild(head);
+    if (!st.data) {
+      if (st.error && !st.pending) {
+        box.appendChild(h("div", { class: "empty-state" }, iconEl("alert"), h("h3", { text: "Could not load agent mastery" }), h("p", { text: st.error }),
+          h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchBloom(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Try again")));
+        return;
+      }
+      box.appendChild(h("div", { class: "mas-wrap" },
+        h("div", { class: "mas-roster" }, ...Array.from({ length: 10 }, () => h("div", { class: "mas-pick sk" }))),
+        h("section", { class: "mas-stage mas-stage-sk" },
+          h("div", { class: "mas-head" }, h("span", { class: "mas-face is-lg sk" }), h("div", { class: "mas-title" }, h("span", { class: "sk sk-line w20" }), h("span", { class: "sk sk-line w60", style: "height:44px;margin-top:8px" }))),
+          h("div", { class: "mas-trackbox" }, h("div", { class: "sk", style: "height:60px" })))));
+      return;
+    }
+    head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchBloom(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
+    const agents = st.data.agents.slice().sort((x, y) => y.points - x.points || y.lifetime - x.lifetime || x.name.localeCompare(y.name));
+    if (!agents.length) {
+      box.appendChild(h("div", { class: "empty-state" }, iconEl("info"), h("h3", { text: "No agents found" }), h("p", { text: "Agent mastery is not available right now." })));
+      return;
+    }
+    if (!agents.some((x) => x.id === masSel)) masSel = agents[0].id;
+    const wrap = h("div", { class: "mas-wrap" });
+    const draw = () => {
+      const ag = agents.find((x) => x.id === masSel) || agents[0];
+      const scroll = window.scrollY;
+      wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd));
+      window.scrollTo({ top: scroll, behavior: "instant" });
+    };
+    draw();
+    box.appendChild(wrap);
   }
 
   /* ---------- alerts ---------- */

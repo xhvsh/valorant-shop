@@ -1002,6 +1002,49 @@ async function accountBattlepass(discordId, puuid) {
   }
 }
 
+// ---- Agent Mastery (Bloomline) --------------------------------------------------
+// Points are this act's mastery points and ShortLevel the act level they reach; LongLevel is
+// the agent's permanent lifetime level. Progress moves only after matches, so it is kept a few
+// minutes. Agents without a Flourish have not been played.
+const BLOOMLINE_TTL = 10 * 60 * 1000;
+
+async function accountBloomline(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  const cacheKey = `bloomline:v1:${discordId}:${account.puuid}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  if (box && box.agents && box.at && Date.now() - box.at < BLOOMLINE_TTL) {
+    return { status: 'ok', agents: box.agents, cached: true, account };
+  }
+  let auth;
+  try {
+    auth = storage.decrypt(account.auth_encrypted);
+  } catch {
+    return { status: 'relink', account };
+  }
+  try {
+    const token = await ensureAccessToken(discordId, account.puuid, auth);
+    const entitlement = await entitlementFor(token.access_token);
+    const res = await riot.bloomline(account.shard || 'na', account.puuid, { ...token, entitlement });
+    const agents = ((res && res.Bonsais) || []).map((b) => {
+      const f = b.Flourish || {};
+      const track = (b.TrackProgressList || [])[0] || {};
+      return {
+        id: String(b.BonsaiID).toLowerCase(),
+        points: Number(f.Points) || 0,
+        level: Number(f.ShortLevel) || 0,
+        previous: Number(f.PreviousShortLevel) || 0,
+        lifetime: Number(f.LongLevel) || Number(track.TrackLevel) || 0,
+      };
+    });
+    await storage.kvSet(cacheKey, { at: Date.now(), agents }, BLOOMLINE_TTL).catch(() => {});
+    return { status: 'ok', agents, account };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
 // ---- Featured bundles: resilient global cache --------------------------------
 // The featured bundles are the same for everyone, but the live source depends on
 // one account (BUNDLE_SOURCE_ID). If that account ever needs a re-link, every
@@ -1036,4 +1079,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountTokens, dropLoadoutCaches, accountBattlepass, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountTokens, dropLoadoutCaches, accountBattlepass, accountBloomline, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

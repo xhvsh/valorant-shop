@@ -493,6 +493,11 @@ async function contracts(shard, puuid, tokens) {
   return pdFetch(PD_URLS.contracts(shard, puuid), tokens);
 }
 
+// Agent Mastery ("Bloomline"): the player's progress on every agent. Unofficial, read-only here.
+async function bloomline(shard, puuid, tokens) {
+  return pdFetch(`https://pd.${shard}.a.pvp.net/bloomline/v0/players/${puuid}`, tokens);
+}
+
 async function accountEntitlements(shard, puuid, tokens) {
   return pdFetch(PD_URLS.entitlements(shard, puuid), tokens);
 }
@@ -833,6 +838,7 @@ module.exports = {
   mmr,
   accountXp,
   contracts,
+  bloomline,
   accountEntitlements,
   playerLoadout,
   accountEntitlementsOfType,

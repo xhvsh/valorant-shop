@@ -1005,4 +1005,41 @@ async function battlepassMeta() {
   return { contractId: pass.contract.id, premiumMarker: first ? first.id : null, xp: levels.map((l) => l.xp) };
 }
 
-module.exports = { CURRENCY, CURRENCY_LABEL, load, resolve, refreshIcons, details, byType, search, storeIndex, kindOf, normalizeName, currencies, tierIcon, competitiveTiers, rankTier, battlepass, battlepassTrack, battlepassMeta, isStoreEligible, isStoreEligibleId, skinKind, skinBuckets };
+// ---- Agent roster (Bloomline tab) ----------------------------------------------
+// The playable agents with the art the mastery page draws: portraits, role and the colours
+// of the agent's own background. Same for everyone, so it is kept for a day.
+const AGENTS_KEY = 'catalog:agents:v1';
+const AGENTS_TTL = 24 * 60 * 60 * 1000;
+let agentsMemo = null;
+
+async function agentRoster() {
+  if (agentsMemo && Date.now() - agentsMemo.at < AGENTS_TTL) return agentsMemo.list;
+  const saved = await storage.kvGet(AGENTS_KEY).catch(() => null);
+  if (saved && saved.list && saved.list.length && Date.now() - saved.at < AGENTS_TTL) {
+    agentsMemo = saved;
+    return saved.list;
+  }
+  try {
+    const json = await fetchJson(`${API}/v1/agents?isPlayableCharacter=true`, 2, 12000);
+    const list = (json.data || []).map((a) => ({
+      id: String(a.uuid).toLowerCase(),
+      name: a.displayName,
+      role: a.role ? { name: a.role.displayName, icon: a.role.displayIcon } : null,
+      icon: a.displayIcon,
+      portrait: a.fullPortrait || a.bustPortrait || null,
+      bust: a.bustPortrait || null,
+      bg: a.background || null,
+      colors: (a.backgroundGradientColors || []).map((c) => `#${String(c).slice(0, 6)}`),
+    })).sort((x, y) => x.name.localeCompare(y.name));
+    if (list.length) {
+      agentsMemo = { at: Date.now(), list };
+      await storage.kvSet(AGENTS_KEY, agentsMemo, 3 * AGENTS_TTL).catch(() => {});
+    }
+    return list;
+  } catch (err) {
+    console.warn('[items] agents unavailable:', err.message);
+    return (saved && saved.list) || (agentsMemo && agentsMemo.list) || [];
+  }
+}
+
+module.exports = { agentRoster, CURRENCY, CURRENCY_LABEL, load, resolve, refreshIcons, details, byType, search, storeIndex, kindOf, normalizeName, currencies, tierIcon, competitiveTiers, rankTier, battlepass, battlepassTrack, battlepassMeta, isStoreEligible, isStoreEligibleId, skinKind, skinBuckets };
