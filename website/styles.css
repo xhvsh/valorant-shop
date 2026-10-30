@@ -1344,8 +1344,19 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
 .bp-ends .i { font-size: 16px; color: var(--text-3); }
 .bp-count { color: var(--text); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .bp-ends-date { color: var(--text-3); }
-.bp-sk { height: 420px; }
-.bp-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.sk-line.w20 { width: 20%; }
+.bp-acct-sk { height: 92px; border: 1px solid var(--line); border-radius: var(--r-lg); }
+.bp-sk-tier { display: block; width: 44px; height: 30px; }
+.bp-acct.is-waiting { opacity: .85; }
+.bp-acct.is-waiting .bp-acct-sub .sk-line { margin-top: 4px; }
+.bp-sk-tiles { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+.bp-sk-tile { aspect-ratio: .8; border-radius: 0; }
+.bp-sk-nav { height: 44px; margin-top: 4px; }
+@media (max-width: 720px) { .bp-sk-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .bp-sk-tile:nth-child(n+4) { display: none; } }
+.bp-art.is-loading { background: var(--surface-3); }
+.bp-art.is-loading::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .06), transparent); animation: shimmer 1.3s infinite; }
+.bp-art img { transition: opacity .25s var(--ease); }
+.bp-art.is-loading img { opacity: 0; }.bp-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
 /* Account cards: avatar, name with Premium or Free, the tier on the right, then the whole
    pass as a bar with a notch between chapters, and the xp to the next tier under it. */

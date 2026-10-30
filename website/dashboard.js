@@ -2254,7 +2254,6 @@
   // a line of diamonds below. The pass is the same for every account: each one is an avatar
   // on that line where it is, and on the tile of the tier it is working on.
   let bpPage = 0;
-  let bpPicked = false;
 
   const bpTotal = (pass) => pass.chapters.reduce((n, ch) => n + ch.levels.length, 0);
   const bpLinked = () => ordered().filter((a) => a.linked);
@@ -2299,7 +2298,19 @@
     const box = h("div", { class: `bp-art${r && r.kind === "card" ? " is-card" : ""}` });
     if (!r) return box;
     const text = () => h("span", { class: "bp-art-text", text: bpShownName(r) });
-    box.appendChild(r.icon ? makeImg(r.icon, r.name, (img) => img.replaceWith(text())) : text());
+    if (r.icon) {
+      // A shimmer holds the square until the picture is in, then the picture fades up.
+      box.classList.add("is-loading");
+      const img = makeImg(r.icon, r.name, (bad) => {
+        box.classList.remove("is-loading");
+        bad.replaceWith(text());
+      });
+      img.loading = "eager";
+      const done = () => box.classList.remove("is-loading");
+      img.addEventListener("load", done);
+      if (img.complete && img.naturalWidth) done();
+      box.appendChild(img);
+    } else box.appendChild(text());
     if (r.amount > 1) box.appendChild(h("b", { class: "bp-amount", text: `x${fmt(r.amount)}` }));
     return box;
   }
@@ -2389,14 +2400,17 @@
     const box = bpProgress[a.puuid] || {};
     const p = box.data;
     const total = p ? p.totalTiers : bpTotal(pass);
-    const sub = !p ? box.error || "Loading progress" : p.tier >= total ? "Pass complete" : p.nextXp ? `${fmt(p.towards)} / ${fmt(p.nextXp)} XP to tier ${p.tier + 1}` : "Not started";
-    return h("button", { class: `bp-acct${box.error ? " is-error" : ""}`, type: "button", disabled: !p, onclick: () => onPage(bpPageOf(pass, p)) },
+    const waiting = !p && !box.error;
+    const sub = !p ? box.error || "" : p.tier >= total ? "Pass complete" : p.nextXp ? `${fmt(p.towards)} / ${fmt(p.nextXp)} XP to tier ${p.tier + 1}` : "Not started";
+    return h("button", { class: `bp-acct${box.error ? " is-error" : ""}${waiting ? " is-waiting" : ""}`, type: "button", disabled: !p, onclick: () => onPage(bpPageOf(pass, p)) },
       emblemEl(a, "md"),
       h("span", { class: "bp-acct-name" }, h("b", {}, ...nameNodes(acctName(a))),
         p && p.premium != null ? h("span", { class: `chip${p.premium ? " main" : ""}`, text: p.premium ? "Premium" : "Free" }) : null),
-      h("span", { class: "bp-acct-tier" }, h("small", { text: "Tier" }), h("span", {}, h("b", { text: p ? String(p.tier) : "-" }), h("i", { text: `/${total}` }))),
+      waiting
+        ? h("span", { class: "bp-acct-tier" }, h("span", { class: "sk bp-sk-tier" }))
+        : h("span", { class: "bp-acct-tier" }, h("small", { text: "Tier" }), h("span", {}, h("b", { text: p ? String(p.tier) : "-" }), h("i", { text: `/${total}` }))),
       h("span", { class: `bp-acct-bar${p ? "" : " sk"}`, style: `--chs:${pass.chapters.length}` }, h("i", { style: `width:${p ? ((bpPos(p) / total) * 100).toFixed(2) : 0}%` })),
-      h("span", { class: "bp-acct-sub", text: sub }));
+      waiting ? h("span", { class: "bp-acct-sub" }, h("span", { class: "sk sk-line w60" })) : h("span", { class: "bp-acct-sub", text: sub }));
   }
 
   function renderBattlepassRows() {
@@ -2404,21 +2418,11 @@
     const pass = battlepass.pass;
     if (!body || !pass) return;
     const accts = bpLinked();
-    // The page opens where the main account is working (or, if it has no progress, the
-    // first account that does).
-    if (!bpPicked) {
-      const main = accts.find((a) => a.is_default);
-      const mainBox = main ? bpProgress[main.puuid] || {} : null;
-      const from = mainBox && mainBox.data ? mainBox.data : !mainBox || mainBox.error ? accts.map(bpData).find(Boolean) : null;
-      if (from) {
-        bpPage = bpPageOf(pass, from);
-        bpPicked = true;
-      }
-    }
+    // The page stays on the first chapter; progress arriving must not move it. Only the
+    // user (arrows, diamonds, account cards) changes the page.
     const scroll = window.scrollY;
     const onPage = (i) => {
       bpPage = Math.max(0, Math.min(pass.chapters.length - 1, i));
-      bpPicked = true;
       renderBattlepassRows();
     };
     body.replaceChildren(
@@ -2440,7 +2444,13 @@
           h("button", { class: "btn btn-ghost", type: "button", onclick: () => loadBattlepass(true) }, iconEl("refresh"), "Try again")));
         return;
       }
-      view.appendChild(h("div", { class: "bp-sk sk" }));
+      const n = Math.max(1, Math.min(3, bpLinked().length));
+      view.appendChild(h("div", { class: "bp-body" },
+        h("div", { class: "bp-accts" }, ...Array.from({ length: n }, () => h("div", { class: "bp-acct bp-acct-sk sk" }))),
+        h("section", { class: "bp-view" },
+          h("div", { class: "bp-view-title" }, h("span", { class: "sk sk-line w40", style: "height:26px" }), h("span", { class: "sk sk-line w20" })),
+          h("div", { class: "bp-sk-tiles" }, ...Array.from({ length: 7 }, () => h("div", { class: "sk bp-sk-tile" }))),
+          h("div", { class: "bp-sk-nav sk" }))));
       loadBattlepass();
       return;
     }
