@@ -2497,7 +2497,6 @@
 
   // What each lifetime level opens up in the agent's store. `img` names the wiki picture.
   const MASTERY_REWARDS = [
-    { at: 0, items: [{ kind: "Level I Frame", img: () => "Level_I_Frame", wide: true }, { kind: "Standard Background", img: (n) => `Standard_Background_${n}` }] },
     { at: 5, items: [{ kind: "Spray", cost: 4000 }, { kind: "Player title", cost: 2500 }, { kind: "Player card", cost: 4500 }, { kind: "KD stat", cost: 2500 }, { kind: "Quote", cost: 5000 }] },
     { at: 10, items: [{ kind: "Level II Frame", cost: 2500, img: () => "Level_II_Frame", wide: true }, { kind: "Agent Role Background", cost: 6000, img: (n) => `Agent_Role_Background_${n}` }, { kind: "Player card", cost: 4500 }, { kind: "MVPs stat", cost: 2500 }, { kind: "Headshots stat", cost: 2500 }] },
     { at: 15, items: [{ kind: "Sidearm skin", cost: 8000 }, { kind: "Quote", cost: 5000 }, { kind: "Spray", cost: 4000 }, { kind: "First Bloods stat", cost: 2500 }] },
@@ -2585,7 +2584,7 @@
       const open = ag.lifetime >= tier.at;
       return h("div", { class: `mas-tier${open ? " is-open" : ""}` },
         h("div", { class: "mas-tier-head" },
-          h("b", { text: tier.at ? `Level ${tier.at}` : "Unlocked" }),
+          h("b", { text: `Level ${tier.at}` }),
           open ? iconEl("check") : iconEl("lock")),
         h("div", { class: "mas-tier-items" }, ...tier.items.map((it) =>
           h("div", { class: `mas-item${it.img ? " has-img" : ""}${it.wide ? " is-wide" : ""}${it.tall ? " is-tall" : ""}` },
