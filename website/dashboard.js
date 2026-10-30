@@ -2554,7 +2554,7 @@
       h("button", { class: `mas-pick${ag.id === masSel ? " is-on" : ""}${ag.points ? "" : " is-new"}`, type: "button", role: "option", "aria-selected": ag.id === masSel ? "true" : "false", onclick: () => onPick(ag.id) },
         masPortrait(ag, "sm"),
         h("span", { class: "mas-pick-name", text: ag.name }),
-        h("span", { class: "mas-pick-lvl", title: "Act level", text: ag.points ? String(masLevel(ag.points)) : "-" }))));
+        h("span", { class: "mas-pick-lvl", title: "Lifetime level", text: ag.lifetime ? String(ag.lifetime) : "-" }))));
   }
 
   function masStageEl(ag, actEnd) {
@@ -2574,14 +2574,16 @@
       segs.push(h("span", { class: `mas-seg${done ? " is-done" : ""}${cur ? " is-cur" : ""}`, title: `Act level ${i}: ${fmt(MASTERY_CUM[i])} MP` },
         h("i", { style: `width:${fill.toFixed(1)}%` })));
     }
+    // Numbers under the bar so the levels are easy to find.
+    const ticks = [1, 5, 10, 15, 20, 25, 30].map((n) => h("span", { class: `mas-tick${lvl >= n ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, text: String(n) }));
     const marks = Object.keys(MASTERY_UPGRADES).map(Number).map((n) => {
       const got = lvl >= n;
-      return h("div", { class: `mas-mile${got ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, title: MASTERY_UPGRADES[n] },
-        h("span", { class: "mas-mile-tick" }),
+      return h("div", { class: `mas-mile${got ? " is-got" : ""}` },
         h("span", { class: "mas-mile-face" }, ag.icon ? makeImg(ag.icon, "") : null, got ? null : iconEl("lock")),
-        h("b", { text: `Act level ${n}` }),
-        h("small", { text: `${fmt(MASTERY_CUM[n])} MP` }),
-        h("small", { class: "mas-mile-up", text: MASTERY_UPGRADES[n] }));
+        h("span", { class: "mas-mile-text" },
+          h("b", { text: `Level ${n}` }),
+          h("span", { class: "mas-mile-up", text: MASTERY_UPGRADES[n] }),
+          h("small", { text: `${fmt(MASTERY_CUM[n])} MP` })));
     });
 
     const label = h("div", { class: "mas-now", style: `left:${((Math.min(lvl + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
@@ -2603,8 +2605,8 @@
         h("div", {}, h("small", { text: "Frame" }), h("b", { text: masFrame(ag.lifetime) })),
         h("div", {}, h("small", { text: next ? `Frame ${next[1]} at` : "Top frame" }), h("b", { text: next ? `Level ${next[0]}` : "Unlocked" }))),
       h("div", { class: "mas-trackbox" },
-        h("div", { class: "mas-track-scroll" },
-          h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-miles" }, ...marks)))));
+        h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-ticks" }, ...ticks)),
+        h("div", { class: "mas-miles" }, ...marks)));
   }
 
   function renderMasteryPanel(box, a) {
