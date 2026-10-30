@@ -85,4 +85,59 @@ async function sendLog(content, opts = {}) {
   }
 }
 
-module.exports = { sendLog, adminMention, userMention, resolveName, renderNames, LOG_CHANNEL_ID };
+// ---- Embeds ---------------------------------------------------------------------------
+// One shape for every log: a coloured bar for the severity, a title, an optional
+// description and a few short fields, stamped with the time. Mentions in the text become
+// plain names (nothing in an embed pings). `ping: true` puts the admin mention in the
+// message body so a failure notifies you; everything else is silent.
+const COLORS = { ok: 0x46d39a, info: 0x5aa9ff, warn: 0xf2b84b, error: 0xff4655 };
+const cut = (v, n) => {
+  const s = String(v === undefined || v === null ? '' : v);
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+};
+
+// level: 'ok' | 'info' | 'warn' | 'error'
+// fields: [{ name, value, inline? }]; empty values are left out.
+async function sendEvent({ level = 'info', title, description = '', fields = [], ping = false } = {}) {
+  const token = process.env.DISCORD_BOT_TOKEN || '';
+  if (!token || !LOG_CHANNEL_ID) {
+    console.warn('[log] no bot token or log channel, skipping discord log');
+    return false;
+  }
+  try {
+    const embed = {
+      color: COLORS[level] || COLORS.info,
+      title: cut(title, 250),
+      description: cut(await renderNames(description, false), 3500) || undefined,
+      fields: [],
+      footer: { text: 'valorant shop' },
+      timestamp: new Date().toISOString(),
+    };
+    for (const f of fields.slice(0, 25)) {
+      const value = cut(await renderNames(f.value, false), 1000);
+      if (!value) continue;
+      embed.fields.push({ name: cut(f.name, 250), value, inline: f.inline !== false });
+    }
+    const pingAdmin = ping && ADMIN_ID;
+    const res = await fetch(`https://discord.com/api/v10/channels/${LOG_CHANNEL_ID}/messages`, {
+      signal: AbortSignal.timeout(8000),
+      method: 'POST',
+      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: pingAdmin ? `<@${ADMIN_ID}>` : undefined,
+        embeds: [embed],
+        allowed_mentions: pingAdmin ? { users: [ADMIN_ID] } : { parse: [] },
+      }),
+    });
+    if (!res.ok) {
+      console.warn('[log] discord log failed:', res.status, await res.text().catch(() => ''));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[log] discord log error:', (e && e.message) || e);
+    return false;
+  }
+}
+
+module.exports = { sendLog, sendEvent, adminMention, userMention, resolveName, renderNames, LOG_CHANNEL_ID };

@@ -96,8 +96,15 @@ async function persistAuth(discordId, puuid, auth) {
   const msg = (lastErr && lastErr.message) || String(lastErr);
   console.error(`[shop] token persist failed for ${discordId} after ${delays.length} tries: ${msg}`);
   try {
-    require('./discord/log')
-      .sendLog(`${require('./discord/log').adminMention()} could not save renewed Riot tokens for ${require('./discord/log').userMention(discordId)} (${String(msg).slice(0, 120)}). The account may need re-linking.`, { ping: true })
+    const dcLog = require('./discord/log');
+    dcLog
+      .sendEvent({
+        level: 'error',
+        title: 'Could not save renewed Riot tokens',
+        description: `${dcLog.userMention(discordId)}'s account may need re-linking.`,
+        fields: [{ name: 'Error', value: String(msg).slice(0, 300), inline: false }],
+        ping: true,
+      })
       .catch(() => {});
   } catch {
     /* logging is best effort */

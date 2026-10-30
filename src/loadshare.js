@@ -11,6 +11,7 @@ const storage = require('./storage');
 const riot = require('./riot');
 const shop = require('./shop');
 const items = require('./items');
+const dcLog = require('./discord/log');
 
 const LINK_TTL_MS = 30 * 60 * 1000;
 const SAVE_LOCK_MS = 60 * 1000;
@@ -165,6 +166,37 @@ async function linkStatus(discordId, puuid) {
   return { active: live, used, expired: !used && !live, expiresAt: rec.expiresAt, cosmetics: rec.cosmetics, lastSave: rec.lastSave || null };
 }
 
+// ---- Riot problems (logged to the log channel) ----------------------------------------------
+// A visitor who hits a Riot problem keeps retrying, so each kind is posted once per link per
+// ten minutes. Only a failed or half-kept write pings the admin; an account that needs
+// re-linking is the owner's to fix (the daily token job already DMs them).
+async function riotProblem(kind, rec, hash, account, { level, title, detail, ping }) {
+  try {
+    const first = await storage.kvInsert(`lshare:logged:${hash}:${kind}`, { at: Date.now() }, 10 * 60 * 1000);
+    if (!first) return;
+    const name = account && (account.label || account.name);
+    dcLog.sendEvent({
+      level,
+      title,
+      description: `${dcLog.userMention(rec.discordId)}'s account ${name ? `**${name}**` : String(rec.puuid).slice(0, 8)}`,
+      fields: [{ name: 'Detail', value: detail, inline: false }],
+      ping: Boolean(ping),
+    });
+  } catch {
+    /* logging is best effort */
+  }
+}
+
+// Turns a failed token lookup into the visitor's error, and logs it.
+async function sessionProblem(ctx, rec, hash) {
+  if (ctx.status === 'relink') {
+    await riotProblem('relink', rec, hash, ctx.account, { level: 'warn', title: 'Loadout link: account needs re-linking', detail: 'Riot signed the account out, so a visitor could not use the link.', ping: false });
+    return httpError('The account owner needs to sign in to Riot again.', 503);
+  }
+  await riotProblem('session', rec, hash, ctx.account, { level: 'error', title: 'Loadout link: could not reach Riot', detail: String(ctx.error || ctx.status || 'unknown'), ping: true });
+  return httpError('Could not reach Riot. Try again in a minute.', 503);
+}
+
 // ---- Owned items ---------------------------------------------------------------------------
 
 async function loadOwned(ctx) {
@@ -232,7 +264,7 @@ const gunState = (g) => ({
 async function viewLink(token) {
   const { hash, rec } = await readRecord(token);
   const ctx = await shop.accountTokens(rec.discordId, rec.puuid);
-  if (ctx.status !== 'ok') throw httpError(ctx.status === 'relink' ? 'The account owner needs to sign in to Riot again.' : 'Could not reach Riot. Try again in a minute.', 503);
+  if (ctx.status !== 'ok') throw await sessionProblem(ctx, rec, hash);
   const [cat, raw, owned] = await Promise.all([
     getCatalog(),
     riot.playerLoadout(ctx.shard, ctx.account.puuid, ctx.tokens),
@@ -427,7 +459,7 @@ async function saveLink(token, payload) {
   let burned = false;
   try {
     const ctx = await shop.accountTokens(rec.discordId, rec.puuid);
-    if (ctx.status !== 'ok') throw httpError(ctx.status === 'relink' ? 'The account owner needs to sign in to Riot again.' : 'Could not reach Riot. Try again in a minute.', 503);
+    if (ctx.status !== 'ok') throw await sessionProblem(ctx, rec, hash);
     const [cat, raw, owned] = await Promise.all([
       getCatalog(),
       riot.playerLoadout(ctx.shard, ctx.account.puuid, ctx.tokens),
@@ -445,9 +477,17 @@ async function saveLink(token, payload) {
     if (!(await storage.kvInsert(usedKey(hash), { at: Date.now() }, LINK_TTL_MS * 4))) throw httpError('This link was already used.', 410);
     burned = true;
 
-    await riot.setPlayerLoadout(ctx.shard, ctx.account.puuid, ctx.tokens, body);
+    try {
+      await riot.setPlayerLoadout(ctx.shard, ctx.account.puuid, ctx.tokens, body);
+    } catch (err) {
+      await riotProblem('write', rec, hash, ctx.account, { level: 'error', title: 'Loadout link: Riot rejected the write', detail: `${err.status || ''} ${(err && err.message) || err}`.trim(), ping: true });
+      throw httpError('Riot did not accept the change. Nothing was saved, and the link still works.', 502);
+    }
     const after = await riot.playerLoadout(ctx.shard, ctx.account.puuid, ctx.tokens);
     const verified = verify(body, after);
+    if (!verified) {
+      await riotProblem('kept', rec, hash, ctx.account, { level: 'warn', title: 'Loadout link: Riot did not keep everything', detail: 'The write was accepted, but the loadout read back differs from what was sent.', ping: true });
+    }
 
     rec.used = true;
     rec.lastSave = { at: Date.now(), changes, verified };

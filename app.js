@@ -542,7 +542,12 @@ app.delete('/api/accounts/:puuid', requireDiscord, async (req, res, next) => {
     } else if (target.is_default) {
       await storage.saveAccount(discordId, rest[0].puuid, { is_default: true });
     }
-    dcLog.sendLog(`${dcLog.userMention(discordId)} removed account **${target.label || target.name || target.puuid}** (${target.shard || '?'})`);
+    dcLog.sendEvent({
+      level: 'info',
+      title: 'Account removed',
+      description: `${dcLog.userMention(discordId)} removed **${target.label || target.name || target.puuid}**`,
+      fields: [{ name: 'Region', value: String(target.shard || '?').toUpperCase() }, { name: 'Accounts left', value: String(rest.length) }],
+    });
     res.json({ ok: true, remaining: rest.length });
   } catch (err) {
     next(err);
@@ -940,7 +945,7 @@ async function createShareFor(discordId, ownerName, puuid) {
   });
   ownerItems[puuid] = { code, name, shard: acct.shard || null, created_at: Date.now() };
   await storage.putOwnerShares(discordId, ownerItems);
-  dcLog.sendLog(`${dcLog.userMention(discordId)} created a share code for **${name}**`);
+  dcLog.sendEvent({ level: 'info', title: 'Share code created', description: `${dcLog.userMention(discordId)} created a share code for **${name}**` });
   return { code, existing: false, name, recipients: 0 };
 }
 
@@ -987,7 +992,12 @@ async function importShareFor(discordId, username, rawCode, ip) {
     added_at: Date.now(),
   };
   await storage.putImportedShares(discordId, items);
-  dcLog.sendLog(`${dcLog.userMention(discordId)} imported a shared account **${rec.name}** from ${dcLog.userMention(rec.owner_id)}`);
+  dcLog.sendEvent({
+    level: 'info',
+    title: 'Shared account imported',
+    description: `${dcLog.userMention(discordId)} imported **${rec.name}**`,
+    fields: [{ name: 'Shared by', value: dcLog.userMention(rec.owner_id) }],
+  });
   return { puuid: rec.puuid, name: rec.name, shard: rec.shard, ownerName: rec.owner_name || null };
 }
 
@@ -1006,7 +1016,7 @@ async function revokeShareFor(discordId, puuid) {
     return null;
   }
   await dropShare(discordId, rec, digest);
-  dcLog.sendLog(`${dcLog.userMention(discordId)} revoked the share code for **${rec.name}**`);
+  dcLog.sendEvent({ level: 'info', title: 'Share code revoked', description: `${dcLog.userMention(discordId)} revoked the share code for **${rec.name}**` });
   return rec.name || puuid;
 }
 
@@ -1078,7 +1088,16 @@ app.post('/api/me/delete', express.json(), requireDiscord, async (req, res, next
     if (!req.body || req.body.confirm !== 'DELETE') throw httpError('Type DELETE to confirm.', 400);
     await rateLimitShared(`wipe:${discordId}`, 3, 60000);
     const summary = await wipeUserData(discordId);
-    dcLog.sendLog(`${dcLog.userMention(discordId)} deleted all their data (${summary.accounts} account(s), ${summary.sharesRevoked} share(s) revoked, ${summary.recipientsRemoved} recipient(s) lost access)`);
+    dcLog.sendEvent({
+      level: 'warn',
+      title: 'User data deleted',
+      description: `${dcLog.userMention(discordId)} deleted all their data`,
+      fields: [
+        { name: 'Accounts', value: String(summary.accounts) },
+        { name: 'Shares revoked', value: String(summary.sharesRevoked) },
+        { name: 'Recipients who lost access', value: String(summary.recipientsRemoved) },
+      ],
+    });
     req.session.destroy(() => {
       res.clearCookie('valshops.sid', { httpOnly: true, sameSite: 'lax', secure: BASE_URL.startsWith('https') });
       res.json({ ok: true, summary });
@@ -1138,7 +1157,7 @@ app.delete('/api/shares/:code', requireDiscord, async (req, res, next) => {
     const rec = await storage.getShare(digest).catch(() => null);
     if (!rec || rec.owner_id !== discordId) throw httpError('Unknown share code.', 404);
     await dropShare(discordId, rec, digest);
-    dcLog.sendLog(`${dcLog.userMention(discordId)} revoked the share code for **${rec.name}**`);
+    dcLog.sendEvent({ level: 'info', title: 'Share code revoked', description: `${dcLog.userMention(discordId)} revoked the share code for **${rec.name}**` });
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -1227,7 +1246,12 @@ app.post('/api/shares/:puuid/rotate', express.json(), requireDiscord, async (req
       }
     }
 
-    dcLog.sendLog(`${dcLog.userMention(discordId)} refreshed the share code for **${rec.name}** (${keepers.length} kept)`);
+    dcLog.sendEvent({
+      level: 'info',
+      title: 'Share code refreshed',
+      description: `${dcLog.userMention(discordId)} refreshed the share code for **${rec.name}**`,
+      fields: [{ name: 'Recipients kept', value: String(keepers.length) }],
+    });
     res.json({ ok: true, code: newCode, rotated_at: now, cooldown_ms: SHARE_ROTATE_COOLDOWN_MS, recipients: keepers.length });
   } catch (err) {
     next(err);
@@ -1622,7 +1646,7 @@ app.post('/api/accounts/add/complete', express.json(), requireDiscord, async (re
       if (result.puuid) {
         await shop.getShop(req.session.discordId, result.puuid, { owned: false }).catch(() => null);
       }
-      dcLog.sendLog(`${dcLog.userMention(req.session.discordId)} linked account **${result.name}**`);
+      dcLog.sendEvent({ level: 'ok', title: 'Account linked', description: `${dcLog.userMention(req.session.discordId)} linked **${result.name}**` });
       res.json({ ...result, hasRefreshToken: Boolean(tokens.refresh_token) });
     } catch (e) {
       await storage.kvDel(`pkce:add:${flowId}`).catch(() => {});
@@ -1635,10 +1659,10 @@ app.post('/api/accounts/add/complete', express.json(), requireDiscord, async (re
   } catch (err) {
     const sid = req.session && req.session.discordId ? req.session.discordId : '?';
     if (err.status && err.status < 500) {
-      dcLog.sendLog(`Link failed for ${dcLog.userMention(sid)}: ${err.message}`);
+      dcLog.sendEvent({ level: 'warn', title: 'Account link failed', description: dcLog.userMention(sid), fields: [{ name: 'Reason', value: err.message, inline: false }] });
       return res.status(err.status).json({ ok: false, error: err.message });
     }
-    dcLog.sendLog(`${dcLog.adminMention()} link error for ${dcLog.userMention(sid)}: ${(err && err.message) || err}`, { ping: true });
+    dcLog.sendEvent({ level: 'error', title: 'Account link error', description: dcLog.userMention(sid), fields: [{ name: 'Error', value: (err && err.message) || String(err), inline: false }], ping: true });
     next(err);
   }
 });
@@ -2234,7 +2258,16 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
     }
   } catch (err) {
     console.error(`[int] followup FAILED name=${cmdName || bundleView} id=${interactionId} err=${(err && err.stack) || err}`);
-    dcLog.sendLog(`${dcLog.adminMention()} followup failed: ${cmdName || bundleView} for ${dcLog.userMention(discordId || '?')}: ${String((err && err.message) || err).slice(0, 200)}`, { ping: true });
+    dcLog.sendEvent({
+      level: 'error',
+      title: 'Command follow-up failed',
+      description: dcLog.userMention(discordId || '?'),
+      fields: [
+        { name: 'Command', value: String(cmdName || bundleView || '?') },
+        { name: 'Error', value: String((err && err.message) || err).slice(0, 300), inline: false },
+      ],
+      ping: true,
+    });
     try {
       const crash = 'Something went wrong loading that. Try the command again in a minute.';
       if (token && !bundleView && !ephemeral) {
@@ -2281,6 +2314,7 @@ app.get('/api/cron/refresh', async (req, res, next) => {
   try {
     if (!cronAuthorized(req)) return res.status(403).json({ error: 'forbidden' });
 
+    const startedAt = Date.now();
     const accounts = await storage.listAccounts();
     let needed = 0;
     let refreshed = 0;
@@ -2359,13 +2393,21 @@ app.get('/api/cron/refresh', async (req, res, next) => {
       }
     }
     {
-      const summary = `Token refresh: checked=${accounts.length} needed=${needed} refreshed=${refreshed} relink=${relink} failed=${failed} relink_dmed=${relinkDmed}`;
-      dcLog.sendLog(
-        failed > 0
-          ? `${dcLog.adminMention()} ${summary}\n${failLines.slice(0, 10).join('\n')}`
-          : summary,
-        { ping: failed > 0 }
-      );
+      dcLog.sendEvent({
+        level: failed > 0 ? 'error' : relink > 0 ? 'warn' : 'ok',
+        title: failed > 0 ? 'Token refresh: failures' : relink > 0 ? 'Token refresh: accounts need re-linking' : 'Token refresh done',
+        description: failed > 0 ? failLines.slice(0, 10).join('\n') : '',
+        fields: [
+          { name: 'Checked', value: String(accounts.length) },
+          { name: 'Needed refresh', value: String(needed) },
+          { name: 'Refreshed', value: String(refreshed) },
+          { name: 'Need re-link', value: String(relink) },
+          { name: 'Failed', value: String(failed) },
+          { name: 'Re-link DMs sent', value: String(relinkDmed) },
+          { name: 'Took', value: `${((Date.now() - startedAt) / 1000).toFixed(1)}s` },
+        ],
+        ping: failed > 0,
+      });
     }
     // Expired sessions and cache rows otherwise only go when somebody reads them.
     await storage.cleanupExpired().catch((e) => console.warn(`[cron] cleanup_expired failed: ${(e && e.message) || e}`));
@@ -2718,10 +2760,25 @@ app.get('/api/cron/dailyshop', async (req, res, next) => {
             ? 'vercel'
             : 'other';
       const sec = ((Date.now() - t0) / 1000).toFixed(1);
-      const summary = `Daily shops ${date} ${at} [${source}]: ${users} user(s), ${sent} sent, ${skipped} skipped, ${failed} failed, ${nmSent} NM alert(s), ${wishlistSent} wishlist alert(s). (${sec}s)`;
       const lines = [...failLines.slice(0, 10), ...okLines.slice(0, 15)];
       // Awaited so the fire-and-forget POST is not cut off when the lambda freezes.
-      await dcLog.sendLog(failLines.length > 0 ? `${dcLog.adminMention()} ${summary}\n${lines.join('\n')}` : `${summary}\n${lines.join('\n')}`, { ping: failLines.length > 0 });
+      await dcLog.sendEvent({
+        level: failLines.length > 0 ? 'error' : 'ok',
+        title: failLines.length > 0 ? 'Daily shop: failures' : 'Daily shop sent',
+        description: lines.join('\n'),
+        fields: [
+          { name: 'Date', value: `${date} ${at}` },
+          { name: 'Source', value: source },
+          { name: 'Users', value: String(users) },
+          { name: 'Sent', value: String(sent) },
+          { name: 'Skipped', value: String(skipped) },
+          { name: 'Failed', value: String(failed) },
+          { name: 'Night market alerts', value: String(nmSent) },
+          { name: 'Wishlist alerts', value: String(wishlistSent) },
+          { name: 'Took', value: `${sec}s` },
+        ],
+        ping: failLines.length > 0,
+      });
     }
     res.json({ ok: true, users, sent, skipped, failed, nmSent, wishlistSent, ms: Date.now() - t0 });
   } catch (err) {
@@ -2855,8 +2912,17 @@ async function runBundleCheck() {
     await Promise.all(Array.from({ length: Math.min(4, recipients.length) }, worker));
   }
 
-  const summary = `New bundle alert: ${names.join(', ')}. ${sent} sent, ${failed} failed, ${recipients.length} subscriber(s).`;
-  await dcLog.sendLog(failed > 0 ? `${dcLog.adminMention()} ${summary}` : summary, { ping: failed > 0 });
+  await dcLog.sendEvent({
+    level: failed > 0 ? 'error' : 'ok',
+    title: failed > 0 ? 'New bundle alert: some DMs failed' : 'New bundle alert sent',
+    description: names.join(', '),
+    fields: [
+      { name: 'Subscribers', value: String(recipients.length) },
+      { name: 'Sent', value: String(sent) },
+      { name: 'Failed', value: String(failed) },
+    ],
+    ping: failed > 0,
+  });
   return { ok: true, checked: true, newCount: fresh.length, sent, failed, recipients: recipients.length, names };
 }
 
