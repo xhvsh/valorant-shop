@@ -2482,15 +2482,30 @@
 
   /* ---------- agent mastery (Bloomline) ---------- */
 
-  // Laid out like the game's Agent Mastery > Act Level page: the agent's portrait and name in
-  // its own colour, the act's 30 levels as a segmented track, and the portrait upgrades at
-  // levels 1, 4, 7 and 10. Mastery points per act level (the wiki's table; its level 9 total
-  // is a typo for 109,900) and the lifetime-level frames come from the game, not the API.
+  // Laid out like the game's Agent Mastery pages. The act level (this act's points, reset every
+  // act) only drives the portrait's level indicator and background; the lifetime level (every act
+  // level ever earned, never reset) unlocks the rewards that can be bought with Kingdom Credits.
+  // Points per act level (the wiki's table; its level 9 total is a typo for 109,900), the
+  // rewards and their art come from the game and its wiki, not the API.
   const MASTERY_STEPS = [2000, 8500, 9300, 10500, 12000, 13800, 15800, 17900, 20100, 22500, 35000, 78000, 205000, 418000];
   const MASTERY_CUM = [0];
   for (let i = 0; i < 30; i++) MASTERY_CUM.push(MASTERY_CUM[i] + (MASTERY_STEPS[i] || 715000));
   const MASTERY_UPGRADES = { 1: "Level indicator", 4: "Level indicator upgrade", 7: "Background upgrade", 10: "Background animation" };
-  const MASTERY_FRAMES = [[30, "IV"], [20, "III"], [10, "II"], [0, "I"]];
+  const WIKI_IMG = "https://wiki.playvalorant.com/en-us/images/thumb/";
+  const wikiImg = (file) => `${WIKI_IMG}${file}.png/200px-${file}.png`;
+  const masKey = (name) => String(name).replace(/[^A-Za-z0-9]/g, "");
+
+  // What each lifetime level opens up in the agent's store. `img` names the wiki picture.
+  const MASTERY_REWARDS = [
+    { at: 0, items: [{ kind: "Level I Frame", img: () => "Level_I_Frame", wide: true }, { kind: "Standard Background", img: (n) => `Standard_Background_${n}` }] },
+    { at: 5, items: [{ kind: "Spray", cost: 4000 }, { kind: "Player title", cost: 2500 }, { kind: "Player card", cost: 4500 }, { kind: "KD stat", cost: 2500 }, { kind: "Quote", cost: 5000 }] },
+    { at: 10, items: [{ kind: "Level II Frame", cost: 2500, img: () => "Level_II_Frame", wide: true }, { kind: "Agent Role Background", cost: 6000, img: (n) => `Agent_Role_Background_${n}` }, { kind: "Player card", cost: 4500 }, { kind: "MVPs stat", cost: 2500 }, { kind: "Headshots stat", cost: 2500 }] },
+    { at: 15, items: [{ kind: "Sidearm skin", cost: 8000 }, { kind: "Quote", cost: 5000 }, { kind: "Spray", cost: 4000 }, { kind: "First Bloods stat", cost: 2500 }] },
+    { at: 20, items: [{ kind: "Level III Frame", cost: 5000, img: () => "Level_III_Frame", wide: true }, { kind: "VALORANT Background", cost: 6000, img: (n) => `VALORANT_Background_${n}` }, { kind: "Buddy", cost: 5500 }, { kind: "Player title", cost: 2500 }, { kind: "Win Rate stat", cost: 2500 }] },
+    { at: 25, items: [{ kind: "Mastery I Pose", cost: 7500, img: (n) => `Mastery_I_Pose_${n}`, tall: true }, { kind: "Agent Lore Background", cost: 6000, img: (n) => `Agent_Lore_Background_${n}` }, { kind: "Spray", cost: 4000 }, { kind: "Clutches stat", cost: 2500 }] },
+    { at: 30, items: [{ kind: "Level IV Frame", cost: 7500, img: () => "Level_IV_Frame", wide: true }, { kind: "Mastery player card (animated)", cost: 7500 }, { kind: "Player title", cost: 2500 }, { kind: "Quote", cost: 5000 }, { kind: "Aces stat", cost: 2500 }] },
+  ];
+
   const bloom = {};
   let masSel = null;
 
@@ -2499,7 +2514,7 @@
     while (l < 30 && pts >= MASTERY_CUM[l + 1]) l++;
     return l;
   };
-  const masFrame = (life) => (MASTERY_FRAMES.find(([min]) => life >= min) || [0, "I"])[1];
+  const masPlayed = (ag) => ag.points > 0 || ag.lifetime > 0;
 
   // The agent's name takes the most vivid colour of its own background, lightened a little
   // so it reads on the dark page like the game's title.
@@ -2541,20 +2556,43 @@
     return box.pending;
   }
 
-  // The agent's square portrait in the game's frame: level I until lifetime level 10, then
-  // II, III at 20 and IV at 30.
-  function masPortrait(ag, size) {
-    const frame = masFrame(ag.lifetime);
-    return h("span", { class: `mas-face is-${size || "md"} f-${frame}`, title: `Level ${frame} frame` },
-      ag.icon ? makeImg(ag.icon, ag.name) : fallbackText(ag.name));
+  function masFace(ag, size) {
+    return h("span", { class: `mas-face is-${size || "md"}` }, ag.icon ? makeImg(ag.icon, ag.name) : fallbackText(ag.name));
   }
 
   function masRosterEl(agents, onPick) {
     return h("div", { class: "mas-roster", role: "listbox", "aria-label": "Agents" }, ...agents.map((ag) =>
-      h("button", { class: `mas-pick${ag.id === masSel ? " is-on" : ""}${ag.points ? "" : " is-new"}`, type: "button", role: "option", "aria-selected": ag.id === masSel ? "true" : "false", onclick: () => onPick(ag.id) },
-        masPortrait(ag, "sm"),
+      h("button", { class: `mas-pick${ag.id === masSel ? " is-on" : ""}${masPlayed(ag) ? "" : " is-new"}`, type: "button", role: "option", "aria-selected": ag.id === masSel ? "true" : "false", onclick: () => onPick(ag.id) },
+        masFace(ag, "sm"),
         h("span", { class: "mas-pick-name", text: ag.name }),
-        h("span", { class: "mas-pick-lvl", title: "Lifetime level", text: ag.lifetime ? String(ag.lifetime) : "-" }))));
+        h("span", { class: "mas-pick-lvl", title: "Lifetime level", text: String(ag.lifetime) }))));
+  }
+
+  // A 30-segment bar with the key levels numbered under it.
+  function masBarEl(value, towards, label) {
+    const segs = [];
+    for (let i = 1; i <= 30; i++) {
+      const fill = i <= value ? 100 : i === value + 1 ? Math.min(100, towards * 100) : 0;
+      segs.push(h("span", { class: `mas-seg${i <= value ? " is-done" : ""}${i === value + 1 ? " is-cur" : ""}` }, h("i", { style: `width:${fill.toFixed(1)}%` })));
+    }
+    const ticks = [1, 5, 10, 15, 20, 25, 30].map((n) => h("span", { class: `mas-tick${value >= n ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, text: String(n) }));
+    return h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-ticks" }, ...ticks));
+  }
+
+  function masRewardsEl(ag) {
+    const key = masKey(ag.name);
+    return h("div", { class: "mas-rewards" }, ...MASTERY_REWARDS.map((tier) => {
+      const open = ag.lifetime >= tier.at;
+      return h("div", { class: `mas-tier${open ? " is-open" : ""}` },
+        h("div", { class: "mas-tier-head" },
+          h("b", { text: tier.at ? `Level ${tier.at}` : "Unlocked" }),
+          open ? iconEl("check") : iconEl("lock")),
+        h("div", { class: "mas-tier-items" }, ...tier.items.map((it) =>
+          h("div", { class: `mas-item${it.img ? " has-img" : ""}${it.wide ? " is-wide" : ""}${it.tall ? " is-tall" : ""}` },
+            it.img ? h("span", { class: "mas-item-img" }, h("img", { src: wikiImg(it.img(key)), alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.parentNode.remove() })) : null,
+            h("span", { class: "mas-item-name", text: it.kind }),
+            it.cost ? h("span", { class: "mas-cost", title: "Kingdom Credits" }, h("i", { "aria-hidden": "true" }), fmt(it.cost)) : h("span", { class: "mas-cost is-free", text: "Free" })))));
+    }));
   }
 
   function masStageEl(ag, actEnd) {
@@ -2564,49 +2602,49 @@
     const toward = lvl >= 30 ? 0 : ag.points - MASTERY_CUM[lvl];
     const need = lvl >= 30 ? 0 : MASTERY_CUM[lvl + 1] - MASTERY_CUM[lvl];
     const daysLeft = actEnd ? Math.max(0, Math.ceil((Date.parse(actEnd) - Date.now()) / 86400000)) : null;
+    const life = Math.min(30, ag.lifetime);
 
-    // 30 segments: the bar fills through the levels reached and part of the one being earned.
-    const segs = [];
-    for (let i = 1; i <= 30; i++) {
-      const done = i <= lvl;
-      const cur = i === lvl + 1;
-      const fill = done ? 100 : cur && need ? Math.min(100, (toward / need) * 100) : 0;
-      segs.push(h("span", { class: `mas-seg${done ? " is-done" : ""}${cur ? " is-cur" : ""}`, title: `Act level ${i}: ${fmt(MASTERY_CUM[i])} MP` },
-        h("i", { style: `width:${fill.toFixed(1)}%` })));
-    }
-    // Numbers under the bar so the levels are easy to find.
-    const ticks = [1, 5, 10, 15, 20, 25, 30].map((n) => h("span", { class: `mas-tick${lvl >= n ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, text: String(n) }));
-    const marks = Object.keys(MASTERY_UPGRADES).map(Number).map((n) => {
+    const actLabel = h("div", { class: "mas-now", style: `left:${((Math.min(lvl + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
+      h("b", { text: ag.points ? `Act level ${lvl}` : "Not played" }),
+      h("span", {}, h("em", { text: fmt(ag.points) }), lvl >= 30 ? " MP" : ` / ${fmt(MASTERY_CUM[lvl + 1])} MP`));
+    const lifeLabel = h("div", { class: "mas-now", style: `left:${((Math.min(life + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
+      h("b", { text: `Lifetime level ${ag.lifetime}` }));
+
+    const upgrades = Object.keys(MASTERY_UPGRADES).map(Number).map((n) => {
       const got = lvl >= n;
-      return h("div", { class: `mas-mile${got ? " is-got" : ""}` },
-        h("span", { class: "mas-mile-face" }, ag.icon ? makeImg(ag.icon, "") : null, got ? null : iconEl("lock")),
-        h("span", { class: "mas-mile-text" },
-          h("b", { text: `Level ${n}` }),
-          h("span", { class: "mas-mile-up", text: MASTERY_UPGRADES[n] }),
-          h("small", { text: `${fmt(MASTERY_CUM[n])} MP` })));
+      return h("div", { class: `mas-up${got ? " is-got" : ""}` },
+        h("b", { text: `Act level ${n}` }),
+        h("span", { text: MASTERY_UPGRADES[n] }),
+        h("small", { text: `${fmt(MASTERY_CUM[n])} MP` }),
+        got ? iconEl("check") : iconEl("lock"));
     });
 
-    const label = h("div", { class: "mas-now", style: `left:${((Math.min(lvl + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
-      h("b", { text: ag.points ? `Act level ${lvl}` : "Not played" }),
-      h("span", {}, h("em", { text: fmt(ag.points) }), lvl >= 30 ? " MP" : ` / ${fmt(MASTERY_CUM[lvl + 1])}`));
-
-    const next = MASTERY_FRAMES.slice().reverse().find(([min]) => ag.lifetime < min && min > 0);
     return h("section", { class: "mas-stage", style: `--a:${accent};--c1:${cols[0]};--c2:${cols[cols.length > 2 ? 2 : cols.length - 1]}` },
-      h("div", { class: "mas-art" }, ag.portrait ? makeImg(ag.portrait, "") : null),
-      h("div", { class: "mas-head" },
-        masPortrait(ag, "lg"),
-        h("div", { class: "mas-title" },
-          h("small", { text: "Act levels" }),
-          h("h3", { text: ag.name }),
-          h("span", { class: "mas-ends", text: daysLeft == null ? "" : daysLeft === 1 ? "Act ends in 1 day" : `Act ends in ${daysLeft} days` }),
-          h("span", { class: "mas-prev", text: `Previous act level: ${ag.previous}` }))),
-      h("div", { class: "mas-lifetime" },
-        h("div", {}, h("small", { text: "Lifetime level" }), h("b", { text: String(ag.lifetime) })),
-        h("div", {}, h("small", { text: "Frame" }), h("b", { text: masFrame(ag.lifetime) })),
-        h("div", {}, h("small", { text: next ? `Frame ${next[1]} at` : "Top frame" }), h("b", { text: next ? `Level ${next[0]}` : "Unlocked" }))),
-      h("div", { class: "mas-trackbox" },
-        h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-ticks" }, ...ticks)),
-        h("div", { class: "mas-miles" }, ...marks)));
+      h("div", { class: "mas-top" },
+        h("div", { class: "mas-art" }, ag.portrait ? makeImg(ag.portrait, "") : null),
+        h("div", { class: "mas-head" },
+          masFace(ag, "lg"),
+          h("div", { class: "mas-title" },
+            h("small", { text: "Agent mastery" }),
+            h("h3", { text: ag.name }),
+            h("span", { class: "mas-ends", text: daysLeft == null ? "" : daysLeft === 1 ? "Act ends in 1 day" : `Act ends in ${daysLeft} days` }))),
+        h("div", { class: "mas-lifebox" },
+          h("small", { text: "Lifetime level" }),
+          h("b", { text: String(ag.lifetime) }),
+          h("span", { text: `Previous act ${ag.previous} · this act ${lvl}` }))),
+      h("div", { class: "mas-block" },
+        h("h4", { text: "Lifetime level" }),
+        h("p", { text: "Every act level ever earned on this agent. It never resets and opens the rewards below." }),
+        masBarEl(life, 0, lifeLabel)),
+      h("div", { class: "mas-block" },
+        h("h4", { text: "This act" }),
+        h("p", { text: "Resets every act. It sets the portrait's level indicator and background." }),
+        masBarEl(lvl, need ? toward / need : 0, actLabel),
+        h("div", { class: "mas-ups" }, ...upgrades)),
+      h("div", { class: "mas-block" },
+        h("h4", { text: "Rewards" }),
+        h("p", { text: "Bought for this agent with Kingdom Credits once its lifetime level is reached." }),
+        masRewardsEl(ag)));
   }
 
   function renderMasteryPanel(box, a) {
@@ -2624,11 +2662,12 @@
         h("div", { class: "mas-roster" }, ...Array.from({ length: 10 }, () => h("div", { class: "mas-pick sk" }))),
         h("section", { class: "mas-stage mas-stage-sk" },
           h("div", { class: "mas-head" }, h("span", { class: "mas-face is-lg sk" }), h("div", { class: "mas-title" }, h("span", { class: "sk sk-line w20" }), h("span", { class: "sk sk-line w60", style: "height:44px;margin-top:8px" }))),
-          h("div", { class: "mas-trackbox" }, h("div", { class: "sk", style: "height:60px" })))));
+          h("div", { class: "sk", style: "height:60px" }), h("div", { class: "sk", style: "height:200px" }))));
       return;
     }
     head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchBloom(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
-    const agents = st.data.agents.slice().sort((x, y) => y.points - x.points || y.lifetime - x.lifetime || x.name.localeCompare(y.name));
+    // Most-levelled first, as in the game; agents never played sit at the end.
+    const agents = st.data.agents.slice().sort((x, y) => y.lifetime - x.lifetime || y.points - x.points || x.name.localeCompare(y.name));
     if (!agents.length) {
       box.appendChild(h("div", { class: "empty-state" }, iconEl("info"), h("h3", { text: "No agents found" }), h("p", { text: "Agent mastery is not available right now." })));
       return;

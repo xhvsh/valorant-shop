@@ -130,7 +130,7 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://media.valorant-api.com https://cdn.discordapp.com",
+  "img-src 'self' data: https://media.valorant-api.com https://cdn.discordapp.com https://wiki.playvalorant.com",
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",
