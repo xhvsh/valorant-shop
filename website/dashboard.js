@@ -2512,6 +2512,7 @@
 
   const bloom = {};
   let masSel = null;
+  let masAcct = null;
   // Per-agent rewards: undefined until asked for, then the map by agent id, or false on failure.
   let masRewards;
 
@@ -2666,9 +2667,7 @@
   function masBoardEl(ag, stats, acct) {
     const key = masKey(ag.name);
     const eq = masEq(ag);
-    const d = S.details[acct.puuid];
-    const card = d && d.equipped && d.equipped.identityCard;
-    const cardArt = card && card.art && card.art.small;
+    const cardArt = ag.icon;
     const riotId = String(acct.name && acct.name.includes("#") ? acct.name : acctName(acct));
     const [game, tag] = riotId.split("#");
     const slots = [0, 1, 2].map((i) => {
@@ -2738,7 +2737,7 @@
       case "frame":
         return h("i", { class: "mas-eq-frame", style: `border-image-source:url("${wikiFile(`${it.name.replace(/\s+/g, "_")}.png`)}")` });
       case "quote":
-        return h("span", { class: "mas-quote" }, h("i", { class: "mas-glyph is-quote", "aria-hidden": "true" }), it.text ? h("q", { text: it.text }) : null);
+        return h("span", { class: `mas-quote${it.text && it.text.length > 44 ? " is-xlong" : it.text && it.text.length > 26 ? " is-long" : ""}` }, h("i", { class: "mas-glyph is-quote", "aria-hidden": "true" }), it.text ? h("q", { text: it.text }) : null);
       case "stat":
         return h("i", { class: "mas-glyph is-stat", "aria-hidden": "true" });
     }
@@ -2877,6 +2876,10 @@
     if (!agents.length) {
       box.appendChild(h("div", { class: "empty-state" }, iconEl("info"), h("h3", { text: "No agents found" }), h("p", { text: "Agent mastery is not available right now." })));
       return;
+    }
+    if (masAcct !== a.puuid) {
+      masAcct = a.puuid;
+      masSel = null;
     }
     if (!agents.some((x) => x.id === masSel)) masSel = agents[0].id;
     const wrap = h("div", { class: "mas-wrap" });
