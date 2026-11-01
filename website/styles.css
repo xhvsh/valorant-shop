@@ -2744,7 +2744,7 @@ div.mas-pick.sk { height: 48px; cursor: default; }
 .mas-play::before { content: ""; width: 0; height: 0; margin-left: 2px; border-style: solid; border-width: 4.5px 0 4.5px 7px; border-color: transparent transparent transparent currentColor; }
 .mas-play.is-on::before { width: 7px; height: 8px; margin: 0; border: 0; border-left: 2.5px solid currentColor; border-right: 2.5px solid currentColor; }
 .mas-play:hover, .mas-play.is-on { border-color: var(--a); color: var(--a); }
-.mas-tile.is-owned .mas-play { top: 24px; }
+.mas-tile.is-owned .mas-play { top: 32px; }
 
 @media (max-width: 1100px) { .mas-eqs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) {

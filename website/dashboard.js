@@ -2810,12 +2810,16 @@
         const place = n === 5 ? (i >= 3 ? `grid-column:1;grid-row:${(i - 3) * 3 + 1} / span 3` : `grid-column:2;grid-row:${i * 2 + 1} / span 2`) : n === 4 ? `grid-column:${(i % 2) + 1};grid-row:${Math.floor(i / 2) * 3 + 1} / span 3` : "";
         const bloom = masBloomOwned(ag, it, quoteNo.get(it));
         const have = bloom != null ? bloom : owned && ((it.id && owned.has(it.id)) || owned.has(masNorm(it.name)));
-        return h("div", { class: `mas-tile is-${it.kind}${big ? " is-big" : ""}${have ? " is-owned" : ""}`, style: place, title: it.name },
+        const tile = h("div", { class: `mas-tile is-${it.kind}${big ? " is-big" : ""}${have ? " is-owned" : ""}`, style: place, title: it.name },
           h("span", { class: "mas-tile-art" }, masRewardArt(it, ag, big)),
           h("span", { class: "mas-tile-cost", title: "Kingdom Credits" }, makeImg(CURRENCY_ICON.kc, "KC"), fmt(it.cost)),
           have ? h("span", { class: "mas-tile-owned", title: "Already on this account" }, iconEl("check"), "Owned") : null,
           it.kind === "quote" && it.audio ? masPlayEl(it) : null,
           h("span", { class: "mas-tile-name", text: it.name }));
+        // Player cards open the same preview as everywhere else.
+        const card = { type: "card", id: it.id, name: it.name };
+        if (it.kind === "card" && canPreview(card)) previewTrigger(tile, card);
+        return tile;
       });
       const left = tier.at - ag.lifetime;
       return h("section", { class: `mas-tier${open ? " is-open" : ""}`, "aria-label": `Lifetime level ${tier.at}` },
