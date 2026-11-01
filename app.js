@@ -131,6 +131,8 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://media.valorant-api.com https://cdn.discordapp.com https://wiki.playvalorant.com",
+  // Agent mastery quotes play the voice line from the wiki.
+  "media-src https://wiki.playvalorant.com",
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",
@@ -731,6 +733,14 @@ app.get('/api/accounts/:puuid/bloomline', requireDiscord, async (req, res, next)
   } catch (err) {
     next(err);
   }
+});
+
+// Every agent's mastery rewards, tier by tier (src/mastery-rewards.json, made by
+// scripts/build-mastery-rewards.js). The same for everyone, so browsers keep it for a day.
+const MASTERY_REWARDS = require('./src/mastery-rewards.json');
+app.get('/api/mastery-rewards', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.json({ ok: true, rewards: MASTERY_REWARDS });
 });
 
 // The stats one agent shows on its mastery card (asked for when the agent is opened).

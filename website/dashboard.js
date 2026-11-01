@@ -2484,36 +2484,46 @@
 
   // Laid out like the game's Agent Mastery pages. The act level (this act's points, reset every
   // act) only drives the portrait's level indicator and background; the lifetime level (every act
-  // level ever earned, never reset) unlocks the rewards that can be bought with Kingdom Credits.
-  // Points per act level (the wiki's table; its level 9 total is a typo for 109,900), the
-  // rewards and their art come from the game and its wiki, not the API.
+  // level ever earned, never reset) is what the Agent ID shows and unlocks the rewards that can be
+  // bought with Kingdom Credits. Points per act level (the wiki's table; its level 9 total is a
+  // typo for 109,900) and the art come from the game and its wiki, not the API.
   const MASTERY_STEPS = [2000, 8500, 9300, 10500, 12000, 13800, 15800, 17900, 20100, 22500, 35000, 78000, 205000, 418000];
   const MASTERY_CUM = [0];
   for (let i = 0; i < 30; i++) MASTERY_CUM.push(MASTERY_CUM[i] + (MASTERY_STEPS[i] || 715000));
   const MASTERY_UPGRADES = { 1: "Level indicator", 4: "Level indicator upgrade", 7: "Background upgrade", 10: "Background animation" };
-  const WIKI_IMG = "https://wiki.playvalorant.com/en-us/images/thumb/";
-  const wikiImg = (file, w = 200) => `${WIKI_IMG}${file}.png/${w}px-${file}.png`;
+  const WIKI = "https://wiki.playvalorant.com/en-us/images/";
+  const wikiImg = (file, w = 200) => `${WIKI}thumb/${file}.png/${w}px-${file}.png`;
+  const wikiFile = (file) => `${WIKI}${file}`;
   const masKey = (name) => String(name).replace(/[^A-Za-z0-9]/g, "");
+  const masNorm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const MAS_ROMAN = ["", "I", "II", "III", "IV"];
+  const masFrameSrc = (n) => wikiFile(`Level_${MAS_ROMAN[n] || "I"}_Frame.png`);
 
-  // What each lifetime level opens up in the agent's store. `img` names the wiki picture.
-  const MASTERY_REWARDS = [
-    { at: 5, items: [{ kind: "Spray", cost: 4000 }, { kind: "Player title", cost: 2500 }, { kind: "Player card", cost: 4500 }, { kind: "KD stat", cost: 2500 }, { kind: "Quote", cost: 5000 }] },
-    { at: 10, items: [{ kind: "Level II Frame", cost: 2500, img: () => "Level_II_Frame", wide: true }, { kind: "Agent Role Background", cost: 6000, img: (n) => `Agent_Role_Background_${n}` }, { kind: "Player card", cost: 4500 }, { kind: "MVPs stat", cost: 2500 }, { kind: "Headshots stat", cost: 2500 }] },
-    { at: 15, items: [{ kind: "Sidearm skin", cost: 8000 }, { kind: "Quote", cost: 5000 }, { kind: "Spray", cost: 4000 }, { kind: "First Bloods stat", cost: 2500 }] },
-    { at: 20, items: [{ kind: "Level III Frame", cost: 5000, img: () => "Level_III_Frame", wide: true }, { kind: "VALORANT Background", cost: 6000, img: (n) => `VALORANT_Background_${n}` }, { kind: "Buddy", cost: 5500 }, { kind: "Player title", cost: 2500 }, { kind: "Win Rate stat", cost: 2500 }] },
-    { at: 25, items: [{ kind: "Mastery I Pose", cost: 7500, img: (n) => `Mastery_I_Pose_${n}`, tall: true }, { kind: "Agent Lore Background", cost: 6000, img: (n) => `Agent_Lore_Background_${n}` }, { kind: "Spray", cost: 4000 }, { kind: "Clutches stat", cost: 2500 }] },
-    { at: 30, items: [{ kind: "Level IV Frame", cost: 7500, img: () => "Level_IV_Frame", wide: true }, { kind: "Mastery player card (animated)", cost: 7500 }, { kind: "Player title", cost: 2500 }, { kind: "Quote", cost: 5000 }, { kind: "Aces stat", cost: 2500 }] },
-  ];
+  // The rewards every agent has, in the order the game lists them. Used until (or if not) the
+  // per-agent list from /api/mastery-rewards, which names each item and has its art, arrives.
+  const MASTERY_TIERS = [
+    { at: 5, items: [["spray", "Spray", 4000], ["title", "Player title", 2500], ["card", "Player card", 4500], ["stat", "KD Stat", 2500], ["quote", "Quote", 5000]] },
+    { at: 10, items: [["stat", "MVPs Stat", 2500], ["frame", "Level II Frame", 2500], ["stat", "Headshots Stat", 2500], ["background", "Agent Role Background", 6000], ["card", "Player card", 4500]] },
+    { at: 15, items: [["skin", "Sidearm skin", 8000], ["quote", "Quote", 5000], ["spray", "Spray", 4000], ["stat", "First Bloods Stat", 2500]] },
+    { at: 20, items: [["buddy", "Buddy", 5500], ["stat", "Win Rate Stat", 2500], ["title", "Player title", 2500], ["background", "VALORANT Background", 6000], ["frame", "Level III Frame", 5000]] },
+    { at: 25, items: [["spray", "Spray", 4000], ["stat", "Clutches Stat", 2500], ["background", "Agent Lore Background", 6000], ["pose", "Mastery I Pose", 7500]] },
+    { at: 30, items: [["title", "Player title", 2500], ["quote", "Quote", 5000], ["stat", "Aces Stat", 2500], ["card", "Mastery player card", 7500], ["frame", "Level IV Frame", 7500]] },
+  ].map((t) => ({ at: t.at, items: t.items.map(([kind, name, cost]) => ({ kind, name, cost })) }));
 
   const bloom = {};
   let masSel = null;
+  // Per-agent rewards: undefined until asked for, then the map by agent id, or false on failure.
+  let masRewards;
 
   const masLevel = (pts) => {
     let l = 0;
     while (l < 30 && pts >= MASTERY_CUM[l + 1]) l++;
     return l;
   };
+  // Riot sends the act level itself; the points table is only the fallback.
+  const masActLevel = (ag) => ag.level || masLevel(ag.points);
   const masPlayed = (ag) => ag.points > 0 || ag.lifetime > 0;
+  const masEq = (ag) => ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
 
   // The agent's name takes the most vivid colour of its own background, lightened a little
   // so it reads on the dark page like the game's title.
@@ -2530,6 +2540,8 @@
     const mix = (v) => Math.round(v + (255 - v) * 0.6);
     return `rgb(${mix(best.r)}, ${mix(best.g)}, ${mix(best.b)})`;
   }
+
+  const masOnTab = (puuid) => S.route.name === "account" && S.route.tab === "mastery" && (!puuid || S.route.puuid === puuid);
 
   function fetchBloom(puuid, force) {
     const box = bloom[puuid] || (bloom[puuid] = {});
@@ -2550,9 +2562,33 @@
       })
       .finally(() => {
         box.pending = null;
-        if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "mastery") renderPanel();
+        if (masOnTab(puuid)) renderPanel();
       });
     return box.pending;
+  }
+
+  function fetchMasRewards() {
+    if (masRewards !== undefined) return;
+    masRewards = null;
+    api("/api/mastery-rewards", { timeoutMs: 20000 })
+      .then((res) => { masRewards = (res && res.rewards) || false; })
+      .catch(() => { masRewards = false; })
+      .finally(() => { if (masOnTab()) renderPanel(); });
+  }
+
+  // Which rewards the account already has, from the owned lists in its details. Null when
+  // those lists are not loaded, so nothing is marked rather than everything marked missing.
+  function masOwned(puuid) {
+    const d = S.details[puuid];
+    if (!d || !Array.isArray(d.cards)) return null;
+    const set = new Set();
+    for (const list of [d.cards, d.sprays, d.buddies, d.titles, d.skins && d.skins.items]) {
+      for (const x of list || []) {
+        if (x.id) set.add(String(x.id).toLowerCase());
+        if (x.name) set.add(masNorm(x.name));
+      }
+    }
+    return set;
   }
 
   function masFace(ag, size) {
@@ -2567,7 +2603,8 @@
         h("span", { class: "mas-pick-lvl", title: "Lifetime level", text: String(ag.lifetime) }))));
   }
 
-  // A 30-segment bar with the key levels numbered under it.
+  // A 30-segment bar with the key levels numbered under it. The label over the current level
+  // turns to keep inside the bar near either end.
   function masBarEl(value, towards, label) {
     const segs = [];
     for (let i = 1; i <= 30; i++) {
@@ -2575,31 +2612,16 @@
       segs.push(h("span", { class: `mas-seg${i <= value ? " is-done" : ""}${i === value + 1 ? " is-cur" : ""}` }, h("i", { style: `width:${fill.toFixed(1)}%` })));
     }
     const ticks = [1, 5, 10, 15, 20, 25, 30].map((n) => h("span", { class: `mas-tick${value >= n ? " is-got" : ""}`, style: `left:${(((n - 0.5) / 30) * 100).toFixed(3)}%`, text: String(n) }));
+    const at = (Math.min(value + 0.5, 29.5) / 30) * 100;
+    label.style.left = `${at.toFixed(3)}%`;
+    if (at > 78) label.classList.add("is-end");
+    else if (at < 22) label.classList.add("is-start");
     return h("div", { class: "mas-track" }, label, h("div", { class: "mas-segs" }, ...segs), h("div", { class: "mas-ticks" }, ...ticks));
   }
 
-  function masRewardsEl(ag) {
-    const key = masKey(ag.name);
-    return h("div", { class: "mas-rewards" }, ...MASTERY_REWARDS.map((tier) => {
-      const open = ag.lifetime >= tier.at;
-      return h("div", { class: `mas-tier${open ? " is-open" : ""}` },
-        h("div", { class: "mas-tier-head" },
-          h("b", { text: `Level ${tier.at}` }),
-          open ? iconEl("check") : iconEl("lock")),
-        h("div", { class: "mas-tier-items" }, ...tier.items.map((it) =>
-          h("div", { class: `mas-item${it.img ? " has-img" : ""}${it.wide ? " is-wide" : ""}${it.tall ? " is-tall" : ""}` },
-            it.img ? h("span", { class: "mas-item-img" }, h("img", { src: wikiImg(it.img(key)), alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.parentNode.remove() })) : null,
-            h("span", { class: "mas-item-name", text: it.kind }),
-            it.cost ? h("span", { class: "mas-cost", title: "Kingdom Credits" }, h("i", { "aria-hidden": "true" }), fmt(it.cost)) : h("span", { class: "mas-cost is-free", text: "Free" })))));
-    }));
-  }
-
-  // What the agent has equipped, named from the game's own data files on the server.
-  const MAS_BG_FILE = { Default: "Standard_Background", Role: "Agent_Role_Background", ValLogo: "VALORANT_Background", Lore: "Agent_Lore_Background" };
-  const MAS_BG_NAME = { Default: "Standard background", Role: "Agent Role background", ValLogo: "VALORANT background", Lore: "Agent Lore background" };
-  const MAS_ROMAN = ["", "I", "II", "III", "IV"];
+  // What each stat id is called on the card, and how its value reads.
   const MAS_STATS = {
-    bloomline_short_level_reached: "Act levels reached", match_aces: "Aces", match_assists: "Assists", match_clutches: "Clutches",
+    bloomline_short_level_reached: "Act Lvl 10 achieved", match_aces: "Aces", match_assists: "Assists", match_clutches: "Clutches",
     match_damage: "Damage", match_first_bloods: "First bloods", match_headshot_pct: "Headshot %", match_kd: "K/D",
     match_kills: "Kills", match_match_mvps: "MVPs", match_playtime_hours: "Hours played", match_win_pct: "Win rate", match_wins: "Games won",
   };
@@ -2613,67 +2635,180 @@
       .then((res) => { masStats[k] = res && res.stats ? res.stats : null; })
       .catch(() => { masStats[k] = null; })
       .finally(() => {
-        if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "mastery" && masSel === agentId) renderPanel();
+        if (masOnTab(puuid) && masSel === agentId) renderPanel();
       });
   };
 
-  // The agent ID board as the game draws it: the equipped background, the agent in its pose,
-  // the level frame over them, the player and agent name bottom left, and the three stat slots
-  // on the right (the Valorant mark where a slot is empty).
-  function masBoardEl(ag, stats, acct, lvl) {
+  const MAS_BG = {
+    Default: ["Standard_Background", "Standard Background"],
+    Role: ["Agent_Role_Background", "Agent Role Background"],
+    ValLogo: ["VALORANT_Background", "VALORANT Background"],
+    Lore: ["Agent_Lore_Background", "Agent Lore Background"],
+  };
+  const masBgSrc = (eq, key, w) => wikiImg(`${(MAS_BG[eq.background] || MAS_BG.Default)[0]}_${key}`, w);
+  const masPoseSrc = (eq, ag, w) => (eq.pose === "HighTier" ? wikiImg(`Mastery_I_Pose_${masKey(ag.name)}`, w) : ag.portrait);
+  const masImg = (src, cls, eager) => h("img", { class: cls, src, alt: "", loading: eager ? "eager" : "lazy", decoding: "async", draggable: "false", referrerpolicy: "no-referrer", onerror: (e) => e.target.remove() });
+
+  // The equipped quote: Riot names it VO1-VO3, the three quotes in the order they unlock.
+  function masQuote(ag, tiers) {
+    const eq = masEq(ag);
+    const n = Number(String(eq.quote || "").replace(/\D/g, ""));
+    if (!n) return null;
+    const quotes = tiers.flatMap((t) => t.items).filter((it) => it.kind === "quote" && it.text);
+    return quotes[n - 1] || { name: `Quote ${n}` };
+  }
+
+  // The Agent ID board as the game draws it: the equipped background inside the level frame,
+  // the agent in its pose rising over the top edge, the player's card and Riot ID with the
+  // lifetime level and agent name bottom left, and three stat slots down the right (the
+  // VALORANT mark where a slot is empty). Sizes are shares of the board's width (cqw), so it
+  // scales as one picture.
+  function masBoardEl(ag, stats, acct) {
     const key = masKey(ag.name);
-    const eq = ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
-    const roman = MAS_ROMAN[eq.frame] || "I";
-    const img = (src, cls) => h("img", { class: cls, src, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.remove() });
-    const pose = eq.pose === "HighTier" ? wikiImg(`Mastery_I_Pose_${key}`, 800) : ag.portrait;
-    const name = String(acct && acctName(acct) || "").replace(/#.*$/, "");
+    const eq = masEq(ag);
+    const d = S.details[acct.puuid];
+    const card = d && d.equipped && d.equipped.identityCard;
+    const cardArt = card && card.art && card.art.small;
+    const riotId = String(acct.name && acct.name.includes("#") ? acct.name : acctName(acct));
+    const [game, tag] = riotId.split("#");
     const slots = [0, 1, 2].map((i) => {
+      if (stats === undefined) return h("div", { class: "mas-slot is-loading" });
       const st = stats && stats[i];
-      if (stats === undefined) return h("div", { class: "mas-slot sk" });
       return st
         ? h("div", { class: "mas-slot has-stat" }, h("b", { text: masStatValue(st) }), h("small", { text: MAS_STATS[st.key] || st.key }))
         : h("div", { class: "mas-slot" }, h("i", { class: "mas-vmark", "aria-hidden": "true" }));
     });
-    return h("div", { class: "mas-board" },
-      img(wikiImg(`${MAS_BG_FILE[eq.background] || "Standard_Background"}_${key}`, 800), "mas-board-bg"),
-      pose ? img(pose, "mas-board-pose") : null,
-      h("div", { class: "mas-board-card" },
-        h("span", { class: "mas-board-face" }, ag.icon ? makeImg(ag.icon, "") : null),
-        h("span", { class: "mas-board-who" }, name ? h("small", { text: name }) : null,
-          h("span", { class: "mas-board-agent" }, h("em", { class: "mas-diamond" }, h("b", { text: String(lvl) })), h("strong", { text: ag.name })))),
-      h("div", { class: "mas-slots" }, ...slots),
-      img(wikiImg(`Level_${roman}_Frame`, 452), "mas-board-frame"));
+    const pose = masPoseSrc(eq, ag, 1600);
+    return h("div", { class: `mas-board${eq.pose === "HighTier" ? " is-mastery-pose" : ""}`, role: "img", "aria-label": `${ag.name} Agent ID` },
+      h("div", { class: "mas-board-bg" }, masImg(masBgSrc(eq, key, 1200), "", true)),
+      h("div", { class: "mas-board-pose" }, pose ? masImg(pose, "", true) : null),
+      h("div", { class: "mas-board-frame", style: `border-image-source:url("${masFrameSrc(eq.frame)}")` }),
+      h("div", { class: "mas-board-id" },
+        h("span", { class: "mas-board-card" }, cardArt ? masImg(cardArt) : null),
+        h("span", { class: "mas-board-riot" }, game, tag ? h("span", { text: `#${tag}` }) : null),
+        h("span", { class: "mas-board-agent" },
+          h("span", { class: "mas-diamond", title: "Lifetime level" }, h("b", { text: String(ag.lifetime) })),
+          h("strong", { text: ag.name }))),
+      h("div", { class: "mas-slots" }, ...slots));
   }
 
-  function masEquippedEl(ag, stats, acct, lvl) {
-    const eq = ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
-    const chip = (label, name) => h("div", { class: "mas-eq" }, h("small", { text: label }), h("b", { text: name }));
-    return h("div", { class: "mas-block" },
-      h("h4", { text: "Equipped" }),
-      h("p", { text: "This agent's card as it shows in the game, with the frame, background, pose and stats it has equipped." }),
-      masBoardEl(ag, stats, acct, lvl),
+  // Under the board, each equipped piece with its own art, like the game's category tabs.
+  function masEquippedEl(ag, stats, acct, tiers) {
+    const key = masKey(ag.name);
+    const eq = masEq(ag);
+    const quote = masQuote(ag, tiers);
+    const tile = (label, name, art, cls) => h("div", { class: `mas-eq${cls ? ` ${cls}` : ""}` },
+      h("span", { class: "mas-eq-art" }, art),
+      h("span", { class: "mas-eq-text" }, h("small", { text: label }), h("b", { text: name })));
+    const statNames = stats === undefined ? "Loading..." : stats && stats.length ? stats.map((s) => MAS_STATS[s.key] || s.key).join(", ") : "None picked";
+    return h("div", { class: "mas-block mas-equipped" },
+      h("h4", { text: "Agent ID" }),
+      h("p", { text: "This agent's card as other players see it, with the background, pose, frame and stats equipped on it." }),
+      masBoardEl(ag, stats, acct),
       h("div", { class: "mas-eqs" },
-        chip("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} frame`),
-        chip("Background", MAS_BG_NAME[eq.background] || "Standard background"),
-        chip("Pose", eq.pose === "HighTier" ? "Mastery I pose" : "Standard pose"),
-        chip("Quote", eq.quote ? `Quote ${String(eq.quote).replace(/\D/g, "") || ""}`.trim() : "None")),
-      stats && !stats.length ? h("p", { class: "mas-stats-none", text: "No stats picked for this agent." }) : null);
+        tile("Background", (MAS_BG[eq.background] || MAS_BG.Default)[1], masImg(masBgSrc(eq, key, 300)), "is-bg"),
+        tile("Pose", eq.pose === "HighTier" ? "Mastery I Pose" : "Standard Pose", masImg(masPoseSrc(eq, ag, 300)), "is-pose"),
+        tile("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} Frame`, h("i", { class: "mas-eq-frame", style: `border-image-source:url("${masFrameSrc(eq.frame)}")` }), "is-frame"),
+        tile("Quote", quote ? quote.name.replace(/\s*Quote$/, "") : "None", h("i", { class: "mas-glyph is-quote", "aria-hidden": "true" }), "is-quote"),
+        tile("Stats", statNames, h("i", { class: "mas-glyph is-stat", "aria-hidden": "true" }), "is-stat")));
+  }
+
+  // One reward's picture, drawn the way the game's reward tile shows that kind of item.
+  function masRewardArt(it, ag, big) {
+    const key = masKey(ag.name);
+    switch (it.kind) {
+      case "card":
+        if (it.icon) return masImg(big ? it.icon : it.icon.replace(/largeart\.png$/, "smallart.png"), big ? "is-card-large" : "is-card");
+        break;
+      case "spray":
+        if (it.icon) return masImg(big && it.anim ? it.anim : it.icon, "is-spray");
+        break;
+      case "buddy":
+        if (it.icon) return masImg(it.icon, "is-buddy");
+        break;
+      case "skin":
+        if (it.icon) return masImg(it.icon, "is-skin");
+        break;
+      case "title":
+        return h("span", { class: "mas-title-plate", text: it.text || "Title" });
+      case "background":
+        return masImg(wikiImg(`${it.name.replace(/\s+/g, "_")}_${key}`, big ? 500 : 300), "is-bg");
+      case "pose":
+        return masImg(wikiImg(`Mastery_I_Pose_${key}`, 400), "is-pose");
+      case "frame":
+        return h("i", { class: "mas-eq-frame", style: `border-image-source:url("${wikiFile(`${it.name.replace(/\s+/g, "_")}.png`)}")` });
+      case "quote":
+        return h("span", { class: "mas-quote" }, h("i", { class: "mas-glyph is-quote", "aria-hidden": "true" }), it.text ? h("q", { text: it.text }) : null);
+      case "stat":
+        return h("i", { class: "mas-glyph is-stat", "aria-hidden": "true" });
+    }
+    if (it.wiki) return masImg(wikiFile(it.wiki), "is-other");
+    return h("i", { class: `mas-glyph is-${it.kind}`, "aria-hidden": "true" });
+  }
+
+  // A quote's voice line, played from the wiki. One plays at a time.
+  let masAudio = null;
+  function masPlayEl(it) {
+    const btn = h("button", { class: "mas-play", type: "button", "aria-label": `Play "${it.text || it.name}"`, title: "Play the voice line" });
+    btn.addEventListener("click", () => {
+      if (masAudio && masAudio.btn === btn && !masAudio.el.paused) {
+        masAudio.el.pause();
+        return;
+      }
+      if (masAudio) masAudio.el.pause();
+      const el = new Audio(wikiFile(it.audio));
+      masAudio = { el, btn };
+      const set = (on) => btn.classList.toggle("is-on", on);
+      el.addEventListener("playing", () => set(true));
+      el.addEventListener("pause", () => set(false));
+      el.addEventListener("ended", () => set(false));
+      el.play().catch(() => { set(false); toast("Could not play the voice line.", "error"); });
+    });
+    return btn;
+  }
+
+  // The game's reward pages: one panel per lifetime level. With five rewards the last two get the
+  // big tiles in the left column and the first three stack on the right; with four it is two by two.
+  function masRewardsEl(ag, tiers, owned) {
+    return h("div", { class: "mas-rewards" }, ...tiers.map((tier) => {
+      const open = ag.lifetime >= tier.at;
+      const n = tier.items.length;
+      const tiles = tier.items.map((it, i) => {
+        const big = n === 5 ? i >= 3 : n === 4;
+        const place = n === 5 ? (i >= 3 ? `grid-column:1;grid-row:${(i - 3) * 3 + 1} / span 3` : `grid-column:2;grid-row:${i * 2 + 1} / span 2`) : n === 4 ? `grid-column:${(i % 2) + 1};grid-row:${Math.floor(i / 2) * 3 + 1} / span 3` : "";
+        const have = owned && ((it.id && owned.has(it.id)) || owned.has(masNorm(it.name)));
+        return h("div", { class: `mas-tile is-${it.kind}${big ? " is-big" : ""}${have ? " is-owned" : ""}`, style: place, title: it.name },
+          h("span", { class: "mas-tile-art" }, masRewardArt(it, ag, big)),
+          h("span", { class: "mas-tile-cost", title: "Kingdom Credits" }, makeImg(CURRENCY_ICON.kc, "KC"), fmt(it.cost)),
+          have ? h("span", { class: "mas-tile-owned", title: "Already on this account" }, iconEl("check"), "Owned") : null,
+          it.kind === "quote" && it.audio ? masPlayEl(it) : null,
+          h("span", { class: "mas-tile-name", text: it.name }));
+      });
+      const left = tier.at - ag.lifetime;
+      return h("section", { class: `mas-tier${open ? " is-open" : ""}`, "aria-label": `Lifetime level ${tier.at}` },
+        h("div", { class: "mas-tier-head" },
+          h("span", { class: "mas-tier-lock" }, iconEl(open ? "check" : "lock")),
+          h("span", { class: "mas-tier-title" },
+            h("b", { text: `Lifetime level ${tier.at}` }),
+            h("small", { text: open ? "Stage unlocked" : `Stage locked · ${left} more level${left === 1 ? "" : "s"}` }))),
+        h("div", { class: `mas-tier-grid is-${n}` }, ...tiles));
+    }));
   }
 
   function masStageEl(ag, actEnd, stats, acct) {
-    const lvl = masLevel(ag.points);
+    const lvl = masActLevel(ag);
     const accent = masAccent(ag.colors);
     const cols = ag.colors && ag.colors.length ? ag.colors : ["#33406b", "#0e1428"];
-    const toward = lvl >= 30 ? 0 : ag.points - MASTERY_CUM[lvl];
+    const toward = lvl >= 30 ? 0 : Math.max(0, ag.points - MASTERY_CUM[lvl]);
     const need = lvl >= 30 ? 0 : MASTERY_CUM[lvl + 1] - MASTERY_CUM[lvl];
     const daysLeft = actEnd ? Math.max(0, Math.ceil((Date.parse(actEnd) - Date.now()) / 86400000)) : null;
     const life = Math.min(30, ag.lifetime);
+    const tiers = (masRewards && masRewards[ag.id]) || MASTERY_TIERS;
 
-    const actLabel = h("div", { class: "mas-now", style: `left:${((Math.min(lvl + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
-      h("b", { text: ag.points ? `Act level ${lvl}` : "Not played" }),
+    const actLabel = h("div", { class: "mas-now" },
+      h("b", { text: ag.points ? `Act level ${lvl}` : "Not played this act" }),
       h("span", {}, h("em", { text: fmt(ag.points) }), lvl >= 30 ? " MP" : ` / ${fmt(MASTERY_CUM[lvl + 1])} MP`));
-    const lifeLabel = h("div", { class: "mas-now", style: `left:${((Math.min(life + 0.5, 29.5) / 30) * 100).toFixed(3)}%` },
-      h("b", { text: `Lifetime level ${ag.lifetime}` }));
+    const lifeLabel = h("div", { class: "mas-now" }, h("b", { text: `Lifetime level ${ag.lifetime}` }));
 
     const upgrades = Object.keys(MASTERY_UPGRADES).map(Number).map((n) => {
       const got = lvl >= n;
@@ -2690,17 +2825,17 @@
         h("div", { class: "mas-head" },
           masFace(ag, "lg"),
           h("div", { class: "mas-title" },
-            h("small", { text: "Agent mastery" }),
+            h("small", { text: ag.role ? `${ag.role.name} · Agent mastery` : "Agent mastery" }),
             h("h3", { text: ag.name }),
             h("span", { class: "mas-ends", text: daysLeft == null ? "" : daysLeft === 1 ? "Act ends in 1 day" : `Act ends in ${daysLeft} days` }))),
         h("div", { class: "mas-lifebox" },
           h("small", { text: "Lifetime level" }),
           h("b", { text: String(ag.lifetime) }),
-          h("span", { text: `Previous act ${ag.previous} · this act ${lvl}` }))),
-      masEquippedEl(ag, stats, acct, lvl),
+          h("span", { text: `Act level ${lvl} · last act ${ag.previous}` }))),
+      masEquippedEl(ag, stats, acct, tiers),
       h("div", { class: "mas-block" },
         h("h4", { text: "Lifetime level" }),
-        h("p", { text: "Every act level ever earned on this agent. It never resets and opens the rewards below." }),
+        h("p", { text: "Every act level ever earned on this agent. It never resets and opens the reward stages below." }),
         masBarEl(life, 0, lifeLabel)),
       h("div", { class: "mas-block" },
         h("h4", { text: "This act" }),
@@ -2708,14 +2843,19 @@
         masBarEl(lvl, need ? toward / need : 0, actLabel),
         h("div", { class: "mas-ups" }, ...upgrades)),
       h("div", { class: "mas-block" },
-        h("h4", { text: "Rewards" }),
-        h("p", { text: "Bought for this agent with Kingdom Credits once its lifetime level is reached." }),
-        masRewardsEl(ag)));
+        h("h4", { text: "Mastery rewards" }),
+        h("p", { text: "Bought for this agent with Kingdom Credits once its lifetime level opens the stage." }),
+        masRewardsEl(ag, tiers, masOwned(acct.puuid))));
   }
 
   function renderMasteryPanel(box, a) {
     const st = bloom[a.puuid] || (bloom[a.puuid] = {});
     if (!st.data && !st.error && !st.pending) fetchBloom(a.puuid);
+    fetchMasRewards();
+    // The board shows the account's player card, and the rewards what it owns: both are in its details.
+    if (!S.details[a.puuid] && !S.detailsError[a.puuid] && !S.detailsPending[a.puuid]) {
+      fetchDetails(a.puuid).then(() => { if (masOnTab(a.puuid)) renderPanel(); }).catch(() => {});
+    }
     const head = h("div", { class: "panel-head" }, h("h2", { text: "Agent mastery" }));
     box.appendChild(head);
     if (!st.data) {
@@ -2728,7 +2868,7 @@
         h("div", { class: "mas-roster" }, ...Array.from({ length: 10 }, () => h("div", { class: "mas-pick sk" }))),
         h("section", { class: "mas-stage mas-stage-sk" },
           h("div", { class: "mas-head" }, h("span", { class: "mas-face is-lg sk" }), h("div", { class: "mas-title" }, h("span", { class: "sk sk-line w20" }), h("span", { class: "sk sk-line w60", style: "height:44px;margin-top:8px" }))),
-          h("div", { class: "sk", style: "height:60px" }), h("div", { class: "sk", style: "height:200px" }))));
+          h("div", { class: "sk", style: "aspect-ratio:5/3;max-width:820px" }), h("div", { class: "sk", style: "height:60px" }))));
       return;
     }
     head.appendChild(h("button", { class: "btn btn-ghost", type: "button", onclick: () => { fetchBloom(a.puuid, true); renderPanel(); } }, iconEl("refresh"), "Refresh"));
@@ -2743,7 +2883,14 @@
     const draw = () => {
       const ag = agents.find((x) => x.id === masSel) || agents[0];
       const scroll = window.scrollY;
+      const rosterScroll = wrap.querySelector(".mas-roster");
+      const keep = rosterScroll ? [rosterScroll.scrollTop, rosterScroll.scrollLeft] : null;
       wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd, masStats[`${a.puuid}:${ag.id}`], a));
+      if (keep) {
+        const r = wrap.querySelector(".mas-roster");
+        r.scrollTop = keep[0];
+        r.scrollLeft = keep[1];
+      }
       fetchMasStats(a.puuid, ag.id);
       window.scrollTo({ top: scroll, behavior: "instant" });
     };

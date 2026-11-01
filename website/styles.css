@@ -2588,7 +2588,7 @@ div.mas-pick.sk { height: 48px; cursor: default; }
 .mas-lifebox b { color: var(--a); font: 700 58px/1 var(--font-head); font-variant-numeric: tabular-nums; }
 .mas-lifebox span { color: var(--text-3); font-size: 11px; letter-spacing: .06em; }
 
-.mas-block { display: grid; gap: 4px; padding: 20px clamp(14px, 2.4vw, 30px); border-top: 1px solid rgba(160, 175, 230, .14); }
+.mas-block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 20px clamp(14px, 2.4vw, 30px); border-top: 1px solid rgba(160, 175, 230, .14); }
 .mas-block h4 { margin: 0; font: 600 16px/1.2 var(--font-head); letter-spacing: .1em; text-transform: uppercase; }
 .mas-block > p { margin: 0 0 6px; color: var(--text-3); font-size: 12px; }
 
@@ -2617,30 +2617,13 @@ div.mas-pick.sk { height: 48px; cursor: default; }
 .mas-up .i { position: absolute; top: 10px; right: 10px; font-size: 13px; color: var(--text-3); }
 .mas-up.is-got .i { color: var(--a); }
 
-/* the rewards: one column per lifetime level that opens something */
-.mas-rewards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.mas-tier { display: grid; align-content: start; gap: 8px; padding: 12px; border: 1px solid rgba(160, 175, 230, .16); background: rgba(8, 12, 28, .55); opacity: .6; }
-.mas-tier.is-open { opacity: 1; border-color: color-mix(in srgb, var(--a) 45%, transparent); }
-.mas-tier-head { display: flex; align-items: center; justify-content: space-between; }
-.mas-tier-head b { font: 600 20px/1 var(--font-head); letter-spacing: .06em; text-transform: uppercase; }
-.mas-tier.is-open .mas-tier-head { color: var(--a); }
-.mas-tier-head .i { font-size: 15px; color: var(--text-3); }
-.mas-tier.is-open .mas-tier-head .i { color: var(--a); }
-.mas-tier-items { display: grid; gap: 6px; }
-.mas-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 7px 9px; background: rgba(255, 255, 255, .04); }
-.mas-item.has-img { grid-template-columns: minmax(0, 1fr) auto; }
-.mas-item-img { grid-column: 1 / -1; display: grid; place-items: center; overflow: hidden; background: rgba(0, 0, 0, .3); }
-.mas-item-img img { display: block; width: 100%; height: auto; max-height: 120px; object-fit: contain; }
-.mas-item.is-wide .mas-item-img { padding: 6px; }
-.mas-item.is-tall .mas-item-img img { max-height: 150px; }
-.mas-item-name { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
-.mas-cost { display: inline-flex; align-items: center; gap: 5px; color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
-.mas-cost i { width: 8px; height: 8px; transform: rotate(45deg); background: #e7c46a; }
-.mas-cost.is-free { color: var(--green); }
+.mas-now.is-end { transform: translateX(calc(-100% + 10px)); text-align: right; }
+.mas-now.is-end::after { justify-self: end; margin-right: 9px; }
+.mas-now.is-start { transform: translateX(-10px); text-align: left; }
+.mas-now.is-start::after { justify-self: start; margin-left: 9px; }
 .mas-stage-sk { padding: 24px; gap: 20px; }
 
 @media (max-width: 900px) {
-  .mas-rewards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mas-ups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
@@ -2649,34 +2632,115 @@ div.mas-pick.sk { height: 48px; cursor: default; }
   .mas-art { width: 70%; opacity: .4; }
   .mas-face.is-lg { width: 72px; height: 72px; }
   .mas-lifebox { width: 100%; }
-  .mas-rewards { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* what the agent has equipped: the board as the game draws it, then the names */
-.mas-board { position: relative; aspect-ratio: 2.35 / 1; width: 100%; max-width: 760px; overflow: hidden; border-radius: 10px; background: #0b0f20; isolation: isolate; }
-.mas-board > img { position: absolute; }
-.mas-board-bg { inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-.mas-board-pose { left: 31%; bottom: -3%; height: 118%; width: 40%; object-fit: contain; object-position: center bottom; z-index: 1; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .55)); }
-.mas-board-frame { inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 4; pointer-events: none; }
-.mas-board-card { position: absolute; left: 5.5%; bottom: 15%; z-index: 3; display: grid; gap: 6px; max-width: 34%; }
-.mas-board-face { width: clamp(34px, 7.5cqw, 58px); width: 58px; height: 58px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .5); background: #1a2036; }
-.mas-board-face img { width: 100%; height: 100%; object-fit: cover; }
-.mas-board-who { display: grid; gap: 4px; min-width: 0; }
-.mas-board-who small { overflow: hidden; color: rgba(255, 255, 255, .8); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.mas-board-agent { display: flex; align-items: center; gap: 8px; }
-.mas-board-agent strong { color: #fff; font: 700 clamp(22px, 3.4vw, 34px)/1 var(--font-head); letter-spacing: .02em; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0, 0, 0, .6); }
-.mas-diamond { display: grid; place-items: center; flex: none; width: 24px; height: 24px; transform: rotate(45deg); border: 2px solid #fff; background: var(--a); }
-.mas-diamond b { transform: rotate(-45deg); color: #0b0f20; font: 700 12px/1 var(--font-head); }
-.mas-slots { position: absolute; right: 5%; top: 15%; bottom: 15%; z-index: 3; display: grid; gap: 6%; width: 19%; }
-.mas-slot { position: relative; display: grid; place-items: center; align-content: center; gap: 2px; min-height: 0; border: 1px solid rgba(255, 255, 255, .18); background: rgba(8, 10, 22, .72); backdrop-filter: blur(2px); clip-path: polygon(8% 0, 100% 0, 100% 100%, 0 100%, 0 12%); text-align: center; }
-.mas-slot.has-stat b { color: #fff; font: 700 clamp(15px, 2.4vw, 24px)/1 var(--font-head); font-variant-numeric: tabular-nums; }
-.mas-slot.has-stat small { color: rgba(255, 255, 255, .7); font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.mas-vmark { width: 38%; aspect-ratio: 1; background: rgba(255, 255, 255, .85); clip-path: polygon(0 12%, 28% 12%, 100% 100%, 100% 88%, 52% 12%, 100% 12%, 100% 0, 0 0); transform: scaleX(1); opacity: .75; }
-.mas-slot.sk { background: var(--surface-3); }
-.mas-eqs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-.mas-eq { display: grid; align-content: start; gap: 4px; padding: 10px 12px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
+/* The Agent ID board, drawn like the game's. Everything inside is sized in cqw (shares of the
+   board's width) so it scales as one picture. The level frame is the game's frame art, 9-sliced
+   so its corners keep their shape on the wider board. */
+.mas-board { position: relative; width: 100%; max-width: 820px; aspect-ratio: 5 / 3; margin: min(18%, 148px) auto 0; container-type: inline-size; isolation: isolate; }
+.mas-board img { display: block; }
+.mas-board-bg { position: absolute; inset: 3.3cqw 3.6cqw; z-index: 0; overflow: hidden; background: linear-gradient(180deg, #121a2c, #0a0f1b);
+  clip-path: polygon(2.2cqw 0, calc(100% - 2.2cqw) 0, 100% 2.2cqw, 100% calc(100% - 2.2cqw), calc(100% - 2.2cqw) 100%, 2.2cqw 100%, 0 calc(100% - 2.2cqw), 0 2.2cqw); }
+.mas-board-bg img { width: 100%; height: 100%; object-fit: cover; }
+.mas-board-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5, 8, 16, .45), transparent 38%); }
+/* The pose stands on the background's bottom edge and may rise over the frame's top. */
+.mas-board-pose { position: absolute; left: 3.6cqw; right: 3.6cqw; top: -18cqw; bottom: 3.3cqw; z-index: 2; overflow: hidden; pointer-events: none; }
+.mas-board-pose img { position: absolute; left: 50%; top: -1.5cqw; width: 112cqw; max-width: none; transform: translateX(-52%); filter: drop-shadow(0 1cqw 2.4cqw rgba(0, 0, 0, .45)); }
+.mas-board-frame { position: absolute; inset: 0; z-index: 1; border: 0 solid transparent; border-image-slice: 60 190; border-image-width: 22.1% 42.04%; border-image-repeat: stretch; opacity: .92; pointer-events: none; }
+.mas-board-id { position: absolute; left: 7.2cqw; bottom: 8.6cqw; z-index: 3; display: grid; justify-items: start; gap: 1cqw; max-width: 42cqw; }
+.mas-board-card { width: 11cqw; aspect-ratio: 1; overflow: hidden; border: max(1px, .2cqw) solid rgba(255, 255, 255, .28); background: #1a2036; box-shadow: 0 .6cqw 1.6cqw rgba(0, 0, 0, .45); }
+.mas-board-card img { width: 100%; height: 100%; object-fit: cover; }
+.mas-board-riot { max-width: 100%; overflow: hidden; color: #fff; font: 700 max(10px, 1.85cqw)/1.2 var(--font); letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 4px rgba(0, 0, 0, .7); }
+.mas-board-riot span { color: rgba(220, 225, 240, .55); font-weight: 500; }
+.mas-board-agent { position: relative; display: flex; align-items: center; gap: 1.2cqw; margin-top: .4cqw; padding-right: 7cqw; }
+.mas-board-agent::before { content: ""; position: absolute; left: 3cqw; right: 0; top: 50%; height: 6.2cqw; transform: translateY(-50%); z-index: -1; background: linear-gradient(90deg, color-mix(in srgb, var(--c1) 70%, rgba(6, 9, 18, .6)), transparent); }
+.mas-board-agent strong { color: #f3f1ea; font: 700 max(18px, 6cqw)/1 var(--font-head); letter-spacing: .01em; text-transform: uppercase; text-shadow: 0 .3cqw 1.2cqw rgba(0, 0, 0, .5); }
+.mas-diamond { position: relative; display: grid; place-items: center; flex: none; width: 6.4cqw; aspect-ratio: 1; }
+.mas-diamond::before { content: ""; position: absolute; inset: 15%; transform: rotate(45deg); border: max(1.5px, .35cqw) solid var(--a); background: color-mix(in srgb, var(--c1) 70%, #0b0f1a); box-shadow: 0 0 1.4cqw color-mix(in srgb, var(--a) 35%, transparent); }
+.mas-diamond b { position: relative; color: #fff; font: 600 max(10px, 2.2cqw)/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.mas-slots { position: absolute; right: 6.6cqw; top: 7.4cqw; z-index: 3; display: grid; gap: 2.6cqw; width: 15.6cqw; }
+.mas-slot { position: relative; display: grid; place-items: center; align-content: center; gap: .5cqw; height: 13cqw; padding: 0 .8cqw;
+  background: linear-gradient(180deg, rgba(6, 9, 18, .94) 0%, color-mix(in srgb, var(--c1) 80%, #0b0f1a) 100%); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05); text-align: center; }
+/* Corner brackets round each slot, in the agent's colour. */
+.mas-slot::before { content: ""; position: absolute; inset: -.7cqw; pointer-events: none; --b: color-mix(in srgb, var(--a) 75%, transparent); --l: 1.6cqw; --w: max(1px, .18cqw);
+  background:
+    linear-gradient(var(--b), var(--b)) left top / var(--l) var(--w) no-repeat, linear-gradient(var(--b), var(--b)) left top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--b), var(--b)) right top / var(--l) var(--w) no-repeat, linear-gradient(var(--b), var(--b)) right top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--b), var(--b)) left bottom / var(--l) var(--w) no-repeat, linear-gradient(var(--b), var(--b)) left bottom / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--b), var(--b)) right bottom / var(--l) var(--w) no-repeat, linear-gradient(var(--b), var(--b)) right bottom / var(--w) var(--l) no-repeat; }
+.mas-slot.has-stat b { color: #fff; font: 700 max(13px, 3.6cqw)/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.mas-slot.has-stat small { max-width: 100%; overflow: hidden; color: rgba(225, 230, 245, .7); font-size: max(8px, 1.15cqw); font-weight: 600; letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.mas-slot.is-loading { background: linear-gradient(100deg, rgba(255, 255, 255, .03) 30%, rgba(255, 255, 255, .09) 50%, rgba(255, 255, 255, .03) 70%) 0 0 / 300% 100%, rgba(8, 12, 24, .9); animation: mas-shine 1.4s linear infinite; }
+@keyframes mas-shine { to { background-position: -300% 0, 0 0; } }
+.mas-vmark { width: 4.2cqw; aspect-ratio: 1; background: #fff;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M2 12v28l44 48h32zM98 12 58 60h26l14-16z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M2 12v28l44 48h32zM98 12 58 60h26l14-16z'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+/* The equipped pieces under the board. */
+.mas-equipped { overflow: hidden; }
+.mas-eqs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.mas-eq { display: grid; grid-template-rows: auto 1fr; min-width: 0; overflow: hidden; border: 1px solid rgba(160, 175, 230, .16); background: rgba(8, 12, 28, .6); }
+.mas-eq-art { position: relative; display: grid; place-items: center; height: 84px; overflow: hidden; background: rgba(0, 0, 0, .28); color: rgba(235, 238, 248, .85); }
+.mas-eq-art img { width: 100%; height: 100%; object-fit: cover; }
+.mas-eq.is-pose .mas-eq-art img { object-position: 50% 12%; transform: scale(1.5); transform-origin: 50% 0; }
+.mas-eq-text { display: grid; align-content: start; gap: 3px; min-width: 0; padding: 9px 11px 10px; }
 .mas-eq small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
-.mas-eq b { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
-.mas-stats-none { margin: 8px 0 0; color: var(--text-3); font-size: 12px; }
-@media (max-width: 900px) { .mas-eqs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .mas-board-agent strong { font-size: 18px; } .mas-board-face { width: 40px; height: 40px; } }
+.mas-eq b { overflow: hidden; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-overflow: ellipsis; }
+.mas-eq-frame { display: block; width: 78%; aspect-ratio: 452 / 160; border: 0 solid transparent; border-image-slice: 60 190; border-image-width: 37.5% 42.04%; opacity: .9; }
+
+/* Kind glyphs for rewards with no picture of their own (stats, quotes). */
+.mas-glyph { display: block; width: 42px; aspect-ratio: 1; background: currentColor; -webkit-mask: var(--m) center / contain no-repeat; mask: var(--m) center / contain no-repeat; }
+.mas-glyph.is-stat { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M8 22h6v18H8zM17 12h6v28h-6zM26 18h6v22h-6zM35 26h6v14h-6z'/%3E%3C/svg%3E"); }
+.mas-glyph.is-quote { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill-rule='evenodd' d='M8 6h32a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H22l-10 8v-8H8a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4zm5 11v8h3v-8zm6-4v16h3V13zm6 2v12h3V15zm6 3v6h3v-6z'/%3E%3C/svg%3E"); }
+.mas-glyph:not(.is-stat):not(.is-quote) { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 4 44 24 24 44 4 24z'/%3E%3C/svg%3E"); opacity: .5; }
+
+/* The reward stages, like the game's reward pages: a panel per lifetime level, gold-edged while
+   locked, with big and small tiles that each show the item, its price and its name. */
+.mas-rewards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.mas-tier { display: grid; align-content: start; gap: 12px; padding: 14px; border: 1px solid rgba(214, 170, 92, .45); background: linear-gradient(180deg, rgba(14, 19, 38, .85), rgba(8, 12, 26, .9)); }
+.mas-tier.is-open { border-color: color-mix(in srgb, var(--a) 55%, transparent); }
+.mas-tier-head { display: flex; align-items: center; gap: 10px; }
+.mas-tier-lock { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: rgba(214, 170, 92, .16); color: #d6aa5c; font-size: 15px; }
+.mas-tier.is-open .mas-tier-lock { background: color-mix(in srgb, var(--a) 18%, transparent); color: var(--a); }
+.mas-tier-title { display: grid; gap: 2px; }
+.mas-tier-title b { font: 600 18px/1 var(--font-head); letter-spacing: .06em; text-transform: uppercase; }
+.mas-tier-title small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-tier.is-open .mas-tier-title small { color: var(--a); }
+.mas-tier-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(6, 48px); gap: 8px; }
+.mas-tile { position: relative; display: grid; min-width: 0; overflow: hidden; border: 1px solid rgba(160, 175, 230, .12); background: radial-gradient(80% 70% at 50% 45%, rgba(60, 74, 128, .22), transparent 75%), #0b1122; color: rgba(235, 238, 248, .9); transition: border-color .15s var(--ease); }
+.mas-tile:hover { border-color: rgba(160, 175, 230, .32); }
+.mas-tier:not(.is-open) .mas-tile-art { opacity: .75; filter: saturate(.8); }
+.mas-tile-art { position: absolute; inset: 20px 8px 28px; display: grid; place-items: center; min-height: 0; }
+.mas-tile-art > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.mas-tile-art > img.is-bg, .mas-tile-art > img.is-pose { position: absolute; inset: -20px -8px -28px; width: calc(100% + 16px); height: calc(100% + 48px); max-width: none; max-height: none; object-fit: cover; }
+.mas-tile-art > img.is-pose { object-position: 50% 15%; }
+.mas-tile.is-background::after, .mas-tile.is-pose::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 9, 18, .55), transparent 30%, transparent 62%, rgba(6, 9, 18, .9)); pointer-events: none; }
+.mas-tile-art > img.is-card-large, .mas-tile-art > img.is-card { filter: drop-shadow(0 4px 12px rgba(0, 0, 0, .5)); }
+.mas-tile-art > img.is-skin { inset: 0 4%; width: 92%; transform: rotate(-4deg); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .5)); }
+.mas-tile-art > img.is-buddy, .mas-tile-art > img.is-spray { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45)); }
+.mas-tile .mas-eq-frame { width: 86%; max-height: 100%; }
+.mas-tile .mas-glyph { width: min(44px, 70%); }
+.mas-tile.is-big .mas-glyph { width: 56px; }
+.mas-tile-cost { position: absolute; top: 5px; right: 7px; z-index: 2; display: inline-flex; align-items: center; gap: 4px; color: rgba(235, 238, 248, .9); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
+.mas-tile-cost img { width: 12px; height: 12px; }
+.mas-tile-name { position: absolute; left: 6px; right: 6px; bottom: 5px; z-index: 2; display: -webkit-box; overflow: hidden; color: rgba(235, 238, 248, .85); font-size: 9.5px; font-weight: 600; line-height: 1.2; letter-spacing: .08em; text-align: center; text-transform: uppercase; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.mas-tile.is-big .mas-tile-name { font-size: 10.5px; }
+.mas-tile-owned { position: absolute; top: 5px; left: 6px; z-index: 2; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px 2px 4px; border-radius: 2px; background: rgba(70, 211, 154, .16); color: var(--green); font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.mas-tile-owned .i { font-size: 11px; }
+.mas-tile.is-owned { border-color: rgba(70, 211, 154, .4); }
+.mas-title-plate { max-width: 100%; overflow: hidden; padding: 5px 10px; border: 1px solid rgba(235, 238, 248, .35); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02)); color: #fff; font: 600 13px/1.1 var(--font-head); letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.mas-tile.is-big .mas-title-plate { font-size: 16px; padding: 7px 14px; }
+.mas-quote { display: grid; justify-items: center; gap: 6px; max-width: 100%; }
+.mas-quote q { display: none; max-width: 100%; color: #fff; font: 600 13px/1.25 var(--font-head); letter-spacing: .04em; text-align: center; text-transform: uppercase; }
+.mas-tile.is-big .mas-quote q { display: block; }
+.mas-play { position: absolute; left: 6px; top: 4px; z-index: 3; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid rgba(235, 238, 248, .3); border-radius: 50%; background: rgba(6, 9, 18, .7); color: #fff; cursor: pointer; }
+.mas-play::before { content: ""; width: 0; height: 0; margin-left: 2px; border-style: solid; border-width: 4.5px 0 4.5px 7px; border-color: transparent transparent transparent currentColor; }
+.mas-play.is-on::before { width: 7px; height: 8px; margin: 0; border: 0; border-left: 2.5px solid currentColor; border-right: 2.5px solid currentColor; }
+.mas-play:hover, .mas-play.is-on { border-color: var(--a); color: var(--a); }
+.mas-tile.is-owned .mas-play { top: 24px; }
+
+@media (max-width: 1100px) { .mas-eqs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .mas-eqs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mas-tier-grid { grid-template-rows: repeat(6, 42px); }
+}
