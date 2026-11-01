@@ -1027,6 +1027,34 @@ function bloomEquipped(b) {
   };
 }
 
+// The Bloomline items an account has bought, by agent (its codename, as in BLOOM_ITEMS). Items every
+// agent starts with are not in the entitlement list, so only purchases show up here.
+const BLOOM_TYPES = {
+  '019c0d72-6a19-7833-b2b5-61f8899fda9f': 'bg',
+  '39fae4b9-19a5-4947-990b-f8324e8f02b9': 'border',
+  'b80ca51d-e3b9-4055-a21c-1b549486c84b': 'clip',
+  '4bde4a88-18a4-45ec-909a-3d97a95036c4': 'num',
+  'bb48fea9-c99e-4b4b-86c9-c91539145dde': 'hype',
+};
+
+function bloomOwned(ent) {
+  const out = {};
+  for (const ty of (ent && ent.EntitlementsByTypes) || []) {
+    if (!BLOOM_TYPES[ty.ItemTypeID]) continue;
+    for (const e of ty.Entitlements || []) {
+      const it = BLOOM_ITEMS[String(e.ItemID).toLowerCase()];
+      if (!it || !it[1]) continue;
+      const o = out[it[1]] || (out[it[1]] = { bg: [], frame: [], quote: [], stats: [], pose: false });
+      if (it[0] === 'bg') o.bg.push(it[2]);
+      else if (it[0] === 'border') o.frame.push(Number((/Level(\d)/.exec(it[2]) || [])[1]) || 1);
+      else if (it[0] === 'clip') o.quote.push(it[2]);
+      else if (it[0] === 'num') o.stats.push(it[2]);
+      else if (it[0] === 'hype' && /high/i.test(it[2])) o.pose = true;
+    }
+  }
+  return out;
+}
+
 async function bloomlineTokens(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
@@ -1049,15 +1077,21 @@ async function bloomlineTokens(discordId, puuid) {
 async function accountBloomline(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
-  const cacheKey = `bloomline:v2:${discordId}:${account.puuid}`;
+  const cacheKey = `bloomline:v3:${discordId}:${account.puuid}`;
   const box = await storage.kvGet(cacheKey).catch(() => null);
   if (box && box.agents && box.at && Date.now() - box.at < BLOOMLINE_TTL) {
-    return { status: 'ok', agents: box.agents, cached: true, account };
+    return { status: 'ok', agents: box.agents, owned: box.owned || null, cached: true, account };
   }
   const t = await bloomlineTokens(discordId, puuid);
   if (t.status !== 'ok') return t;
   try {
-    const res = await riot.bloomline(account.shard || 'na', account.puuid, t.tokens);
+    const shard = account.shard || 'na';
+    const [res, ent] = await Promise.all([
+      riot.bloomline(shard, account.puuid, t.tokens),
+      riot.accountEntitlements(shard, account.puuid, t.tokens).catch(() => null),
+    ]);
+    // null when the ownership list did not come back, so nothing is marked rather than all missing.
+    const owned = ent ? bloomOwned(ent) : null;
     const agents = ((res && res.Bonsais) || []).map((b) => {
       const f = b.Flourish || {};
       const track = (b.TrackProgressList || [])[0] || {};
@@ -1070,8 +1104,8 @@ async function accountBloomline(discordId, puuid) {
         equipped: bloomEquipped(b),
       };
     });
-    await storage.kvSet(cacheKey, { at: Date.now(), agents }, BLOOMLINE_TTL).catch(() => {});
-    return { status: 'ok', agents, account };
+    await storage.kvSet(cacheKey, { at: Date.now(), agents, owned }, BLOOMLINE_TTL).catch(() => {});
+    return { status: 'ok', agents, owned, account };
   } catch (err) {
     if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
     return { status: 'error', account, error: err.message };

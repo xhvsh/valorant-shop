@@ -729,7 +729,8 @@ app.get('/api/accounts/:puuid/bloomline', requireDiscord, async (req, res, next)
     }
     const [roster, pass] = await Promise.all([items.agentRoster(), items.battlepass().catch(() => null)]);
     const mine = new Map(result.agents.map((a) => [a.id, a]));
-    const agents = roster.map((r) => ({ ...r, ...(mine.get(r.id) || { points: 0, level: 0, previous: 0, lifetime: 0, equipped: { background: 'Default', frame: 1, pose: 'Default', quote: null } }) }));
+    const owned = result.owned;
+    const agents = roster.map((r) => ({ ...r, owned: owned ? owned[r.dev] || { bg: [], frame: [], quote: [], stats: [], pose: false } : null, ...(mine.get(r.id) || { points: 0, level: 0, previous: 0, lifetime: 0, equipped: { background: 'Default', frame: 1, pose: 'Default', quote: null } }) }));
     res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), agents, actEnd: pass && pass.act ? pass.act.end : null });
   } catch (err) {
     next(err);

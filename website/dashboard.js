@@ -2768,14 +2768,32 @@
 
   // The game's reward pages: one panel per lifetime level. With five rewards the last two get the
   // big tiles in the left column and the first three stack on the right; with four it is two by two.
+  // Whether the agent's own Bloomline reward (frame, background, quote, stat, pose) is bought. Null for
+  // any other kind of reward, or when Riot's ownership list did not load, so the caller falls back.
+  const MAS_STAT_KEYS = { "Aces Stat": "match_aces", "Clutches Stat": "match_clutches", "First Bloods Stat": "match_first_bloods", "Headshots Stat": "match_headshot_pct", "KD Stat": "match_kd", "MVPs Stat": "match_match_mvps", "Win Rate Stat": "match_win_pct" };
+  const MAS_BG_VARIANT = { "Agent Role Background": "Role", "VALORANT Background": "ValLogo", "Agent Lore Background": "Lore" };
+  function masBloomOwned(ag, it, quoteNo) {
+    const o = ag.owned;
+    if (!o) return null;
+    if (it.kind === "frame") return o.frame.includes(MAS_ROMAN.indexOf((/Level (I+V?|IV) Frame/.exec(it.name) || [])[1]));
+    if (it.kind === "background") return MAS_BG_VARIANT[it.name] ? o.bg.includes(MAS_BG_VARIANT[it.name]) : null;
+    if (it.kind === "quote") return quoteNo ? o.quote.includes(`VO${quoteNo}`) : null;
+    if (it.kind === "stat") return MAS_STAT_KEYS[it.name] ? o.stats.includes(MAS_STAT_KEYS[it.name]) : null;
+    if (it.kind === "pose") return o.pose;
+    return null;
+  }
+
   function masRewardsEl(ag, tiers, owned) {
+    // The three quotes are VO1 to VO3 in the order they unlock.
+    const quoteNo = new Map(tiers.flatMap((t) => t.items).filter((it) => it.kind === "quote").map((it, i) => [it, i + 1]));
     return h("div", { class: "mas-rewards" }, ...tiers.map((tier) => {
       const open = ag.lifetime >= tier.at;
       const n = tier.items.length;
       const tiles = tier.items.map((it, i) => {
         const big = n === 5 ? i >= 3 : n === 4;
         const place = n === 5 ? (i >= 3 ? `grid-column:1;grid-row:${(i - 3) * 3 + 1} / span 3` : `grid-column:2;grid-row:${i * 2 + 1} / span 2`) : n === 4 ? `grid-column:${(i % 2) + 1};grid-row:${Math.floor(i / 2) * 3 + 1} / span 3` : "";
-        const have = owned && ((it.id && owned.has(it.id)) || owned.has(masNorm(it.name)));
+        const bloom = masBloomOwned(ag, it, quoteNo.get(it));
+        const have = bloom != null ? bloom : owned && ((it.id && owned.has(it.id)) || owned.has(masNorm(it.name)));
         return h("div", { class: `mas-tile is-${it.kind}${big ? " is-big" : ""}${have ? " is-owned" : ""}`, style: place, title: it.name },
           h("span", { class: "mas-tile-art" }, masRewardArt(it, ag, big)),
           h("span", { class: "mas-tile-cost", title: "Kingdom Credits" }, makeImg(CURRENCY_ICON.kc, "KC"), fmt(it.cost)),
