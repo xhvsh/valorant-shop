@@ -66,6 +66,19 @@ function accentOf(colors, lighten = 0.6) {
   return best ? mix(best.c, [255, 255, 255], lighten) : [233, 236, 245];
 }
 
+// The act level this act's mastery points reach (Riot sends it too; this is the fallback).
+const ACT_STEPS = [2000, 8500, 9300, 10500, 12000, 13800, 15800, 17900, 20100, 22500, 35000, 78000, 205000, 418000];
+function actLevel(points) {
+  let total = 0;
+  let level = 0;
+  while (level < 30) {
+    total += ACT_STEPS[level] || 715000;
+    if (points < total) break;
+    level += 1;
+  }
+  return level;
+}
+
 // The agent's own colour as a number, for a message's accent bar.
 function agentColor(colors) {
   const [r, g, b] = accentOf(colors, 0.2).map(Math.round);
@@ -271,4 +284,4 @@ async function renderMasteryCard({ agent, equipped, lifetime, riotId, stats }) {
   return resvg.render().asPng();
 }
 
-module.exports = { renderMasteryCard, STAT_LABELS, accentOf, agentColor };
+module.exports = { renderMasteryCard, STAT_LABELS, accentOf, agentColor, actLevel };

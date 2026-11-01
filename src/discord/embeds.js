@@ -148,8 +148,9 @@ function buildRankMessage(details, name, cardUrl) {
 
 // /mastery: "Riot ID - Agent" as the heading, then the rendered Agent ID card. The accent bar
 // takes the agent's own colour.
-function buildMasteryMessage(title, color, cardUrl) {
-  const parts = [text(`## ${title}`)];
+function buildMasteryMessage(title, color, cardUrl, detail) {
+  const parts = [text(`## ${title}${detail ? `
+${detail}` : ''}`)];
   if (cardUrl) parts.push(gallery(cardUrl, false));
   return { flags: V2, components: [container(color != null ? color : COLORS.fallback, parts)] };
 }

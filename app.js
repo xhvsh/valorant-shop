@@ -26,7 +26,7 @@ const { handleInteraction, bundlePayload, prewarmBundles, BUNDLE_SOURCE_ID, acco
 const { dedupeBundles } = require('./src/parse');
 const dcLog = require('./src/discord/log');
 const { waitUntil } = require('@vercel/functions');
-const { renderMasteryCard, agentColor } = require('./src/mastery-card');
+const { renderMasteryCard, agentColor, actLevel } = require('./src/mastery-card');
 const { renderSkinGrid, renderAnimatedSkinGrid, renderWalletImage, renderBundleMedia, renderRankImage, renderCollectionImage } = require('./src/grid');
 
 // fetch with a hard deadline. Without one, a stalled Discord (or self) call holds
@@ -1991,7 +1991,12 @@ async function masteryPayloadInner(discordId, puuid, agentId) {
   const color = agentColor(agent.colors);
   const imgName = 'mastery.png';
   return {
-    payload: buildMasteryMessage(`${name || 'Agent mastery'} - ${agent.name}`, color, png ? `attachment://${imgName}` : null),
+    payload: buildMasteryMessage(
+      `${name || 'Agent mastery'} - ${agent.name}`,
+      color,
+      png ? `attachment://${imgName}` : null,
+      `Lifetime level **${mine.lifetime}** · Act level **${mine.level || actLevel(mine.points)}**`
+    ),
     file: png ? { name: imgName, buf: png } : null,
   };
 }
