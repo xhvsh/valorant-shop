@@ -2751,3 +2751,13 @@ div.mas-pick.sk { height: 48px; cursor: default; }
   .mas-eqs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mas-tier-grid { grid-template-rows: repeat(6, 42px); }
 }
+
+/* Reward tiles that open a preview (player cards) look clickable: pointer, hover lift, a corner mark. */
+.mas-tile.is-previewable { cursor: zoom-in; }
+.mas-tile.is-previewable:hover, .mas-tile.is-previewable:focus-visible { border-color: var(--a); box-shadow: 0 0 0 1px color-mix(in srgb, var(--a) 55%, transparent), 0 6px 18px rgba(0, 0, 0, .4); outline: none; }
+.mas-tile.is-previewable .mas-tile-art > img { transition: transform .18s var(--ease); }
+.mas-tile.is-previewable:hover .mas-tile-art > img, .mas-tile.is-previewable:focus-visible .mas-tile-art > img { transform: scale(1.06); }
+.mas-tile.is-previewable::after { content: ""; position: absolute; right: 6px; bottom: 22px; z-index: 3; width: 14px; height: 14px; background: rgba(235, 238, 248, .75); pointer-events: none; transition: background-color .15s var(--ease);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1 2h2v2h2v2h-2v2H9v-2H7V9h2z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1 2h2v2h2v2h-2v2H9v-2H7V9h2z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.mas-tile.is-previewable:hover::after, .mas-tile.is-previewable:focus-visible::after { background: var(--a); }
