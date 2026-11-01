@@ -2707,25 +2707,12 @@
       h("div", { class: "mas-slots" }, ...slots));
   }
 
-  // Under the board, each equipped piece with its own art, like the game's category tabs.
-  function masEquippedEl(ag, stats, acct, tiers) {
-    const key = masKey(ag.name);
-    const eq = masEq(ag);
-    const quote = masQuote(ag, tiers);
-    const tile = (label, name, art, cls) => h("div", { class: `mas-eq${cls ? ` ${cls}` : ""}` },
-      h("span", { class: "mas-eq-art" }, art),
-      h("span", { class: "mas-eq-text" }, h("small", { text: label }), h("b", { text: name })));
-    const statNames = stats === undefined ? "Loading..." : stats && stats.length ? stats.map((s) => MAS_STATS[s.key] || s.key).join(", ") : "None picked";
+  // The agent's equipped Agent ID board.
+  function masEquippedEl(ag, stats, acct) {
     return h("div", { class: "mas-block mas-equipped" },
       h("h4", { text: "Agent ID" }),
       h("p", { text: "This agent's card as other players see it, with the background, pose, frame and stats equipped on it." }),
-      masBoardEl(ag, stats, acct),
-      h("div", { class: "mas-eqs" },
-        tile("Background", (MAS_BG[eq.background] || MAS_BG.Default)[1], masImg(masBgSrc(eq, key, 300)), "is-bg"),
-        tile("Pose", eq.pose === "HighTier" ? "Mastery I Pose" : "Standard Pose", masImg(masPoseSrc(eq, ag, 300)), "is-pose"),
-        tile("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} Frame`, h("i", { class: "mas-eq-frame", style: `border-image-source:url("${masFrameSrc(eq.frame)}")` }), "is-frame"),
-        tile("Quote", quote ? quote.name.replace(/\s*Quote$/, "") : "None", h("i", { class: "mas-glyph is-quote", "aria-hidden": "true" }), "is-quote"),
-        tile("Stats", statNames, h("i", { class: "mas-glyph is-stat", "aria-hidden": "true" }), "is-stat")));
+      masBoardEl(ag, stats, acct));
   }
 
   // One reward's picture, drawn the way the game's reward tile shows that kind of item.
@@ -2869,7 +2856,7 @@
           h("small", { text: "Lifetime level" }),
           h("b", { text: String(ag.lifetime) }),
           h("span", { text: `Act level ${lvl} · last act ${ag.previous}` }))),
-      masEquippedEl(ag, stats, acct, tiers),
+      masEquippedEl(ag, stats, acct),
       h("div", { class: "mas-block" },
         h("h4", { text: "Lifetime level" }),
         h("p", { text: "Every act level ever earned on this agent. It never resets and opens the reward stages below." }),
