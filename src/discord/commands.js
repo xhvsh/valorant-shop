@@ -26,6 +26,14 @@ const COMMANDS = [
   { name: 'rank', description: 'Show your current competitive rank', options: [accountOption()] },
   { name: 'collection', description: 'Show how many skins you own (standard, limited, battle pass)', options: [accountOption()] },
   {
+    name: 'mastery',
+    description: 'Show an agent\'s Agent Mastery card (default: your main account\'s highest level agent)',
+    options: [
+      accountOption(),
+      { type: 3, name: 'agent', description: 'Which agent (default: the highest level one)', autocomplete: true },
+    ],
+  },
+  {
     name: 'share',
     description: 'Share an account with friends, or add one someone shared with you',
     options: [
@@ -255,6 +263,7 @@ async function handleInteraction(body, ctx) {
     case 'nightmarket':
     case 'rank':
     case 'collection':
+    case 'mastery':
       return deferPublic();
     case 'bundle':
       return deferPublic();

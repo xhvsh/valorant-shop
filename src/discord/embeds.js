@@ -146,6 +146,14 @@ function buildRankMessage(details, name, cardUrl) {
   return { flags: V2, components: [container(color, parts)] };
 }
 
+// /mastery: "Riot ID - Agent" as the heading, then the rendered Agent ID card. The accent bar
+// takes the agent's own colour.
+function buildMasteryMessage(title, color, cardUrl) {
+  const parts = [text(`## ${title}`)];
+  if (cardUrl) parts.push(gallery(cardUrl, false));
+  return { flags: V2, components: [container(color != null ? color : COLORS.fallback, parts)] };
+}
+
 // Column data for /collection, shared by the stat card renderer and the plain
 // text fallback.
 function collectionColumns(details) {
@@ -303,4 +311,5 @@ module.exports = {
   dailyFooter,
   alertFooter,
   fmtLeft,
+  buildMasteryMessage,
 };

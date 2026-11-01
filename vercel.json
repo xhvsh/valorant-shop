@@ -4,7 +4,7 @@
     { "source": "/(.*)", "destination": "/api/index" }
   ],
   "functions": {
-    "api/index.js": { "maxDuration": 60 }
+    "api/index.js": { "maxDuration": 60, "includeFiles": "assets/mastery/**" }
   },
   "crons": [
     {

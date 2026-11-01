@@ -21,11 +21,12 @@ const shop = require('./src/shop');
 const loadshare = require('./src/loadshare');
 const PackageStore = require('./src/session');
 const { verifyRequest } = require('./src/discord/verify');
-const { buildNotice, EPHEMERAL, buildShopMessage, buildAccessoryMessage, buildNightMarketMessage, buildBundleMessage, bundleAccentColor, buildRankMessage, buildCollectionMessage, collectionColumns, bundleComponents, dailyFooter, alertFooter } = require('./src/discord/embeds');
+const { buildNotice, EPHEMERAL, buildShopMessage, buildAccessoryMessage, buildNightMarketMessage, buildBundleMessage, bundleAccentColor, buildRankMessage, buildCollectionMessage, buildMasteryMessage, collectionColumns, bundleComponents, dailyFooter, alertFooter } = require('./src/discord/embeds');
 const { handleInteraction, bundlePayload, prewarmBundles, BUNDLE_SOURCE_ID, accountChoices, OWN_ACCOUNT_COMMANDS } = require('./src/discord/commands');
 const { dedupeBundles } = require('./src/parse');
 const dcLog = require('./src/discord/log');
 const { waitUntil } = require('@vercel/functions');
+const { renderMasteryCard, agentColor } = require('./src/mastery-card');
 const { renderSkinGrid, renderAnimatedSkinGrid, renderWalletImage, renderBundleMedia, renderRankImage, renderCollectionImage } = require('./src/grid');
 
 // fetch with a hard deadline. Without one, a stalled Discord (or self) call holds
@@ -1933,6 +1934,61 @@ function commandOptions(data) {
   return { sub: null, options: top };
 }
 
+// The agents an account has progress on, most levelled first, for the /mastery agent picker.
+async function masteryAgentChoices(discordId, puuid, query) {
+  const access = await accountAccessFor(discordId, puuid);
+  if (!access) return [];
+  const [res, roster] = await Promise.all([shop.accountBloomline(access.ownerId, puuid), items.agentRoster()]);
+  if (res.status !== 'ok') return [];
+  const byId = new Map(roster.map((a) => [a.id, a]));
+  const q = String(query || '').toLowerCase();
+  return res.agents
+    .filter((a) => (a.points > 0 || a.lifetime > 0) && byId.has(a.id))
+    .sort((x, y) => y.lifetime - x.lifetime || y.points - x.points)
+    .map((a) => ({ a, r: byId.get(a.id) }))
+    .filter(({ r }) => !q || r.name.toLowerCase().includes(q))
+    .slice(0, 25)
+    .map(({ a, r }) => ({ name: `${r.name} (level ${a.lifetime})`, value: r.id }));
+}
+
+// /mastery: the Agent ID card of one agent. Without a choice, the account's main account and its
+// highest level agent (lifetime level, then this act's points).
+async function masteryPayload(discordId, puuid, agentId) {
+  const access = await accountAccessFor(discordId, puuid);
+  if (!access) return { payload: accountNotice('unlinked', { puuid }) };
+  const res = await shop.accountBloomline(access.ownerId, puuid);
+  if (res.status !== 'ok') {
+    return { payload: accountNotice(res.status, { shared: access.shared, puuid: puuid || true, what: 'agent mastery', error: res.error }) };
+  }
+  const roster = await items.agentRoster();
+  const byId = new Map(roster.map((a) => [a.id, a]));
+  const played = res.agents
+    .filter((a) => byId.has(a.id))
+    .sort((x, y) => y.lifetime - x.lifetime || y.points - x.points || byId.get(x.id).name.localeCompare(byId.get(y.id).name));
+  const mine = (agentId && played.find((a) => a.id === String(agentId).toLowerCase())) || played[0];
+  if (!mine) return { payload: accountNotice('error', { what: 'agent mastery' }) };
+  const agent = byId.get(mine.id);
+  const name = (res.account && (res.account.name || res.account.label)) || null;
+  // Stats are best effort: without them the slots show the VALORANT mark.
+  const st = await shop.accountBloomlineStats(access.ownerId, res.account.puuid, mine.id).catch(() => null);
+  const png = await renderMasteryCard({
+    agent,
+    equipped: mine.equipped,
+    lifetime: mine.lifetime,
+    riotId: name,
+    stats: st && st.status === 'ok' ? st.stats : [],
+  }).catch((e) => {
+    console.warn('[mastery] render failed:', (e && e.message) || e);
+    return null;
+  });
+  const color = agentColor(agent.colors);
+  const imgName = 'mastery.png';
+  return {
+    payload: buildMasteryMessage(`${name || 'Agent mastery'} - ${agent.name}`, color, png ? `attachment://${imgName}` : null),
+    file: png ? { name: imgName, buf: png } : null,
+  };
+}
+
 const interactionCtx = {
   storage,
   shop,
@@ -1963,6 +2019,11 @@ app.post(
         const { options } = commandOptions(data);
         const focused = options.find((o) => o && o.focused);
         const query = focused && focused.value != null ? String(focused.value) : '';
+        if (data.name === 'mastery' && focused && focused.name === 'agent') {
+          const accOpt = options.find((o) => o && o.name === 'account');
+          const agentChoices = await masteryAgentChoices(discordIdFrom(body), accOpt && accOpt.value ? String(accOpt.value) : undefined, query).catch(() => []);
+          return res.json({ type: 8, data: { choices: agentChoices } });
+        }
         const choices = await accountChoices(interactionCtx, discordIdFrom(body), query, {
           ownOnly: OWN_ACCOUNT_COMMANDS.has(data.name),
         }).catch(() => []);
@@ -1978,6 +2039,7 @@ app.post(
           const accOpt = cmdOpts.find((o) => o && o.name === 'account');
           const accountPuuid = accOpt && accOpt.value ? String(accOpt.value) : undefined;
           const codeOpt = cmdOpts.find((o) => o && o.name === 'code');
+          const agentOpt = cmdOpts.find((o) => o && o.name === 'agent');
           const user = (body.member && body.member.user) || body.user || {};
           const job = (async () => {
             try {
@@ -1989,6 +2051,7 @@ app.post(
                 sub,
                 puuid: accountPuuid,
                 code: codeOpt && codeOpt.value ? String(codeOpt.value) : undefined,
+                agent: agentOpt && agentOpt.value ? String(agentOpt.value) : undefined,
                 username: user.username || null,
                 ephemeral: Boolean(response.data && response.data.flags & EPHEMERAL),
               });
@@ -2147,7 +2210,7 @@ async function sendPrivateNotice(token, payload) {
 
 app.post('/api/interactions/followup', express.json(), async (req, res, next) => {
   // Read before the try, so the catch below can name the command and answer the user.
-  const { interactionId, token, discordId, name: cmdName, bundleView, bundleId, puuid, sub, code, username, ephemeral } = req.body || {};
+  const { interactionId, token, discordId, name: cmdName, bundleView, bundleId, puuid, sub, code, agent: agentId, username, ephemeral } = req.body || {};
   try {
     if (req.headers['x-link-secret'] !== LINK_SECRET) {
       return res.status(403).json({ error: 'forbidden' });
@@ -2226,6 +2289,10 @@ app.post('/api/interactions/followup', express.json(), async (req, res, next) =>
           }
         }
       }
+    } else if (cmdName === 'mastery') {
+      const out = await masteryPayload(discordId, puuid || undefined, agentId);
+      payload = out.payload;
+      if (out.file) files.push(out.file);
     } else if (cmdName === 'collection') {
       const access = await accountAccessFor(discordId, puuid || undefined);
       if (!access) {
