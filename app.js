@@ -1934,21 +1934,37 @@ function commandOptions(data) {
   return { sub: null, options: top };
 }
 
-// The agents an account has progress on, most levelled first, for the /mastery agent picker.
+// Every agent, for the /mastery agent picker. When the chosen account's progress is at hand
+// (it is cached after the first look) its agents come first, most levelled first, with their level;
+// otherwise, or if Riot is slow (Discord only waits a few seconds), they are listed by name.
 async function masteryAgentChoices(discordId, puuid, query) {
-  const access = await accountAccessFor(discordId, puuid);
-  if (!access) return [];
-  const [res, roster] = await Promise.all([shop.accountBloomline(access.ownerId, puuid), items.agentRoster()]);
-  if (res.status !== 'ok') return [];
-  const byId = new Map(roster.map((a) => [a.id, a]));
+  const roster = await items.agentRoster();
+  let mine = new Map();
+  try {
+    const progress = await Promise.race([
+      (async () => {
+        const access = await accountAccessFor(discordId, puuid);
+        if (!access) return null;
+        const res = await shop.accountBloomline(access.ownerId, puuid);
+        return res.status === 'ok' ? res.agents : null;
+      })(),
+      new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    if (progress) mine = new Map(progress.map((a) => [a.id, a]));
+  } catch {
+    /* names only */
+  }
   const q = String(query || '').toLowerCase();
-  return res.agents
-    .filter((a) => (a.points > 0 || a.lifetime > 0) && byId.has(a.id))
-    .sort((x, y) => y.lifetime - x.lifetime || y.points - x.points)
-    .map((a) => ({ a, r: byId.get(a.id) }))
+  return roster
+    .map((r) => ({ r, a: mine.get(r.id) }))
     .filter(({ r }) => !q || r.name.toLowerCase().includes(q))
+    .sort((x, y) => {
+      const lx = x.a ? x.a.lifetime : -1;
+      const ly = y.a ? y.a.lifetime : -1;
+      return ly - lx || x.r.name.localeCompare(y.r.name);
+    })
     .slice(0, 25)
-    .map(({ a, r }) => ({ name: `${r.name} (level ${a.lifetime})`, value: r.id }));
+    .map(({ r, a }) => ({ name: a && a.lifetime > 0 ? `${r.name} (level ${a.lifetime})` : r.name, value: r.id }));
 }
 
 // /mastery: the Agent ID card of one agent. Without a choice, the account's main account and its
@@ -1965,8 +1981,12 @@ async function masteryPayload(discordId, puuid, agentId) {
   const played = res.agents
     .filter((a) => byId.has(a.id))
     .sort((x, y) => y.lifetime - x.lifetime || y.points - x.points || byId.get(x.id).name.localeCompare(byId.get(y.id).name));
-  const mine = (agentId && played.find((a) => a.id === String(agentId).toLowerCase())) || played[0];
-  if (!mine) return { payload: accountNotice('error', { what: 'agent mastery' }) };
+  // Chosen on purpose, an agent is shown even at level 0; by default only one with progress is.
+  const mine = (agentId && played.find((a) => a.id === String(agentId).toLowerCase())) || played.find((a) => a.points > 0 || a.lifetime > 0);
+  if (!mine) {
+    const who = (res.account && (res.account.name || res.account.label)) || 'This account';
+    return { payload: buildNotice(`**${who}** has no agent mastery progress yet. Pick an agent in the \`agent\` option to see its card anyway.`, { private: true }) };
+  }
   const agent = byId.get(mine.id);
   const name = (res.account && (res.account.name || res.account.label)) || null;
   // Stats are best effort: without them the slots show the VALORANT mark.
