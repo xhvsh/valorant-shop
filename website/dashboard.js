@@ -2603,7 +2603,7 @@
     match_damage: "Damage", match_first_bloods: "First bloods", match_headshot_pct: "Headshot %", match_kd: "K/D",
     match_kills: "Kills", match_match_mvps: "MVPs", match_playtime_hours: "Hours played", match_win_pct: "Win rate", match_wins: "Games won",
   };
-  const masStatValue = (s) => (/_pct$/.test(s.key) ? `${fmt(Math.round(s.value * 10) / 10)}%` : s.key === "match_kd" ? String(Math.round(s.value * 100) / 100) : fmt(Math.round(s.value)));
+  const masStatValue = (s) => (/_pct$/.test(s.key) ? `${fmt(Math.round(s.value * 10) / 10)}%` : s.key === "match_kd" ? String(Math.round(s.value * 100) / 100) : s.key === "match_playtime_hours" ? `${fmt(Math.round(s.value * 10) / 10)}h` : fmt(Math.round(s.value)));
   const masStats = {};
   const fetchMasStats = (puuid, agentId) => {
     const k = `${puuid}:${agentId}`;

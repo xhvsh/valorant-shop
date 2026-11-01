@@ -499,7 +499,7 @@ async function bloomline(shard, puuid, tokens) {
 }
 
 async function bloomlineAgent(shard, puuid, agentId, tokens) {
-  return pdFetch(`https://pd.${shard}.a.pvp.net/bloomline/v0/players/${puuid}/bonsai/${agentId}`, tokens);
+  return pdFetch(`https://pd.${shard}.a.pvp.net/bloomline/v0/players/${puuid}/bonsai/${agentId}?includeModules=true`, tokens);
 }
 
 async function accountEntitlements(shard, puuid, tokens) {

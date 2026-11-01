@@ -1084,7 +1084,7 @@ async function accountBloomlineStats(discordId, puuid, agentId) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
   const id = String(agentId || '').toLowerCase();
-  const cacheKey = `bloomline:stats:v1:${discordId}:${account.puuid}:${id}`;
+  const cacheKey = `bloomline:stats:v2:${discordId}:${account.puuid}:${id}`;
   const box = await storage.kvGet(cacheKey).catch(() => null);
   if (box && box.stats && box.at && Date.now() - box.at < BLOOMLINE_TTL) return { status: 'ok', stats: box.stats, account };
   const t = await bloomlineTokens(discordId, puuid);
@@ -1092,7 +1092,10 @@ async function accountBloomlineStats(discordId, puuid, agentId) {
   try {
     const res = await riot.bloomlineAgent(account.shard || 'na', account.puuid, id, t.tokens);
     const b = ((res && res.Bonsais) || [])[0] || {};
+    // Entries with a ModuleID are the stats picked for the card's slots; the rest are every other
+    // stat's value and are not shown.
     const stats = (b.NumberModules || [])
+      .filter((m) => m.ModuleID)
       .map((m) => {
         const it = BLOOM_ITEMS[String(m.NumberID || '').toLowerCase()];
         return it && it[0] === 'num' && it[2] !== 'none' ? { key: it[2], value: Number(m.Value) || 0 } : null;
