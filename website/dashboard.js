@@ -1485,7 +1485,23 @@
     const a = currentAcct();
     if (!box || !a) return;
     const tab = S.route.tab;
+    // The mastery tab is redrawn as its data arrives (stats, rewards, details). Emptying the panel
+    // would shrink the page and the browser would pull the scroll position up, so while the same
+    // view is redrawn its height is held and the scroll put back once the new content is in.
+    const view = `${a.puuid}:${tab}`;
+    const keepScroll = tab === "mastery" && box.dataset.view === view && box.offsetHeight > 0;
+    const keepY = window.scrollY;
+    if (keepScroll) box.style.minHeight = `${box.offsetHeight}px`;
+    box.dataset.view = view;
     box.innerHTML = "";
+    if (keepScroll) {
+      requestAnimationFrame(() => {
+        box.style.minHeight = "";
+        window.scrollTo({ top: keepY, behavior: "instant" });
+      });
+    } else {
+      box.style.minHeight = "";
+    }
     if (!a.linked && ["daily", "acc", "nm", "collection", "loadout", "mastery"].includes(tab)) {
       box.appendChild(h("div", { class: "empty-state" }, iconEl("link"), h("h3", { text: "Not connected" }), h("p", { text: "Re-link this account to load its shops and collection." })));
       return;
@@ -2906,6 +2922,8 @@
       const scroll = window.scrollY;
       const rosterScroll = wrap.querySelector(".mas-roster");
       const keep = rosterScroll ? [rosterScroll.scrollTop, rosterScroll.scrollLeft] : null;
+      // Hold the height while the agent is swapped, so the page cannot shrink and drag the scroll up.
+      if (wrap.offsetHeight) wrap.style.minHeight = `${wrap.offsetHeight}px`;
       wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd, masStats[`${a.puuid}:${ag.id}`], a));
       if (keep) {
         const r = wrap.querySelector(".mas-roster");
@@ -2914,6 +2932,10 @@
       }
       fetchMasStats(a.puuid, ag.id);
       window.scrollTo({ top: scroll, behavior: "instant" });
+      requestAnimationFrame(() => {
+        wrap.style.minHeight = "";
+        window.scrollTo({ top: scroll, behavior: "instant" });
+      });
     };
     draw();
     box.appendChild(wrap);
