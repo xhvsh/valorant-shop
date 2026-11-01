@@ -1934,42 +1934,29 @@ function commandOptions(data) {
   return { sub: null, options: top };
 }
 
-// Every agent, for the /mastery agent picker. When the chosen account's progress is at hand
-// (it is cached after the first look) its agents come first, most levelled first, with their level;
-// otherwise, or if Riot is slow (Discord only waits a few seconds), they are listed by name.
-async function masteryAgentChoices(discordId, puuid, query) {
+// Every agent, by name, for the /mastery agent picker. The list does not depend on the chosen
+// account (Discord only sends the account's id along, and a level would be the main account's).
+async function masteryAgentChoices(query) {
   const roster = await items.agentRoster();
-  let mine = new Map();
-  try {
-    const progress = await Promise.race([
-      (async () => {
-        const access = await accountAccessFor(discordId, puuid);
-        if (!access) return null;
-        const res = await shop.accountBloomline(access.ownerId, puuid);
-        return res.status === 'ok' ? res.agents : null;
-      })(),
-      new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
-    ]);
-    if (progress) mine = new Map(progress.map((a) => [a.id, a]));
-  } catch {
-    /* names only */
-  }
   const q = String(query || '').toLowerCase();
   return roster
-    .map((r) => ({ r, a: mine.get(r.id) }))
-    .filter(({ r }) => !q || r.name.toLowerCase().includes(q))
-    .sort((x, y) => {
-      const lx = x.a ? x.a.lifetime : -1;
-      const ly = y.a ? y.a.lifetime : -1;
-      return ly - lx || x.r.name.localeCompare(y.r.name);
-    })
+    .filter((r) => !q || r.name.toLowerCase().includes(q))
+    .sort((x, y) => x.name.localeCompare(y.name))
     .slice(0, 25)
-    .map(({ r, a }) => ({ name: a && a.lifetime > 0 ? `${r.name} (level ${a.lifetime})` : r.name, value: r.id }));
+    .map((r) => ({ name: r.name, value: r.id }));
 }
 
 // /mastery: the Agent ID card of one agent. Without a choice, the account's main account and its
 // highest level agent (lifetime level, then this act's points).
 async function masteryPayload(discordId, puuid, agentId) {
+  const out = await masteryPayloadInner(discordId, puuid, agentId);
+  // A failure is answered in the channel, where the command was run, not as a private notice
+  // that removes the "thinking" message.
+  if (out.payload) delete out.payload.private;
+  return out;
+}
+
+async function masteryPayloadInner(discordId, puuid, agentId) {
   const access = await accountAccessFor(discordId, puuid);
   if (!access) return { payload: accountNotice('unlinked', { puuid }) };
   const res = await shop.accountBloomline(access.ownerId, puuid);
@@ -2040,8 +2027,7 @@ app.post(
         const focused = options.find((o) => o && o.focused);
         const query = focused && focused.value != null ? String(focused.value) : '';
         if (data.name === 'mastery' && focused && focused.name === 'agent') {
-          const accOpt = options.find((o) => o && o.name === 'account');
-          const agentChoices = await masteryAgentChoices(discordIdFrom(body), accOpt && accOpt.value ? String(accOpt.value) : undefined, query).catch(() => []);
+          const agentChoices = await masteryAgentChoices(query).catch(() => []);
           return res.json({ type: 8, data: { choices: agentChoices } });
         }
         const choices = await accountChoices(interactionCtx, discordIdFrom(body), query, {
