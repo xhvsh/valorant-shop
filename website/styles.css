@@ -2732,6 +2732,9 @@ div.mas-pick.sk { height: 48px; cursor: default; }
 .mas-tile.is-big .mas-title-plate { font-size: 16px; padding: 7px 14px; }
 .mas-quote { display: grid; justify-items: center; gap: 6px; max-width: 100%; }
 .mas-quote q { display: none; max-width: 100%; color: #fff; font: 600 13px/1.25 var(--font-head); letter-spacing: .04em; text-align: center; text-transform: uppercase; }
+.mas-tile:not(.is-big) .mas-quote { grid-auto-flow: column; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.mas-tile:not(.is-big) .mas-quote .mas-glyph { flex: none; width: 24px; }
+.mas-tile:not(.is-big) .mas-quote q { display: -webkit-box; overflow: hidden; min-width: 0; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #fff; font: 600 11px/1.2 var(--font-head); letter-spacing: .02em; text-align: left; text-transform: none; }
 .mas-tile.is-big .mas-quote q { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; text-transform: none; font-size: 12px; line-height: 1.25; letter-spacing: .02em; }
 .mas-tile.is-big .mas-quote.is-long q { font-size: 11px; }
 .mas-tile.is-big .mas-quote.is-xlong q { font-size: 10px; line-height: 1.2; }
