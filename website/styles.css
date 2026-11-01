@@ -2651,3 +2651,19 @@ div.mas-pick.sk { height: 48px; cursor: default; }
   .mas-lifebox { width: 100%; }
   .mas-rewards { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* what the agent has equipped */
+.mas-eqs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.mas-eq { display: grid; align-content: start; gap: 6px; padding: 10px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
+.mas-eq small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-eq b { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.mas-eq-img { display: grid; place-items: center; overflow: hidden; background: rgba(0, 0, 0, .3); }
+.mas-eq-img img { display: block; width: 100%; height: auto; max-height: 110px; object-fit: contain; }
+.mas-eq.is-wide .mas-eq-img { padding: 6px; }
+.mas-eq.is-tall .mas-eq-img img { max-height: 140px; }
+.mas-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.mas-stat { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
+.mas-stat small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.mas-stat b { color: var(--a); font: 600 24px/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.mas-stats-none { grid-column: 1 / -1; color: var(--text-3); font-size: 12px; }
+@media (max-width: 900px) { .mas-eqs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

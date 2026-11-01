@@ -1005,17 +1005,31 @@ async function accountBattlepass(discordId, puuid) {
 // ---- Agent Mastery (Bloomline) --------------------------------------------------
 // Points are this act's mastery points and ShortLevel the act level they reach; LongLevel is
 // the agent's permanent lifetime level. Progress moves only after matches, so it is kept a few
-// minutes. Agents without a Flourish have not been played.
+// minutes. Agents without a Flourish have not been played. What an agent has equipped comes
+// back as ids; BLOOM_ITEMS (read from the game's data files) says what each id is, so the page
+// can show "Level II frame" without being sent ids.
 const BLOOMLINE_TTL = 10 * 60 * 1000;
+const BLOOM_ITEMS = require('./bloomline-items.json');
 
-async function accountBloomline(discordId, puuid) {
+function bloomEquipped(b) {
+  const kind = (id, want) => {
+    const it = id && BLOOM_ITEMS[String(id).toLowerCase()];
+    return it && it[0] === want ? it[2] : null;
+  };
+  const border = kind(b.BorderID, 'border');
+  const hype = kind(b.HypeID, 'hype');
+  const clip = kind(b.ClipID, 'clip');
+  return {
+    background: kind(b.BackgroundID, 'bg') || 'Default',
+    frame: border ? Number((/Level(\d)/.exec(border) || [])[1]) || 1 : 1,
+    pose: hype && /high/i.test(hype) ? 'HighTier' : 'Default',
+    quote: clip && clip !== 'Default' ? clip : null,
+  };
+}
+
+async function bloomlineTokens(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
-  const cacheKey = `bloomline:v1:${discordId}:${account.puuid}`;
-  const box = await storage.kvGet(cacheKey).catch(() => null);
-  if (box && box.agents && box.at && Date.now() - box.at < BLOOMLINE_TTL) {
-    return { status: 'ok', agents: box.agents, cached: true, account };
-  }
   let auth;
   try {
     auth = storage.decrypt(account.auth_encrypted);
@@ -1025,7 +1039,25 @@ async function accountBloomline(discordId, puuid) {
   try {
     const token = await ensureAccessToken(discordId, account.puuid, auth);
     const entitlement = await entitlementFor(token.access_token);
-    const res = await riot.bloomline(account.shard || 'na', account.puuid, { ...token, entitlement });
+    return { status: 'ok', account, tokens: { ...token, entitlement } };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
+async function accountBloomline(discordId, puuid) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  const cacheKey = `bloomline:v2:${discordId}:${account.puuid}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  if (box && box.agents && box.at && Date.now() - box.at < BLOOMLINE_TTL) {
+    return { status: 'ok', agents: box.agents, cached: true, account };
+  }
+  const t = await bloomlineTokens(discordId, puuid);
+  if (t.status !== 'ok') return t;
+  try {
+    const res = await riot.bloomline(account.shard || 'na', account.puuid, t.tokens);
     const agents = ((res && res.Bonsais) || []).map((b) => {
       const f = b.Flourish || {};
       const track = (b.TrackProgressList || [])[0] || {};
@@ -1035,10 +1067,39 @@ async function accountBloomline(discordId, puuid) {
         level: Number(f.ShortLevel) || 0,
         previous: Number(f.PreviousShortLevel) || 0,
         lifetime: Number(f.LongLevel) || Number(track.TrackLevel) || 0,
+        equipped: bloomEquipped(b),
       };
     });
     await storage.kvSet(cacheKey, { at: Date.now(), agents }, BLOOMLINE_TTL).catch(() => {});
     return { status: 'ok', agents, account };
+  } catch (err) {
+    if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
+    return { status: 'error', account, error: err.message };
+  }
+}
+
+// The three stats an agent shows on its card, with their values. Only the one-agent call has
+// them, so this is asked for when an agent is opened, not for all thirty.
+async function accountBloomlineStats(discordId, puuid, agentId) {
+  const account = await storage.getAccount(discordId, puuid);
+  if (!account) return { status: 'unlinked' };
+  const id = String(agentId || '').toLowerCase();
+  const cacheKey = `bloomline:stats:v1:${discordId}:${account.puuid}:${id}`;
+  const box = await storage.kvGet(cacheKey).catch(() => null);
+  if (box && box.stats && box.at && Date.now() - box.at < BLOOMLINE_TTL) return { status: 'ok', stats: box.stats, account };
+  const t = await bloomlineTokens(discordId, puuid);
+  if (t.status !== 'ok') return t;
+  try {
+    const res = await riot.bloomlineAgent(account.shard || 'na', account.puuid, id, t.tokens);
+    const b = ((res && res.Bonsais) || [])[0] || {};
+    const stats = (b.NumberModules || [])
+      .map((m) => {
+        const it = BLOOM_ITEMS[String(m.NumberID || '').toLowerCase()];
+        return it && it[0] === 'num' && it[2] !== 'none' ? { key: it[2], value: Number(m.Value) || 0 } : null;
+      })
+      .filter(Boolean);
+    await storage.kvSet(cacheKey, { at: Date.now(), stats }, BLOOMLINE_TTL).catch(() => {});
+    return { status: 'ok', stats, account };
   } catch (err) {
     if (err.code === 'RELINK' || err.status === 401) return { status: 'relink', account };
     return { status: 'error', account, error: err.message };
@@ -1079,4 +1140,4 @@ async function anyCachedBundles() {
   return best.length ? best : latestBundles();
 }
 
-module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountTokens, dropLoadoutCaches, accountBattlepass, accountBloomline, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };
+module.exports = { getShop, warmAccount, cachedStoreFor, accountDetails, accountLoadout, accountTokens, dropLoadoutCaches, accountBattlepass, accountBloomline, accountBloomlineStats, buildLoadout, renewTokens, refreshTokens: lockedRefresh, STORE_TTL, rememberBundles, latestBundles, anyCachedBundles };

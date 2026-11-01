@@ -2594,7 +2594,51 @@
     }));
   }
 
-  function masStageEl(ag, actEnd) {
+  // What the agent has equipped, named from the game's own data files on the server.
+  const MAS_BG_FILE = { Default: "Standard_Background", Role: "Agent_Role_Background", ValLogo: "VALORANT_Background", Lore: "Agent_Lore_Background" };
+  const MAS_BG_NAME = { Default: "Standard background", Role: "Agent Role background", ValLogo: "VALORANT background", Lore: "Agent Lore background" };
+  const MAS_ROMAN = ["", "I", "II", "III", "IV"];
+  const MAS_STATS = {
+    bloomline_short_level_reached: "Act levels reached", match_aces: "Aces", match_assists: "Assists", match_clutches: "Clutches",
+    match_damage: "Damage", match_first_bloods: "First bloods", match_headshot_pct: "Headshot %", match_kd: "K/D",
+    match_kills: "Kills", match_match_mvps: "MVPs", match_playtime_hours: "Hours played", match_win_pct: "Win rate", match_wins: "Games won",
+  };
+  const masStatValue = (s) => (/_pct$/.test(s.key) ? `${fmt(Math.round(s.value * 10) / 10)}%` : s.key === "match_kd" ? String(Math.round(s.value * 100) / 100) : fmt(Math.round(s.value)));
+  const masStats = {};
+  const fetchMasStats = (puuid, agentId) => {
+    const k = `${puuid}:${agentId}`;
+    if (k in masStats) return;
+    masStats[k] = undefined;
+    api(`/api/accounts/${encodeURIComponent(puuid)}/bloomline/${encodeURIComponent(agentId)}`, { timeoutMs: 30000 })
+      .then((res) => { masStats[k] = res && res.stats ? res.stats : null; })
+      .catch(() => { masStats[k] = null; })
+      .finally(() => {
+        if (S.route.name === "account" && S.route.puuid === puuid && S.route.tab === "mastery" && masSel === agentId) renderPanel();
+      });
+  };
+
+  function masEquippedEl(ag, stats) {
+    const key = masKey(ag.name);
+    const eq = ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
+    const tile = (label, name, file, cls) => h("div", { class: `mas-eq ${cls || ""}` },
+      h("small", { text: label }),
+      file ? h("span", { class: "mas-eq-img" }, h("img", { src: wikiImg(file), alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.parentNode.remove() })) : null,
+      h("b", { text: name }));
+    const slots = stats === undefined
+      ? [0, 1, 2].map(() => h("div", { class: "mas-stat" }, h("span", { class: "sk sk-line w60" }), h("span", { class: "sk sk-line w40", style: "height:22px" })))
+      : (stats || []).map((st) => h("div", { class: "mas-stat" }, h("small", { text: MAS_STATS[st.key] || st.key }), h("b", { text: masStatValue(st) })));
+    return h("div", { class: "mas-block" },
+      h("h4", { text: "Equipped" }),
+      h("p", { text: "What this agent currently shows on its card." }),
+      h("div", { class: "mas-eqs" },
+        tile("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} frame`, `Level_${MAS_ROMAN[eq.frame] || "I"}_Frame`, "is-wide"),
+        tile("Background", MAS_BG_NAME[eq.background] || "Standard background", `${MAS_BG_FILE[eq.background] || "Standard_Background"}_${key}`),
+        tile("Pose", eq.pose === "HighTier" ? "Mastery I pose" : "Standard pose", eq.pose === "HighTier" ? `Mastery_I_Pose_${key}` : null, eq.pose === "HighTier" ? "is-tall" : ""),
+        tile("Quote", eq.quote ? `Quote ${String(eq.quote).replace(/\D/g, "") || ""}`.trim() : "None", null)),
+      h("div", { class: "mas-stats" }, ...(slots.length ? slots : [h("span", { class: "mas-stats-none", text: "No stats picked for this agent" })])));
+  }
+
+  function masStageEl(ag, actEnd, stats) {
     const lvl = masLevel(ag.points);
     const accent = masAccent(ag.colors);
     const cols = ag.colors && ag.colors.length ? ag.colors : ["#33406b", "#0e1428"];
@@ -2631,6 +2675,7 @@
           h("small", { text: "Lifetime level" }),
           h("b", { text: String(ag.lifetime) }),
           h("span", { text: `Previous act ${ag.previous} · this act ${lvl}` }))),
+      masEquippedEl(ag, stats),
       h("div", { class: "mas-block" },
         h("h4", { text: "Lifetime level" }),
         h("p", { text: "Every act level ever earned on this agent. It never resets and opens the rewards below." }),
@@ -2676,7 +2721,8 @@
     const draw = () => {
       const ag = agents.find((x) => x.id === masSel) || agents[0];
       const scroll = window.scrollY;
-      wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd));
+      wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd, masStats[`${a.puuid}:${ag.id}`]));
+      fetchMasStats(a.puuid, ag.id);
       window.scrollTo({ top: scroll, behavior: "instant" });
     };
     draw();

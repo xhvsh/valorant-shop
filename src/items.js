@@ -1008,7 +1008,7 @@ async function battlepassMeta() {
 // ---- Agent roster (Bloomline tab) ----------------------------------------------
 // The playable agents with the art the mastery page draws: portraits, role and the colours
 // of the agent's own background. Same for everyone, so it is kept for a day.
-const AGENTS_KEY = 'catalog:agents:v1';
+const AGENTS_KEY = 'catalog:agents:v2';
 const AGENTS_TTL = 24 * 60 * 60 * 1000;
 let agentsMemo = null;
 
@@ -1024,6 +1024,7 @@ async function agentRoster() {
     const list = (json.data || []).map((a) => ({
       id: String(a.uuid).toLowerCase(),
       name: a.displayName,
+      dev: a.developerName,
       role: a.role ? { name: a.role.displayName, icon: a.role.displayIcon } : null,
       icon: a.displayIcon,
       portrait: a.fullPortrait || a.bustPortrait || null,

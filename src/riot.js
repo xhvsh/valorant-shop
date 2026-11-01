@@ -498,6 +498,10 @@ async function bloomline(shard, puuid, tokens) {
   return pdFetch(`https://pd.${shard}.a.pvp.net/bloomline/v0/players/${puuid}`, tokens);
 }
 
+async function bloomlineAgent(shard, puuid, agentId, tokens) {
+  return pdFetch(`https://pd.${shard}.a.pvp.net/bloomline/v0/players/${puuid}/bonsai/${agentId}`, tokens);
+}
+
 async function accountEntitlements(shard, puuid, tokens) {
   return pdFetch(PD_URLS.entitlements(shard, puuid), tokens);
 }
@@ -839,6 +843,7 @@ module.exports = {
   accountXp,
   contracts,
   bloomline,
+  bloomlineAgent,
   accountEntitlements,
   playerLoadout,
   accountEntitlementsOfType,

@@ -726,8 +726,28 @@ app.get('/api/accounts/:puuid/bloomline', requireDiscord, async (req, res, next)
     }
     const [roster, pass] = await Promise.all([items.agentRoster(), items.battlepass().catch(() => null)]);
     const mine = new Map(result.agents.map((a) => [a.id, a]));
-    const agents = roster.map((r) => ({ ...r, ...(mine.get(r.id) || { points: 0, level: 0, previous: 0, lifetime: 0 }) }));
+    const agents = roster.map((r) => ({ ...r, ...(mine.get(r.id) || { points: 0, level: 0, previous: 0, lifetime: 0, equipped: { background: 'Default', frame: 1, pose: 'Default', quote: null } }) }));
     res.json({ ok: true, status: 'ok', cached: Boolean(result.cached), agents, actEnd: pass && pass.act ? pass.act.end : null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// The stats one agent shows on its mastery card (asked for when the agent is opened).
+app.get('/api/accounts/:puuid/bloomline/:agent', requireDiscord, async (req, res, next) => {
+  try {
+    const discordId = req.session.discordId;
+    rateLimit(`${discordId}:bloomline-agent`, 60, 60000);
+    const puuid = String(req.params.puuid || '');
+    const agent = String(req.params.agent || '');
+    if (!/^[0-9a-f-]{36}$/i.test(agent)) throw httpError('Unknown agent.', 404);
+    const access = await accountAccessFor(discordId, puuid);
+    if (!access) throw httpError('Unknown account.', 404);
+    const result = await shop.accountBloomlineStats(access.ownerId, puuid, agent);
+    if (result.status === 'unlinked') throw httpError('Unknown account.', 404);
+    if (result.status === 'relink') return res.json({ ok: true, status: 'relink' });
+    if (result.status === 'error') return res.json({ ok: false, status: 'error', error: result.error || 'Could not load the agent stats.' });
+    res.json({ ok: true, status: 'ok', stats: result.stats });
   } catch (err) {
     next(err);
   }
