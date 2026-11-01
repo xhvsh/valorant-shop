@@ -2730,7 +2730,8 @@ div.mas-pick.sk { height: 48px; cursor: default; }
 .mas-tile.is-owned { border-color: rgba(70, 211, 154, .4); }
 .mas-title-plate { max-width: 100%; overflow: hidden; padding: 5px 10px; border: 1px solid rgba(235, 238, 248, .35); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02)); color: #fff; font: 600 13px/1.1 var(--font-head); letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .mas-tile.is-big .mas-title-plate { font-size: 16px; padding: 7px 14px; }
-.mas-quote { display: grid; justify-items: center; gap: 6px; max-width: 100%; }
+.mas-quote { display: grid; justify-items: center; gap: 6px; width: 100%; max-width: 100%; }
+.mas-tile .mas-quote .mas-glyph { width: 30px; }
 .mas-quote q { display: none; max-width: 100%; color: #fff; font: 600 13px/1.25 var(--font-head); letter-spacing: .04em; text-align: center; text-transform: uppercase; }
 .mas-tile:not(.is-big) .mas-quote { grid-auto-flow: column; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .mas-tile:not(.is-big) .mas-quote .mas-glyph { flex: none; width: 24px; }
