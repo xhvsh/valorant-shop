@@ -2492,7 +2492,7 @@
   for (let i = 0; i < 30; i++) MASTERY_CUM.push(MASTERY_CUM[i] + (MASTERY_STEPS[i] || 715000));
   const MASTERY_UPGRADES = { 1: "Level indicator", 4: "Level indicator upgrade", 7: "Background upgrade", 10: "Background animation" };
   const WIKI_IMG = "https://wiki.playvalorant.com/en-us/images/thumb/";
-  const wikiImg = (file) => `${WIKI_IMG}${file}.png/200px-${file}.png`;
+  const wikiImg = (file, w = 200) => `${WIKI_IMG}${file}.png/${w}px-${file}.png`;
   const masKey = (name) => String(name).replace(/[^A-Za-z0-9]/g, "");
 
   // What each lifetime level opens up in the agent's store. `img` names the wiki picture.
@@ -2617,28 +2617,50 @@
       });
   };
 
-  function masEquippedEl(ag, stats) {
+  // The agent ID board as the game draws it: the equipped background, the agent in its pose,
+  // the level frame over them, the player and agent name bottom left, and the three stat slots
+  // on the right (the Valorant mark where a slot is empty).
+  function masBoardEl(ag, stats, acct, lvl) {
     const key = masKey(ag.name);
     const eq = ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
-    const tile = (label, name, file, cls) => h("div", { class: `mas-eq ${cls || ""}` },
-      h("small", { text: label }),
-      file ? h("span", { class: "mas-eq-img" }, h("img", { src: wikiImg(file), alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.parentNode.remove() })) : null,
-      h("b", { text: name }));
-    const slots = stats === undefined
-      ? [0, 1, 2].map(() => h("div", { class: "mas-stat" }, h("span", { class: "sk sk-line w60" }), h("span", { class: "sk sk-line w40", style: "height:22px" })))
-      : (stats || []).map((st) => h("div", { class: "mas-stat" }, h("small", { text: MAS_STATS[st.key] || st.key }), h("b", { text: masStatValue(st) })));
-    return h("div", { class: "mas-block" },
-      h("h4", { text: "Equipped" }),
-      h("p", { text: "What this agent currently shows on its card." }),
-      h("div", { class: "mas-eqs" },
-        tile("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} frame`, `Level_${MAS_ROMAN[eq.frame] || "I"}_Frame`, "is-wide"),
-        tile("Background", MAS_BG_NAME[eq.background] || "Standard background", `${MAS_BG_FILE[eq.background] || "Standard_Background"}_${key}`),
-        tile("Pose", eq.pose === "HighTier" ? "Mastery I pose" : "Standard pose", eq.pose === "HighTier" ? `Mastery_I_Pose_${key}` : null, eq.pose === "HighTier" ? "is-tall" : ""),
-        tile("Quote", eq.quote ? `Quote ${String(eq.quote).replace(/\D/g, "") || ""}`.trim() : "None", null)),
-      h("div", { class: "mas-stats" }, ...(slots.length ? slots : [h("span", { class: "mas-stats-none", text: "No stats picked for this agent" })])));
+    const roman = MAS_ROMAN[eq.frame] || "I";
+    const img = (src, cls) => h("img", { class: cls, src, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.remove() });
+    const pose = eq.pose === "HighTier" ? wikiImg(`Mastery_I_Pose_${key}`, 800) : ag.portrait;
+    const name = String(acct && acctName(acct) || "").replace(/#.*$/, "");
+    const slots = [0, 1, 2].map((i) => {
+      const st = stats && stats[i];
+      if (stats === undefined) return h("div", { class: "mas-slot sk" });
+      return st
+        ? h("div", { class: "mas-slot has-stat" }, h("b", { text: masStatValue(st) }), h("small", { text: MAS_STATS[st.key] || st.key }))
+        : h("div", { class: "mas-slot" }, h("i", { class: "mas-vmark", "aria-hidden": "true" }));
+    });
+    return h("div", { class: "mas-board" },
+      img(wikiImg(`${MAS_BG_FILE[eq.background] || "Standard_Background"}_${key}`, 800), "mas-board-bg"),
+      pose ? img(pose, "mas-board-pose") : null,
+      h("div", { class: "mas-board-card" },
+        h("span", { class: "mas-board-face" }, ag.icon ? makeImg(ag.icon, "") : null),
+        h("span", { class: "mas-board-who" }, name ? h("small", { text: name }) : null,
+          h("span", { class: "mas-board-agent" }, h("em", { class: "mas-diamond" }, h("b", { text: String(lvl) })), h("strong", { text: ag.name })))),
+      h("div", { class: "mas-slots" }, ...slots),
+      img(wikiImg(`Level_${roman}_Frame`, 452), "mas-board-frame"));
   }
 
-  function masStageEl(ag, actEnd, stats) {
+  function masEquippedEl(ag, stats, acct, lvl) {
+    const eq = ag.equipped || { background: "Default", frame: 1, pose: "Default", quote: null };
+    const chip = (label, name) => h("div", { class: "mas-eq" }, h("small", { text: label }), h("b", { text: name }));
+    return h("div", { class: "mas-block" },
+      h("h4", { text: "Equipped" }),
+      h("p", { text: "This agent's card as it shows in the game, with the frame, background, pose and stats it has equipped." }),
+      masBoardEl(ag, stats, acct, lvl),
+      h("div", { class: "mas-eqs" },
+        chip("Frame", `Level ${MAS_ROMAN[eq.frame] || "I"} frame`),
+        chip("Background", MAS_BG_NAME[eq.background] || "Standard background"),
+        chip("Pose", eq.pose === "HighTier" ? "Mastery I pose" : "Standard pose"),
+        chip("Quote", eq.quote ? `Quote ${String(eq.quote).replace(/\D/g, "") || ""}`.trim() : "None")),
+      stats && !stats.length ? h("p", { class: "mas-stats-none", text: "No stats picked for this agent." }) : null);
+  }
+
+  function masStageEl(ag, actEnd, stats, acct) {
     const lvl = masLevel(ag.points);
     const accent = masAccent(ag.colors);
     const cols = ag.colors && ag.colors.length ? ag.colors : ["#33406b", "#0e1428"];
@@ -2675,7 +2697,7 @@
           h("small", { text: "Lifetime level" }),
           h("b", { text: String(ag.lifetime) }),
           h("span", { text: `Previous act ${ag.previous} · this act ${lvl}` }))),
-      masEquippedEl(ag, stats),
+      masEquippedEl(ag, stats, acct, lvl),
       h("div", { class: "mas-block" },
         h("h4", { text: "Lifetime level" }),
         h("p", { text: "Every act level ever earned on this agent. It never resets and opens the rewards below." }),
@@ -2721,7 +2743,7 @@
     const draw = () => {
       const ag = agents.find((x) => x.id === masSel) || agents[0];
       const scroll = window.scrollY;
-      wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd, masStats[`${a.puuid}:${ag.id}`]));
+      wrap.replaceChildren(masRosterEl(agents, (id) => { masSel = id; draw(); }), masStageEl(ag, st.data.actEnd, masStats[`${a.puuid}:${ag.id}`], a));
       fetchMasStats(a.puuid, ag.id);
       window.scrollTo({ top: scroll, behavior: "instant" });
     };

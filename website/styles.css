@@ -2652,18 +2652,31 @@ div.mas-pick.sk { height: 48px; cursor: default; }
   .mas-rewards { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* what the agent has equipped */
-.mas-eqs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.mas-eq { display: grid; align-content: start; gap: 6px; padding: 10px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
+/* what the agent has equipped: the board as the game draws it, then the names */
+.mas-board { position: relative; aspect-ratio: 2.35 / 1; width: 100%; max-width: 760px; overflow: hidden; border-radius: 10px; background: #0b0f20; isolation: isolate; }
+.mas-board > img { position: absolute; }
+.mas-board-bg { inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.mas-board-pose { left: 31%; bottom: -3%; height: 118%; width: 40%; object-fit: contain; object-position: center bottom; z-index: 1; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .55)); }
+.mas-board-frame { inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 4; pointer-events: none; }
+.mas-board-card { position: absolute; left: 5.5%; bottom: 15%; z-index: 3; display: grid; gap: 6px; max-width: 34%; }
+.mas-board-face { width: clamp(34px, 7.5cqw, 58px); width: 58px; height: 58px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .5); background: #1a2036; }
+.mas-board-face img { width: 100%; height: 100%; object-fit: cover; }
+.mas-board-who { display: grid; gap: 4px; min-width: 0; }
+.mas-board-who small { overflow: hidden; color: rgba(255, 255, 255, .8); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mas-board-agent { display: flex; align-items: center; gap: 8px; }
+.mas-board-agent strong { color: #fff; font: 700 clamp(22px, 3.4vw, 34px)/1 var(--font-head); letter-spacing: .02em; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0, 0, 0, .6); }
+.mas-diamond { display: grid; place-items: center; flex: none; width: 24px; height: 24px; transform: rotate(45deg); border: 2px solid #fff; background: var(--a); }
+.mas-diamond b { transform: rotate(-45deg); color: #0b0f20; font: 700 12px/1 var(--font-head); }
+.mas-slots { position: absolute; right: 5%; top: 15%; bottom: 15%; z-index: 3; display: grid; gap: 6%; width: 19%; }
+.mas-slot { position: relative; display: grid; place-items: center; align-content: center; gap: 2px; min-height: 0; border: 1px solid rgba(255, 255, 255, .18); background: rgba(8, 10, 22, .72); backdrop-filter: blur(2px); clip-path: polygon(8% 0, 100% 0, 100% 100%, 0 100%, 0 12%); text-align: center; }
+.mas-slot.has-stat b { color: #fff; font: 700 clamp(15px, 2.4vw, 24px)/1 var(--font-head); font-variant-numeric: tabular-nums; }
+.mas-slot.has-stat small { color: rgba(255, 255, 255, .7); font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.mas-vmark { width: 38%; aspect-ratio: 1; background: rgba(255, 255, 255, .85); clip-path: polygon(0 12%, 28% 12%, 100% 100%, 100% 88%, 52% 12%, 100% 12%, 100% 0, 0 0); transform: scaleX(1); opacity: .75; }
+.mas-slot.sk { background: var(--surface-3); }
+.mas-eqs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.mas-eq { display: grid; align-content: start; gap: 4px; padding: 10px 12px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
 .mas-eq small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .mas-eq b { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
-.mas-eq-img { display: grid; place-items: center; overflow: hidden; background: rgba(0, 0, 0, .3); }
-.mas-eq-img img { display: block; width: 100%; height: auto; max-height: 110px; object-fit: contain; }
-.mas-eq.is-wide .mas-eq-img { padding: 6px; }
-.mas-eq.is-tall .mas-eq-img img { max-height: 140px; }
-.mas-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-.mas-stat { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid rgba(160, 175, 230, .18); background: rgba(8, 12, 28, .6); }
-.mas-stat small { color: var(--text-3); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
-.mas-stat b { color: var(--a); font: 600 24px/1 var(--font-head); font-variant-numeric: tabular-nums; }
-.mas-stats-none { grid-column: 1 / -1; color: var(--text-3); font-size: 12px; }
+.mas-stats-none { margin: 8px 0 0; color: var(--text-3); font-size: 12px; }
 @media (max-width: 900px) { .mas-eqs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .mas-board-agent strong { font-size: 18px; } .mas-board-face { width: 40px; height: 40px; } }
