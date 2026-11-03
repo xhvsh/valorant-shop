@@ -523,6 +523,14 @@ html { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
     radial-gradient(700px 500px at 110% 110%, rgba(255, 70, 85, .07), transparent 60%),
     var(--bg);
 }
+.landing-info { width: min(520px, 100%); color: var(--text-2); font-size: 13.5px; line-height: 1.6; }
+.landing-info h2 { margin: 18px 0 8px; color: var(--text); font-size: 15px; letter-spacing: .02em; }
+.landing-info h2:first-child { margin-top: 0; }
+.landing-info p { margin: 0 0 8px; }
+.landing-info dt { margin-top: 10px; color: var(--text); font-weight: 600; }
+.landing-info dd { margin: 2px 0 0; }
+.landing-info a { color: var(--red-2); }
+.landing-by { margin-top: 14px; color: var(--text-3); font-size: 12.5px; }
 .landing-card {
   width: min(520px, 100%);
   padding: clamp(24px, 5vw, 40px);

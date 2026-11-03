@@ -53,6 +53,7 @@ const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY || '';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
 // The public home for this app is xhv.sh/valorant-shop. Direct browser hits on
@@ -208,6 +209,9 @@ function renderIndexHtml(mountPath) {
 // Dashboard routes are real paths (history API), so each one returns the shell.
 app.get(['/', '/index.html', '/wishlist', '/bundles', '/battlepass', '/settings', '/a/:puuid', '/a/:puuid/:tab'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store, must-revalidate');
+  // Only the signed-out landing at the root is meant to be indexed; the other
+  // routes serve the same shell for signed-in users.
+  if (req.path !== '/') res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   res.type('html').send(renderIndexHtml(res.locals.mountPath || ''));
 });
 // Loadout share page. Its asset links are relative, so it works at / and under the mount.

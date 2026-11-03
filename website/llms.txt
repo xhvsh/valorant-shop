@@ -1,0 +1,7 @@
+# valorant shop
+
+> Free, open-source dashboard and Discord bot that shows the daily VALORANT shop, accessory shop and Night Market for every linked Riot account, with wishlist alerts by Discord DM. Unofficial fan project, not affiliated with Riot Games.
+
+- [Home](https://xhv.sh/valorant-shop/): overview, how it works and FAQ
+- [Disclaimer and how it works](https://xhv.sh/valorant-shop/legal): what data is stored and how sign-in works
+- [Author](https://xhv.sh/): xhvsh

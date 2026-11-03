@@ -12,8 +12,12 @@
   <meta property="og:title" content="VALORANT Shop Checker: Daily Store, Night Market &amp; Wishlist Alerts" />
   <meta property="og:description" content="Every shop for every linked account, wishlist alerts by Discord DM. Free and open source." />
   <meta property="og:url" content="https://xhv.sh/valorant-shop/" />
-  <meta property="og:image" content="https://xhv.sh/valorant-shop/logo.png" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://xhv.sh/valorant-shop/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="valorant shop: your VALORANT shops, all in one place" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://xhv.sh/valorant-shop/og.png" />
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"valorant shop","url":"https://xhv.sh/valorant-shop/","applicationCategory":"GameApplication","operatingSystem":"Any","description":"Check the daily shop, accessories and Night Market for every VALORANT account you own, track a wishlist and get Discord DMs.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"xhvsh","url":"https://xhv.sh/"}}</script>
   <noscript><style>#splash{display:none}#landing[hidden]{display:block}</style></noscript>
   <link rel="icon" type="image/png" href="/logo.png" />
@@ -21,7 +25,7 @@
   <link rel="preload" as="font" type="font/woff2" href="/fonts/oswald-600-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-400-latin.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-600-latin.woff2" crossorigin />
-  <link rel="stylesheet" href="/styles.css?v=296" />
+  <link rel="stylesheet" href="/styles.css?v=297" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" width="0" height="0">
@@ -88,6 +92,22 @@
       <p class="landing-foot">Also on Discord: <a id="installLink" href="#" target="_blank" rel="noopener">add the app</a> for slash commands, or <a id="guildInstallLink" href="#" target="_blank" rel="noopener">add it to a server</a>.</p>
       <p class="landing-foot landing-kofi">Free and open source. <a href="https://ko-fi.com/xhvsh" target="_blank" rel="noopener">Support it on Ko-fi</a> if you like it.</p>
     </div>
+    <section class="landing-info" aria-labelledby="howTitle">
+      <h2 id="howTitle">How valorant shop works</h2>
+      <p>valorant shop shows the VALORANT item store for every Riot account you link: the daily skin shop, the accessory shop and the Night Market when it is live. The daily shop resets every 24 hours and the accessory shop every two weeks, so a wishlist saves you checking by hand. Add the skins you want and the bot sends you a Discord DM the moment one appears in a linked account's shop.</p>
+      <h2>Frequently asked questions</h2>
+      <dl>
+        <dt>How do I link a Riot account?</dt>
+        <dd>Sign in with Discord, choose Add account, sign in at Riot in a new tab, then paste the address of the page that fails to load. It takes about a minute.</dd>
+        <dt>Is it safe?</dt>
+        <dd>Your Riot password never reaches valorant shop. Only an encrypted sign-in token is stored so your shops can load, and you can remove an account at any time. The project is free and open source.</dd>
+        <dt>Can I link more than one account?</dt>
+        <dd>Yes. Every account you link gets its own shop, and you can share an account with friends as read-only.</dd>
+        <dt>Is it official?</dt>
+        <dd>No. It is an unofficial fan project and is not affiliated with Riot Games. Read the <a href="/legal">disclaimer and how it works</a>.</dd>
+      </dl>
+      <p class="landing-by">Built by <a href="https://xhv.sh/">xhvsh</a>.</p>
+    </section>
     <p class="legal">Unofficial fan project. Not affiliated with Riot Games. <a href="/legal">Disclaimer and how it works</a></p>
   </div>
 
@@ -312,6 +332,6 @@
     <button class="btn sm" id="updateBtn" type="button">Reload</button>
   </div>
 
-  <script src="/dashboard.js?v=296"></script>
+  <script src="/dashboard.js?v=297"></script>
 </body>
 </html>
