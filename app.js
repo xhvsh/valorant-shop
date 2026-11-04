@@ -2656,7 +2656,10 @@ function staleRotation(store) {
 
 async function waitForRotation(result, discordId, puuid, until) {
   let r = result;
-  while (r && r.status === 'ok' && staleRotation(r.store) && Date.now() + ROTATION_POLL_MS < until) {
+  // An 'error' result (Riot 5xx or timeout) is retried like a stale rotation;
+  // otherwise one bad gateway at midnight pushes the DM to the 00:08 catch-up.
+  const retryable = (x) => x && ((x.status === 'ok' && staleRotation(x.store)) || x.status === 'error');
+  while (retryable(r) && Date.now() + ROTATION_POLL_MS < until) {
     await new Promise((resolve) => setTimeout(resolve, ROTATION_POLL_MS));
     r = await shop.getShop(discordId, puuid, { force: true }).catch(() => r);
   }
