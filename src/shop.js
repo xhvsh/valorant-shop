@@ -3,7 +3,6 @@
 const riot = require('./riot');
 const storage = require('./storage');
 const items = require('./items');
-const overrides = require('./overrides');
 const { buildStoreResponse } = require('./parse');
 
 const STORE_TTL = 45 * 60 * 1000;
@@ -367,7 +366,7 @@ async function withOwned(store, discordId, account, getTokens) {
       // The owned marks are a nicety: never let this lookup hold the shop for long.
       const lookup = (async () => {
         const tokens = await getTokens();
-        return overrides.entitlements(account, await riot.accountEntitlements(account.shard || 'na', account.puuid, tokens));
+        return riot.accountEntitlements(account.shard || 'na', account.puuid, tokens);
       })();
       lookup.catch(() => {});
       let timer;
@@ -453,7 +452,7 @@ async function getShop(discordId, puuid, opts = {}) {
   const cached = opts.force ? null : cachedStore(account, await resetAtFor(discordId, account.puuid));
   if (cached) {
     const tCached = Date.now();
-    const fresh = overrides.store(account, await healWallet(discordId, account, await freshStore(cached)));
+    const fresh = await healWallet(discordId, account, await freshStore(cached));
     const tFresh = Date.now();
     const store = opts.owned === false ? fresh : await withOwned(fresh, discordId, account, () => tokensFor(discordId, account));
     console.log(`[time] getShop cached lookup=${tCached - tStart}ms catalog+wallet=${tFresh - tCached}ms owned=${Date.now() - tFresh}ms`);
@@ -523,7 +522,7 @@ async function getShop(discordId, puuid, opts = {}) {
     } catch (e) {
       console.warn(`[shop] cache persist failed for ${discordId}: ${(e && e.message) || e}`);
     }
-    const out = overrides.store(account, items.refreshIcons(store));
+    const out = items.refreshIcons(store);
     return {
       status: 'ok',
       store: opts.owned === false ? out : await withOwned(out, discordId, account, async () => tokens),
@@ -719,7 +718,7 @@ async function accountDetails(discordId, puuid, opts = {}) {
     const [mmrRes, xpRes, entRes, loadoutRes] = await Promise.allSettled([
       want('rank') ? riot.mmr(shard, account.puuid, tokens) : skipped,
       want('rank') ? riot.accountXp(shard, account.puuid, tokens) : skipped,
-      want('collection') ? riot.accountEntitlements(shard, account.puuid, tokens).then((r) => overrides.entitlements(account, r)) : skipped,
+      want('collection') ? riot.accountEntitlements(shard, account.puuid, tokens) : skipped,
       scope === 'full' ? riot.playerLoadout(shard, account.puuid, tokens) : skipped,
     ]);
     const ran = (r) => r.status !== 'fulfilled' || !(r.value && r.value.__skipped);
@@ -888,7 +887,7 @@ async function buildLoadout(raw) {
 async function accountLoadout(discordId, puuid) {
   const account = await storage.getAccount(discordId, puuid);
   if (!account) return { status: 'unlinked' };
-  const cacheKey = `loadout:v3:${discordId}:${account.puuid}`;
+  const cacheKey = `loadout:v2:${discordId}:${account.puuid}`;
   const box = await storage.kvGet(cacheKey).catch(() => null);
   if (box && box.loadout && box.at && Date.now() - box.at < LOADOUT_TTL) {
     return { status: 'ok', loadout: box.loadout, cached: true, account };
@@ -904,7 +903,7 @@ async function accountLoadout(discordId, puuid) {
     const entitlement = await entitlementFor(token.access_token);
     const tokens = { ...token, entitlement };
     await items.load().catch(() => {});
-    const raw = overrides.loadout(account, await riot.playerLoadout(account.shard || 'na', account.puuid, tokens));
+    const raw = await riot.playerLoadout(account.shard || 'na', account.puuid, tokens);
     const loadout = await buildLoadout(raw);
     await storage.kvSet(cacheKey, { at: Date.now(), loadout }, LOADOUT_TTL).catch(() => {});
     return { status: 'ok', loadout, account };
@@ -938,7 +937,7 @@ async function accountTokens(discordId, puuid) {
 // Forget the cached loadout and collection after the loadout was changed.
 async function dropLoadoutCaches(discordId, puuid) {
   await Promise.all([
-    storage.kvDel(`loadout:v3:${discordId}:${puuid}`),
+    storage.kvDel(`loadout:v2:${discordId}:${puuid}`),
     storage.kvDel(`acctdetails:v12:${discordId}:${puuid}`),
   ]).catch(() => {});
 }
