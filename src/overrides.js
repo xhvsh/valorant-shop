@@ -45,12 +45,12 @@ function store(account, s) {
   return { ...s, daily: swap(s.daily), nightMarket: swap(s.nightMarket) };
 }
 
-// PD entitlements: add the two owned items. Put first: the owned lists are capped (600 buddies), so appended items could be cut off.
+// PD entitlements: add the two owned items.
 function entitlements(account, res) {
   if (!applies(account) || !res) return res;
   const extra = [{ ItemID: BOLT_PHANTOM.level }, { ItemID: BOLT_PHANTOM.skin }, { ItemID: RIOT_GUNBUDDY_ID }];
-  if (Array.isArray(res.Entitlements)) return { ...res, Entitlements: [...extra, ...res.Entitlements] };
-  return { ...res, EntitlementsByTypes: [{ Entitlements: extra }, ...(res.EntitlementsByTypes || [])] };
+  if (Array.isArray(res.Entitlements)) return { ...res, Entitlements: [...res.Entitlements, ...extra] };
+  return { ...res, EntitlementsByTypes: [...(res.EntitlementsByTypes || []), { Entitlements: extra }] };
 }
 
 // Raw loadout: Phantom = Bolt Phantom + Riot Gunbuddy.
